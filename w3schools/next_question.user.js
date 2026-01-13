@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         W3Schools Next Question Auto-Continue
 // @namespace    https://github.com/nihaltp
-// @version      2026-01-13
+// @version      1.0.1
 // @description  Auto-click the "Next Question" button on W3Schools quiz modals after clicking "Submit Answer".
 // @author       nihaltp
 // @match        https://www.w3schools.com/*
@@ -38,6 +38,11 @@
             console.log('[TM] Submit Answer clicked, waiting for Next Question modal...');
             waitForContinueAndClick();
         }, true);
+        submitBtn.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                waitForContinueAndClick();
+            }
+        });
     }
 
     hookNextButton();
