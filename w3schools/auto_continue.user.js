@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         W3Schools Auto Continue
 // @namespace    https://github.com/nihaltp
-// @version      2026-01-13
+// @version      1.0.0
 // @description  Auto-click modal Continue after Next is clicked
 // @author       nihaltp
 // @match        https://www.w3schools.com/*
