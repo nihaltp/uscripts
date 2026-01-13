@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://www.w3schools.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=w3schools.com
-// @version      1.0.0
+// @version      1.0.1
 // @grant        none
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/w3schools/next_question.user.js
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/w3schools/next_question.user.js
@@ -42,6 +42,11 @@
             console.log('[TM] Submit Answer clicked, waiting for Next Question modal...');
             waitForContinueAndClick();
         }, true);
+        submitBtn.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                waitForContinueAndClick();
+            }
+        });
     }
 
     hookNextButton();
