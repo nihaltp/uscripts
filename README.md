@@ -9,3 +9,5 @@
 ## Pixabay
 
 [Hide AI Images in Pixabay](https://raw.githubusercontent.com/nihaltp/uscripts/main/pixabay/hide_ai.user.js)
+
+[Pixabay Navigation using Arrow Keys](https://raw.githubusercontent.com/nihaltp/uscripts/main/pixabay/page_navigation.user.js)
