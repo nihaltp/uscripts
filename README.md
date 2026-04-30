@@ -14,4 +14,8 @@
 
 ## YouTube
 
-[Persistant Playback Speed](https://raw.githubusercontent.com/nihaltp/uscripts/main/yt/playback_speed.user.js)
+[Persistant Playback Speed](https://raw.githubusercontent.com/nihaltp/uscripts/main/yt/playback_speed.user.js) - Remember your preferred playback speed on YouTube and apply it to all videos. updates the speed in real-time as you change it.
+
+## 10FastFingers
+
+[Retest on Enter](https://raw.githubusercontent.com/nihaltp/uscripts/main/10fastfingers/enter_retest.user.js) - Press reset button when enter key is pressed
