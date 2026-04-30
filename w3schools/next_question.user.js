@@ -8,7 +8,7 @@
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT
 // @match        https://www.w3schools.com/*
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=w3schools.com
+// @icon         https://w3schools.com/favicon.ico
 // @version      1.0.1
 // @grant        none
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/w3schools/next_question.user.js

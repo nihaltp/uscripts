@@ -8,7 +8,7 @@
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT
 // @match        https://10fastfingers.com/*
-// @icon         https://www.google.com/s2/favicon?sz=64&domain=10fastfingers.com
+// @icon         https://10fastfingers.com/favicons/favicon.ico
 // @version      1.0.0
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/10fastfingers/enter_retest.user.js

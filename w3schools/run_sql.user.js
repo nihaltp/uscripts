@@ -8,7 +8,7 @@
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT
 // @match        https://www.w3schools.com/sql/try*.asp*
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=w3schools.com
+// @icon         https://w3schools.com/favicon.ico
 // @version      1.0.0
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/w3schools/run_sql.user.js

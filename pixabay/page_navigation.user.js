@@ -8,7 +8,7 @@
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT
 // @match        https://pixabay.com/*
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=pixabay.com
+// @icon         https://pixabay.com/favicon.ico
 // @version      1.0.0
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/pixabay/page_navigation.user.js
