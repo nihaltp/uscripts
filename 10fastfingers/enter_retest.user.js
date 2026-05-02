@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://10fastfingers.com/*
 // @icon         https://10fastfingers.com/favicons/favicon.ico
-// @version      1.0.0
+// @version      1.0.1
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/10fastfingers/enter_retest.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/10fastfingers/enter_retest.user.js
@@ -24,25 +24,15 @@
   }
 
   function findReloadButton() {
-    const btns = document.querySelectorAll('button[data-testid="TypingBox-reload"]');
-    for (const btn of btns) {
-      let insideTextPractice = false;
-      let el = btn.parentElement;
-      while (el) {
-        if (el.tagName === 'DIV' && el.getAttribute('data-testid') === 'TextPractice-root') {
-          insideTextPractice = true;
-          break;
-        }
-        el = el.parentElement;
-      }
-      if (!insideTextPractice) {
-        reloadBtn = btn;
-        log("Found reload button");
-        return;
-      }
+    // Removed check for "TypingBox-reload" in the DOM since typing tests doesn't need enter key while typing.
+    const btn = document.querySelector('button[data-testid="TypingBox-reload"]');
+    if (btn) {
+      reloadBtn = btn;
+      log("Found reload button");
+    } else {
+      reloadBtn = null;
+      log("Reload button not found");
     }
-    reloadBtn = null;
-    log("Reload button not found");
   }
 
   // Listen for Enter key
