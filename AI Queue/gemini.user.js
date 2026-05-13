@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      1.0.2
+// @version      1.0.3
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/gemini.user.js
@@ -322,6 +322,7 @@
       input.value = '';
 
       renderQueue();
+      saveQueue();
     });
 
     startBtn.addEventListener('click', async () => {
@@ -521,6 +522,7 @@
     queue.splice(index, 1);
 
     renderQueue();
+    saveQueue();
   }
 
   // MARK: deleteFailedItem
@@ -534,6 +536,7 @@
 
     failedQueue.splice(index, 1);
     renderQueue();
+    saveQueue();
   }
 
   // MARK: retryFailedItem
@@ -552,6 +555,7 @@
     queue.push(item);
 
     renderQueue();
+    saveQueue();
   }
 
   // MARK: editQueueItem
@@ -590,6 +594,7 @@
     queue.splice(toIndex, 0, movedItem);
 
     renderQueue();
+    saveQueue();
   }
 
   // MARK: setStatus
@@ -1087,6 +1092,38 @@
     }
   }
 
+  // MARK: storage persistence
+  function saveQueue() {
+    try {
+      const data = {
+        queue: queue,
+        failedQueue: failedQueue,
+      };
+      localStorage.setItem('pq-queue-state', JSON.stringify(data));
+      log('queue saved to storage');
+    } catch (err) {
+      error('Failed to save queue:', err);
+    }
+  }
+
+  function loadQueue() {
+    try {
+      const stored = localStorage.getItem('pq-queue-state');
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (Array.isArray(data.queue)) {
+          queue.push(...data.queue);
+        }
+        if (Array.isArray(data.failedQueue)) {
+          failedQueue.push(...data.failedQueue);
+        }
+        log('queue loaded from storage', queue.length, 'items');
+      }
+    } catch (err) {
+      error('Failed to load queue:', err);
+    }
+  }
+
   // MARK: getToolbarHost
   function getToolbarHost() {
     const editor = getComposerEditor();
@@ -1381,7 +1418,9 @@
 
   // MARK: init
   function init() {
+    loadQueue();
     createPanel();
+    renderQueue();
     repairUi('init');
     startDomObserver();
     startUrlWatcher();
