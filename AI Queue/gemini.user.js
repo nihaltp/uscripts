@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      1.0.3
+// @version      1.0.4
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/gemini.user.js
@@ -284,7 +284,7 @@
     window.pqInput = input;
     window.pqAddBtn = addBtn;
 
-    addBtn.addEventListener('click', () => {
+    const handleAddClick = () => {
       const text = input.value.trim();
 
       if (!text) {
@@ -323,6 +323,15 @@
 
       renderQueue();
       saveQueue();
+    };
+
+    addBtn.addEventListener('click', handleAddClick);
+
+    input.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleAddClick();
+      }
     });
 
     startBtn.addEventListener('click', async () => {
