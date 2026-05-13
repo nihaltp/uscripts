@@ -10,7 +10,7 @@
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      2.0.0
+// @version      2.0.1
 // @grant        none
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/logging.js
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/utils.js
@@ -49,6 +49,7 @@
     const input = window.pqPanel.querySelector('#pq-input');
     const addBtn = window.pqPanel.querySelector('#pq-add');
     const startBtn = window.pqPanel.querySelector('#pq-start');
+    const stopBtn = window.pqPanel.querySelector('#pq-stop');
 
     window.pqInput = input;
     window.pqAddBtn = addBtn;
@@ -94,12 +95,27 @@
       }
     });
 
+    function updateStartStopButtons() {
+      if (!startBtn || !stopBtn) return;
+      startBtn.disabled = window.aiQueue.running;
+      stopBtn.style.display = window.aiQueue.running ? 'block' : 'none';
+    }
+
     startBtn.addEventListener('click', async () => {
       if (window.aiQueue.running) return;
 
       window.aiQueue.running = true;
+      updateStartStopButtons();
       updateToolbarButton(window.pqToolbarButton, window.aiQueue.queue, window.aiQueue.running);
       processChatGPTQueue();
+    });
+
+    stopBtn?.addEventListener('click', () => {
+      if (!window.aiQueue.running) return;
+      window.aiQueue.running = false;
+      setStatus(window.pqPanel, 'Stopped');
+      updateStartStopButtons();
+      updateToolbarButton(window.pqToolbarButton, window.aiQueue.queue, window.aiQueue.running);
     });
   }
 
@@ -107,7 +123,7 @@
   async function processChatGPTQueue() {
     setStatus(window.pqPanel, 'Running');
 
-    while (window.aiQueue.queue.length > 0) {
+    while (window.aiQueue.queue.length > 0 && window.aiQueue.running) {
       await waitForIdle();
 
       const item = window.aiQueue.queue.shift();
@@ -128,8 +144,15 @@
       saveChatGPTQueue();
     }
 
-    setStatus(window.pqPanel, 'Finished');
+    if (!window.aiQueue.running) {
+      setStatus(window.pqPanel, 'Stopped');
+    } else {
+      setStatus(window.pqPanel, 'Finished');
+    }
+
     window.aiQueue.running = false;
+    const stopBtnRef = window.pqPanel?.querySelector('#pq-stop');
+    if (stopBtnRef) stopBtnRef.style.display = 'none';
     updateToolbarButton(window.pqToolbarButton, window.aiQueue.queue, window.aiQueue.running);
   }
 

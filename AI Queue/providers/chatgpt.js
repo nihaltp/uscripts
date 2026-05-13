@@ -68,6 +68,13 @@ function createChatGPTPanel() {
     startBtn.style.width = '100%';
     startBtn.textContent = 'Start Queue';
 
+    const stopBtn = document.createElement('button');
+    stopBtn.id = 'pq-stop';
+    stopBtn.style.marginTop = '10px';
+    stopBtn.style.width = '100%';
+    stopBtn.textContent = 'Stop Queue';
+    stopBtn.style.display = 'none';
+
     const status = document.createElement('div');
     status.id = 'pq-status';
     status.style.marginTop = '10px';
@@ -82,6 +89,7 @@ function createChatGPTPanel() {
     window.pqPanel.appendChild(textarea);
     window.pqPanel.appendChild(addBtn);
     window.pqPanel.appendChild(startBtn);
+    window.pqPanel.appendChild(stopBtn);
     window.pqPanel.appendChild(status);
     window.pqPanel.appendChild(list);
 
