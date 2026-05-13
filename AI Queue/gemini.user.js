@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      1.0.0
+// @version      1.0.1
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/gemini.user.js
@@ -23,7 +23,7 @@
   let running = false;
   let editingId = null;
   let draggedId = null;
-  window.aiQueueDebug = true; // set to true to enable debug logs
+  window.aiQueueDebug = false; // set to true to enable debug logs
 
   // -----------------------------
   // MARK: UI
@@ -858,35 +858,65 @@
     }
 
     if (editor.isContentEditable) {
+      // Prefer replacing the entire editable content to avoid accidental
+      // leading newlines from appending at block boundaries. Select all
+      // content then insert text (execCommand) which replaces the selection.
+      editor.focus?.({ preventScroll: true });
+
       const selection = window.getSelection();
-      const range = document.createRange();
 
-      range.selectNodeContents(editor);
-      range.collapse(false);
+      if (selection) {
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(editor);
 
-      selection?.removeAllRanges();
-      selection?.addRange(range);
+          selection.removeAllRanges();
+          selection.addRange(range);
 
-      editor.dispatchEvent(new InputEvent('beforeinput', {
-        bubbles: true,
-        cancelable: true,
-        inputType: 'insertText',
-        data: prompt,
-      }));
+          editor.dispatchEvent(new InputEvent('beforeinput', {
+            bubbles: true,
+            cancelable: true,
+            inputType: 'insertText',
+            data: prompt,
+          }));
 
-      const inserted = document.execCommand && document.execCommand('insertText', false, prompt);
+          let inserted = false;
 
-      if (!inserted) {
-        editor.textContent = prompt;
+          try {
+            inserted = document.execCommand && document.execCommand('insertText', false, prompt);
+          } catch (e) {
+            inserted = false;
+          }
+
+          if (!inserted) {
+            editor.textContent = prompt;
+          }
+
+          // Move caret to end
+          const endRange = document.createRange();
+          endRange.selectNodeContents(editor);
+          endRange.collapse(false);
+
+          selection.removeAllRanges();
+          selection.addRange(endRange);
+
+          editor.dispatchEvent(new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            inputType: 'insertText',
+            data: prompt,
+          }));
+
+          editor.dispatchEvent(new Event('change', { bubbles: true }));
+          return;
+        } catch (err) {
+          log('setEditorValue(contenteditable) failed, falling back to textContent', err);
+        }
       }
 
-      editor.dispatchEvent(new InputEvent('input', {
-        bubbles: true,
-        cancelable: true,
-        inputType: 'insertText',
-        data: prompt,
-      }));
-
+      // Fallback: directly set textContent
+      editor.textContent = prompt;
+      editor.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: prompt }));
       editor.dispatchEvent(new Event('change', { bubbles: true }));
       return;
     }
