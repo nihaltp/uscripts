@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      1.0.1
+// @version      1.0.2
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/gemini.user.js
@@ -20,6 +20,7 @@
   'use strict';
 
   const queue = [];
+  const failedQueue = [];
   let running = false;
   let editingId = null;
   let draggedId = null;
@@ -244,12 +245,26 @@
       list.style.marginTop = '10px';
       list.style.paddingLeft = '20px';
 
+      const failedTitle = document.createElement('div');
+      failedTitle.id = 'pq-failed-title';
+      failedTitle.style.marginTop = '12px';
+      failedTitle.style.fontSize = '13px';
+      failedTitle.style.opacity = '0.8';
+      failedTitle.textContent = 'Failed Prompts';
+
+      const failedList = document.createElement('ol');
+      failedList.id = 'pq-failed-list';
+      failedList.style.marginTop = '6px';
+      failedList.style.paddingLeft = '20px';
+
       panel.appendChild(title);
       panel.appendChild(textarea);
       panel.appendChild(addBtn);
       panel.appendChild(startBtn);
       panel.appendChild(status);
       panel.appendChild(list);
+      panel.appendChild(failedTitle);
+      panel.appendChild(failedList);
 
       if (document.body) {
         document.body.appendChild(panel);
@@ -322,6 +337,8 @@
   // MARK: renderQueue
   function renderQueue() {
     const list = panel.querySelector('#pq-list');
+    const failedList = panel.querySelector('#pq-failed-list');
+    const failedTitle = panel.querySelector('#pq-failed-title');
 
     while (list.firstChild) {
       list.removeChild(list.firstChild);
@@ -433,6 +450,61 @@
       list.appendChild(li);
     });
 
+    // render failed queue
+    if (failedList) {
+      while (failedList.firstChild) {
+        failedList.removeChild(failedList.firstChild);
+      }
+
+      if (failedQueue.length > 0) {
+        failedTitle.style.display = 'block';
+      } else if (failedTitle) {
+        failedTitle.style.display = 'none';
+      }
+
+      failedQueue.forEach((item) => {
+        const li = document.createElement('li');
+        li.style.marginBottom = '8px';
+
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.gap = '6px';
+        row.style.alignItems = 'flex-start';
+
+        const text = document.createElement('div');
+        text.textContent = item.prompt;
+        text.style.flex = '1';
+        text.style.wordBreak = 'break-word';
+        text.style.fontSize = '13px';
+        text.style.opacity = '0.9';
+
+        const attemptBadge = document.createElement('div');
+        attemptBadge.textContent = `Attempts: ${item.attempts || 0}`;
+        attemptBadge.style.opacity = '0.7';
+        attemptBadge.style.fontSize = '12px';
+
+        const retryBtn = document.createElement('button');
+        retryBtn.textContent = 'Retry';
+        retryBtn.style.cursor = 'pointer';
+        retryBtn.addEventListener('click', () => retryFailedItem(item.id));
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '✕';
+        deleteBtn.title = 'Delete';
+        deleteBtn.style.cursor = 'pointer';
+        deleteBtn.style.color = '#ff6b6b';
+        deleteBtn.addEventListener('click', () => deleteFailedItem(item.id));
+
+        row.appendChild(text);
+        row.appendChild(attemptBadge);
+        row.appendChild(retryBtn);
+        row.appendChild(deleteBtn);
+
+        li.appendChild(row);
+        failedList.appendChild(li);
+      });
+    }
+
     updateToolbarButton();
     log('queue rendered safely');
   }
@@ -447,6 +519,37 @@
     }
 
     queue.splice(index, 1);
+
+    renderQueue();
+  }
+
+  // MARK: deleteFailedItem
+  function deleteFailedItem(id) {
+    const index = failedQueue.findIndex(item => item.id === id);
+
+    if (index === -1) {
+      error('Failed item to delete not found:', id);
+      return;
+    }
+
+    failedQueue.splice(index, 1);
+    renderQueue();
+  }
+
+  // MARK: retryFailedItem
+  function retryFailedItem(id) {
+    const index = failedQueue.findIndex(item => item.id === id);
+
+    if (index === -1) {
+      error('Failed item to retry not found:', id);
+      return;
+    }
+
+    const [item] = failedQueue.splice(index, 1);
+
+    // reset attempts so it will be retried fresh
+    item.attempts = 0;
+    queue.push(item);
 
     renderQueue();
   }
@@ -785,23 +888,30 @@
 
   // MARK: waitForIdle
   async function waitForIdle({ timeoutMs = 60000, intervalMs = 200 } = {}) {
-    await waitForCondition(async () => {
-      const initialState = getGenerationState();
+    try {
+      await waitForCondition(async () => {
+        const initialState = getGenerationState();
 
-      if (initialState.generating) {
-        return false;
-      }
+        if (initialState.generating) {
+          return false;
+        }
 
-      await sleep(intervalMs);
+        await sleep(intervalMs);
 
-      return !getGenerationState().generating;
-    }, {
-      timeoutMs,
-      intervalMs,
-      description: 'Gemini to become idle',
-    });
+        return !getGenerationState().generating;
+      }, {
+        timeoutMs,
+        intervalMs,
+        description: 'Gemini to become idle',
+      });
 
-    await sleep(300);
+      await sleep(300);
+    } catch (err) {
+      log('waitForIdle timed out:', err.message);
+
+      // Give a short grace period and continue.
+      await sleep(300);
+    }
   }
 
   // MARK: waitForGenerationStart
@@ -1216,14 +1326,50 @@
       setStatus(`Sending: ${prompt.slice(0, 40)}...`);
 
       try {
-        await sendPrompt(prompt);
-        await waitForPromptProcessing();
+        // Try sending with a few quick retries. On persistent failure,
+        // requeue the prompt once (so it can be retried later) and continue
+        // processing the rest of the queue instead of aborting.
+        const maxRetries = 2;
+        let sent = false;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            await sendPrompt(prompt);
+            await waitForPromptProcessing();
+            sent = true;
+            break;
+          } catch (err) {
+            error(`Error processing prompt (attempt ${attempt}):`, err);
+            setStatus(`Error sending prompt (attempt ${attempt}): ${err.message}`);
+            await sleep(1000 * attempt);
+          }
+        }
+
+        if (!sent) {
+          item.attempts = (item.attempts || 0) + 1;
+
+          const maxTotalAttempts = 3;
+
+          if (item.attempts < maxTotalAttempts) {
+            log('Re-queueing failed prompt for later retry', { id: item.id, attempts: item.attempts });
+            queue.push(item);
+          } else {
+            log('Moving prompt to failed queue after max attempts', { id: item.id, attempts: item.attempts });
+            failedQueue.push(item);
+          }
+
+          renderQueue();
+          updateToolbarButton();
+
+          // Continue with next item rather than aborting the entire queue.
+          continue;
+        }
       } catch (err) {
-        error('Error processing prompt:', err);
-        setStatus('Error: ' + err.message);
-        running = false;
+        // Defensive catch: ensure the loop keeps running on unexpected errors.
+        error('Unexpected error in processQueue:', err);
+        renderQueue();
         updateToolbarButton();
-        return;
+        continue;
       }
     }
 
