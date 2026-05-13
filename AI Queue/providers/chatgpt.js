@@ -195,6 +195,7 @@ function renderChatGPTQueue() {
     editBtn.title = 'Edit';
     editBtn.style.cursor = 'pointer';
     editBtn.style.color = '#7dd3fc';
+    editBtn.style.display = 'none';
 
     editBtn.addEventListener('click', () => {
       editQueueItem(item.id, window.aiQueue.queue, (id, prompt) => {
@@ -211,6 +212,7 @@ function renderChatGPTQueue() {
     deleteBtn.title = 'Delete';
     deleteBtn.style.cursor = 'pointer';
     deleteBtn.style.color = '#ff6b6b';
+    deleteBtn.style.display = 'none';
 
     deleteBtn.addEventListener('click', () => {
       deleteQueueItem(item.id, window.aiQueue.queue, renderChatGPTQueue, saveChatGPTQueue);
@@ -247,6 +249,23 @@ function renderChatGPTQueue() {
 
     li.appendChild(row);
 
+    // Show action buttons on hover, keep visible while editing
+    li.addEventListener('mouseenter', () => {
+      if (window.aiQueue.editingId === item.id) {
+        editBtn.style.display = 'inline-block';
+        deleteBtn.style.display = 'inline-block';
+      } else {
+        editBtn.style.display = 'inline-block';
+        deleteBtn.style.display = 'inline-block';
+      }
+    });
+
+    li.addEventListener('mouseleave', () => {
+      if (window.aiQueue.editingId === item.id) return;
+      editBtn.style.display = 'none';
+      deleteBtn.style.display = 'none';
+    });
+
     li.addEventListener('dragover', e => {
       e.preventDefault();
       try {
@@ -262,7 +281,9 @@ function renderChatGPTQueue() {
     li.addEventListener('drop', e => {
       e.preventDefault();
       li.style.borderTop = '';
-      const draggedId = window.aiQueue.draggedId || (e.dataTransfer && e.dataTransfer.getData && e.dataTransfer.getData('text/plain'));
+      const draggedId =
+        window.aiQueue.draggedId ||
+        (e.dataTransfer && e.dataTransfer.getData && e.dataTransfer.getData('text/plain'));
       if (draggedId && draggedId !== item.id) {
         moveQueueItem(
           draggedId,
