@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      1.0.4
+// @version      1.0.5
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/gemini.user.js
@@ -41,6 +41,11 @@
   let urlWatcher = null;
   let lastKnownUrl = location.href;
   let lastGenerationLabel = '';
+  let panelDragging = false;
+  let panelDragStartX = 0;
+  let panelDragStartY = 0;
+  let panelStartX = 0;
+  let panelStartY = 0;
 
   // MARK: logging helpers
   function log(...args) {
@@ -271,6 +276,7 @@
       }
 
       setupPanelEvents();
+      setupPanelDrag();
       panelInitialized = true;
     }
   }
@@ -341,6 +347,52 @@
 
       updateToolbarButton();
       processQueue();
+    });
+  }
+
+  // MARK: setupPanelDrag
+  function setupPanelDrag() {
+    if (!panel) return;
+
+    panel.addEventListener('mousedown', (e) => {
+      if (e.button !== 2) return; // only right-click (button 2)
+      
+      e.preventDefault();
+      e.stopPropagation();
+
+      panelDragging = true;
+      panelDragStartX = e.clientX;
+      panelDragStartY = e.clientY;
+      panelStartX = panel.offsetLeft;
+      panelStartY = panel.offsetTop;
+
+      log('panel drag started');
+    }, true);
+
+    document.addEventListener('mousemove', (e) => {
+      if (!panelDragging) return;
+
+      const deltaX = e.clientX - panelDragStartX;
+      const deltaY = e.clientY - panelDragStartY;
+
+      panel.style.left = (panelStartX + deltaX) + 'px';
+      panel.style.top = (panelStartY + deltaY) + 'px';
+      panel.style.right = 'auto';
+      panel.style.bottom = 'auto';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (panelDragging) {
+        panelDragging = false;
+        log('panel drag ended');
+      }
+    });
+
+    // Prevent context menu while dragging
+    panel.addEventListener('contextmenu', (e) => {
+      if (panelDragging) {
+        e.preventDefault();
+      }
     });
   }
 
