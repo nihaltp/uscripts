@@ -177,7 +177,7 @@ function renderGeminiQueue() {
   window.aiQueue.queue.forEach((item, index) => {
     const li = document.createElement('li');
     li.style.marginBottom = '10px';
-    li.draggable = true;
+    li.draggable = false;
 
     const row = document.createElement('div');
     row.style.display = 'flex';
@@ -236,18 +236,38 @@ function renderGeminiQueue() {
     row.appendChild(editBtn);
     row.appendChild(deleteBtn);
 
-    li.appendChild(row);
+    const dragHandle = document.createElement('span');
+    dragHandle.textContent = '☰';
+    dragHandle.title = 'Drag to reorder';
+    dragHandle.style.cursor = 'grab';
+    dragHandle.style.userSelect = 'none';
+    dragHandle.style.marginRight = '6px';
+    dragHandle.style.alignSelf = 'center';
+    dragHandle.draggable = true;
 
-    li.addEventListener('dragstart', () => {
+    dragHandle.addEventListener('dragstart', e => {
       window.aiQueue.draggedId = item.id;
+      try {
+        e.dataTransfer.setData('text/plain', item.id);
+        e.dataTransfer.effectAllowed = 'move';
+      } catch (err) {}
+      li.style.opacity = '0.6';
     });
 
-    li.addEventListener('dragend', () => {
+    dragHandle.addEventListener('dragend', () => {
       window.aiQueue.draggedId = null;
+      li.style.opacity = '';
     });
+
+    row.insertBefore(dragHandle, row.firstChild);
+
+    li.appendChild(row);
 
     li.addEventListener('dragover', e => {
       e.preventDefault();
+      try {
+        e.dataTransfer.dropEffect = 'move';
+      } catch (err) {}
       li.style.borderTop = '2px solid #7dd3fc';
     });
 
@@ -258,10 +278,10 @@ function renderGeminiQueue() {
     li.addEventListener('drop', e => {
       e.preventDefault();
       li.style.borderTop = '';
-
-      if (window.aiQueue.draggedId && window.aiQueue.draggedId !== item.id) {
+      const draggedId = window.aiQueue.draggedId || (e.dataTransfer && e.dataTransfer.getData && e.dataTransfer.getData('text/plain'));
+      if (draggedId && draggedId !== item.id) {
         moveQueueItem(
-          window.aiQueue.draggedId,
+          draggedId,
           item.id,
           window.aiQueue.queue,
           renderGeminiQueue,
