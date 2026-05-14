@@ -10,7 +10,7 @@
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      2.0.5
+// @version      2.0.6
 // @grant        none
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/logging.js
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/utils.js
@@ -93,8 +93,6 @@
     }
 
     window.aiQueue.running = false;
-    const stopBtnRef = window.pqPanel?.querySelector('#pq-stop');
-    if (stopBtnRef) stopBtnRef.style.display = 'none';
     AIQueue.ui.updateToolbarButton(
       window.pqToolbarButton,
       window.aiQueue.queue,

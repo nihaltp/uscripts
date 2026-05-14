@@ -3,7 +3,6 @@ function setupPanelControls({ createItem, renderQueue, saveQueue, processQueue }
   const input = window.pqPanel.querySelector('#pq-input');
   const addBtn = window.pqPanel.querySelector('#pq-add');
   const startBtn = window.pqPanel.querySelector('#pq-start');
-  const stopBtn = window.pqPanel.querySelector('#pq-stop');
 
   window.pqInput = input;
   window.pqAddBtn = addBtn;
@@ -51,14 +50,26 @@ function setupPanelControls({ createItem, renderQueue, saveQueue, processQueue }
   });
 
   function updateStartStopButtons() {
-    if (!startBtn || !stopBtn) return;
-    startBtn.disabled = window.aiQueue.running;
-    stopBtn.style.display = window.aiQueue.running ? 'block' : 'none';
+    if (!startBtn) return;
+    startBtn.textContent = window.aiQueue.running ? 'Stop Queue' : 'Start Queue';
+    startBtn.disabled = false;
   }
 
   startBtn.addEventListener('click', async () => {
-    if (window.aiQueue.running) return;
+    if (window.aiQueue.running) {
+      // act as Stop button
+      window.aiQueue.running = false;
+      AIQueue.queue.setStatus(window.pqPanel, 'Stopped');
+      updateStartStopButtons();
+      AIQueue.ui.updateToolbarButton(
+        window.pqToolbarButton,
+        window.aiQueue.queue,
+        window.aiQueue.running
+      );
+      return;
+    }
 
+    // act as Start button
     window.aiQueue.running = true;
     updateStartStopButtons();
     AIQueue.ui.updateToolbarButton(
@@ -80,18 +91,8 @@ function setupPanelControls({ createItem, renderQueue, saveQueue, processQueue }
       );
     }
   });
-
-  stopBtn?.addEventListener('click', () => {
-    if (!window.aiQueue.running) return;
-    window.aiQueue.running = false;
-    AIQueue.queue.setStatus(window.pqPanel, 'Stopped');
-    updateStartStopButtons();
-    AIQueue.ui.updateToolbarButton(
-      window.pqToolbarButton,
-      window.aiQueue.queue,
-      window.aiQueue.running
-    );
-  });
+  // initialize button state
+  updateStartStopButtons();
 }
 
 window.setupPanelControls = setupPanelControls;
