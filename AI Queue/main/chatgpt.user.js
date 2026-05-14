@@ -10,7 +10,7 @@
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      2.0.3
+// @version      2.0.4
 // @grant        none
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/logging.js
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/utils.js
@@ -20,6 +20,10 @@
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/queue.js
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/storage.js
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/ui.js
+// @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/panel.js
+// @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/queue-ui.js
+// @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/panel-controls.js
+// @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/drag.js
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/providers/chatgpt.js
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/main/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/main/chatgpt.user.js
@@ -44,79 +48,12 @@
   window.pqPanelInitialized = false;
   window.isPanelVisible = false;
 
-  // Setup panel events
-  function setupPanelEvents() {
-    const input = window.pqPanel.querySelector('#pq-input');
-    const addBtn = window.pqPanel.querySelector('#pq-add');
-    const startBtn = window.pqPanel.querySelector('#pq-start');
-    const stopBtn = window.pqPanel.querySelector('#pq-stop');
-
-    window.pqInput = input;
-    window.pqAddBtn = addBtn;
-
-    const handleAddClick = () => {
-      const text = input.value.trim();
-
-      if (!text) {
-        error('Empty prompt, not adding to queue');
-        return;
-      }
-
-      if (window.aiQueue.editingId !== null) {
-        const item = window.aiQueue.queue.find(item => item.id === window.aiQueue.editingId);
-
-        if (!item) {
-          error('Editing item not found in queue:', window.aiQueue.editingId);
-          return;
-        }
-
-        item.prompt = text;
-        window.aiQueue.editingId = null;
-        addBtn.textContent = 'Add To Queue';
-      } else {
-        window.aiQueue.queue.push({
-          id: crypto.randomUUID(),
-          prompt: text,
-        });
-      }
-
-      updateToolbarButton(window.pqToolbarButton, window.aiQueue.queue, window.aiQueue.running);
-      input.value = '';
-      renderChatGPTQueue();
-      saveChatGPTQueue();
+  // Setup panel controls (moved to core)
+  function createChatGPTItem(text) {
+    return {
+      id: crypto.randomUUID(),
+      prompt: text,
     };
-
-    addBtn.addEventListener('click', handleAddClick);
-
-    input.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        handleAddClick();
-      }
-    });
-
-    function updateStartStopButtons() {
-      if (!startBtn || !stopBtn) return;
-      startBtn.disabled = window.aiQueue.running;
-      stopBtn.style.display = window.aiQueue.running ? 'block' : 'none';
-    }
-
-    startBtn.addEventListener('click', async () => {
-      if (window.aiQueue.running) return;
-
-      window.aiQueue.running = true;
-      updateStartStopButtons();
-      updateToolbarButton(window.pqToolbarButton, window.aiQueue.queue, window.aiQueue.running);
-      processChatGPTQueue();
-    });
-
-    stopBtn?.addEventListener('click', () => {
-      if (!window.aiQueue.running) return;
-      window.aiQueue.running = false;
-      setStatus(window.pqPanel, 'Stopped');
-      updateStartStopButtons();
-      updateToolbarButton(window.pqToolbarButton, window.aiQueue.queue, window.aiQueue.running);
-    });
   }
 
   // ChatGPT-specific queue processor
@@ -219,21 +156,21 @@
   function init() {
     loadChatGPTQueue();
     createChatGPTPanel();
-    setupPanelEvents();
-    setupChatGPTPanelDrag();
+    setupPanelControls({ createItem: createChatGPTItem, renderQueue: renderChatGPTQueue, saveQueue: saveChatGPTQueue, processQueue: processChatGPTQueue });
+    setupPanelDrag();
     renderChatGPTQueue();
     ensureChatGPTToolbarButton();
     startDomObserver(
       createChatGPTPanel,
-      setupPanelEvents,
-      setupChatGPTPanelDrag,
+      () => setupPanelControls({ createItem: createChatGPTItem, renderQueue: renderChatGPTQueue, saveQueue: saveChatGPTQueue, processQueue: processChatGPTQueue }),
+      setupPanelDrag,
       ensureChatGPTToolbarButton,
       isOwnMutation
     );
     startUrlWatcher(
       createChatGPTPanel,
-      setupPanelEvents,
-      setupChatGPTPanelDrag,
+      () => setupPanelControls({ createItem: createChatGPTItem, renderQueue: renderChatGPTQueue, saveQueue: saveChatGPTQueue, processQueue: processChatGPTQueue }),
+      setupPanelDrag,
       ensureChatGPTToolbarButton
     );
   }
