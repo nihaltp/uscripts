@@ -40,9 +40,11 @@ function createQueueItemElement(item, { renderQueue, saveQueue }) {
   dragHandle.style.userSelect = 'none';
   dragHandle.style.marginRight = '6px';
   dragHandle.style.alignSelf = 'center';
-  dragHandle.draggable = true;
+  dragHandle.style.marginLeft = '6px';
 
   dragHandle.addEventListener('dragstart', e => {
+  // hide by default; show on hover
+  dragHandle.style.display = 'none';
     window.aiQueue.draggedId = item.id;
     try {
       e.dataTransfer.setData('text/plain', item.id);
@@ -51,13 +53,15 @@ function createQueueItemElement(item, { renderQueue, saveQueue }) {
     li.style.opacity = '0.6';
   });
 
+    dragHandle.style.display = 'inline-block';
   dragHandle.addEventListener('dragend', () => {
     window.aiQueue.draggedId = null;
     li.style.opacity = '';
   });
 
   row.insertBefore(dragHandle, row.firstChild);
-
+  // place drag handle on the right
+  row.appendChild(dragHandle);
   li.appendChild(row);
 
   // hover show/hide
@@ -65,11 +69,15 @@ function createQueueItemElement(item, { renderQueue, saveQueue }) {
     editBtn.style.display = 'inline-block';
     deleteBtn.style.display = 'inline-block';
   });
+    dragHandle.style.display = 'inline-block';
   li.addEventListener('mouseleave', () => {
     if (window.aiQueue.editingId === item.id) return;
     editBtn.style.display = 'none';
     deleteBtn.style.display = 'none';
   });
+    // keep visible while dragging
+    if (window.aiQueue.draggedId === item.id) return;
+    dragHandle.style.display = 'none';
 
   // drag/drop
   li.addEventListener('dragover', e => {
