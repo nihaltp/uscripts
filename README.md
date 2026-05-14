@@ -22,8 +22,8 @@
 
 ## ChatGPT
 
-[ChatGPT Prompt Queue](https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/main/chatgpt.user.js) - A script to manage multiple AI conversations in a queue, allowing you to switch between them and keep track of their status.
+[ChatGPT Prompt Queue](https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js) - A script to manage multiple AI conversations in a queue, allowing you to switch between them and keep track of their status.
 
 ## Gemini
 
-[Gemini Prompt Queue](https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/main/gemini.user.js) - A script to manage multiple Gemini prompts in a queue, allowing you to switch between them and keep track of their status.
+[Gemini Prompt Queue](https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js) - A script to manage multiple Gemini prompts in a queue, allowing you to switch between them and keep track of their status.
