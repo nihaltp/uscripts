@@ -89,7 +89,7 @@ function createQueueItemElement(item, { renderQueue, saveQueue }) {
       window.aiQueue.draggedId ||
       (e.dataTransfer && e.dataTransfer.getData && e.dataTransfer.getData('text/plain'));
     if (draggedId && draggedId !== item.id) {
-      moveQueueItem(draggedId, item.id, window.aiQueue.queue, renderQueue, saveQueue);
+      AIQueue.queue.moveQueueItem(draggedId, item.id, window.aiQueue.queue, renderQueue, saveQueue);
     }
   });
 

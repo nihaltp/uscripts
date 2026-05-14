@@ -1,29 +1,32 @@
-// Queue management
-function deleteQueueItem(id, queue, renderQueue, saveQueue) {
+// Queue management exported to AIQueue.queue
+window.AIQueue = window.AIQueue || {};
+window.AIQueue.queue = window.AIQueue.queue || {};
+
+AIQueue.queue.deleteQueueItem = function (id, queue, renderQueue, saveQueue) {
   const index = queue.findIndex(item => item.id === id);
 
   if (index === -1) {
-    error('Item to delete not found in queue:', id);
+    AIQueue.logging.error('Item to delete not found in queue:', id);
     return;
   }
 
   queue.splice(index, 1);
   renderQueue();
   saveQueue?.();
-}
+};
 
-function editQueueItem(id, queue, updateUI) {
+AIQueue.queue.editQueueItem = function (id, queue, updateUI) {
   const item = queue.find(item => item.id === id);
 
   if (!item) {
-    error('Item to edit not found in queue:', id);
+    AIQueue.logging.error('Item to edit not found in queue:', id);
     return;
   }
 
   updateUI(id, item.prompt);
-}
+};
 
-function moveQueueItem(fromId, toId, queue, renderQueue, saveQueue) {
+AIQueue.queue.moveQueueItem = function (fromId, toId, queue, renderQueue, saveQueue) {
   const fromIndex = queue.findIndex(item => item.id === fromId);
   const toIndex = queue.findIndex(item => item.id === toId);
 
@@ -34,13 +37,13 @@ function moveQueueItem(fromId, toId, queue, renderQueue, saveQueue) {
 
   renderQueue();
   saveQueue?.();
-}
+};
 
-function setStatus(panel, text) {
+AIQueue.queue.setStatus = function (panel, text) {
   if (!panel) return;
 
   const status = panel.querySelector('#pq-status');
   if (status) {
     status.textContent = text;
   }
-}
+};

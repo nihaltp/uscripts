@@ -1,10 +1,10 @@
 // Shared panel creation helper for providers
 function createBasePanel(titleText, includeFailedList = false) {
-  if (window.pqPanel && isAttached(window.pqPanel)) {
+  if (window.pqPanel && AIQueue.utils.isAttached(window.pqPanel)) {
     return;
   }
 
-  if (window.pqPanel && !isAttached(window.pqPanel)) {
+  if (window.pqPanel && !AIQueue.utils.isAttached(window.pqPanel)) {
     if (document.body) {
       document.body.appendChild(window.pqPanel);
     }

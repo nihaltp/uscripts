@@ -10,7 +10,7 @@
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      2.0.4
+// @version      2.0.5
 // @grant        none
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/logging.js
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/utils.js
@@ -24,6 +24,7 @@
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/queue-ui.js
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/panel-controls.js
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/drag.js
+// @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/core/exports.js
 // @require      https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/providers/chatgpt.js
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/main/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI Queue/main/chatgpt.user.js
@@ -58,7 +59,7 @@
 
   // ChatGPT-specific queue processor
   async function processChatGPTQueue() {
-    setStatus(window.pqPanel, 'Running');
+    AIQueue.queue.setStatus(window.pqPanel, 'Running');
 
     while (window.aiQueue.queue.length > 0 && window.aiQueue.running) {
       await waitForIdle();
@@ -66,36 +67,44 @@
       const item = window.aiQueue.queue.shift();
       const prompt = item.prompt;
 
-      updateToolbarButton(window.pqToolbarButton, window.aiQueue.queue, window.aiQueue.running);
+      AIQueue.ui.updateToolbarButton(
+        window.pqToolbarButton,
+        window.aiQueue.queue,
+        window.aiQueue.running
+      );
       renderChatGPTQueue();
 
-      setStatus(window.pqPanel, `Sending: ${prompt.slice(0, 40)}...`);
+      AIQueue.queue.setStatus(window.pqPanel, `Sending: ${prompt.slice(0, 40)}...`);
 
       try {
         await sendPrompt(prompt);
         await waitForPromptProcessing();
       } catch (err) {
-        error('Failed to send prompt:', err.message);
+        AIQueue.logging.error('Failed to send prompt:', err.message);
       }
 
       saveChatGPTQueue();
     }
 
     if (!window.aiQueue.running) {
-      setStatus(window.pqPanel, 'Stopped');
+      AIQueue.queue.setStatus(window.pqPanel, 'Stopped');
     } else {
-      setStatus(window.pqPanel, 'Finished');
+      AIQueue.queue.setStatus(window.pqPanel, 'Finished');
     }
 
     window.aiQueue.running = false;
     const stopBtnRef = window.pqPanel?.querySelector('#pq-stop');
     if (stopBtnRef) stopBtnRef.style.display = 'none';
-    updateToolbarButton(window.pqToolbarButton, window.aiQueue.queue, window.aiQueue.running);
+    AIQueue.ui.updateToolbarButton(
+      window.pqToolbarButton,
+      window.aiQueue.queue,
+      window.aiQueue.running
+    );
   }
 
   // Ensure toolbar button
   function ensureChatGPTToolbarButton() {
-    ensureToolbarStyles();
+    AIQueue.ui.ensureToolbarStyles();
 
     if (!window.pqToolbarButton) {
       window.pqToolbarButton = document.createElement('button');
@@ -103,7 +112,7 @@
       window.pqToolbarButton.type = 'button';
       window.pqToolbarButton.textContent = 'Queue';
       window.pqToolbarButton.addEventListener('click', () => {
-        window.isPanelVisible = togglePanel(window.pqPanel, window.isPanelVisible);
+        window.isPanelVisible = AIQueue.ui.togglePanel(window.pqPanel, window.isPanelVisible);
       });
     }
 
@@ -156,20 +165,37 @@
   function init() {
     loadChatGPTQueue();
     createChatGPTPanel();
-    setupPanelControls({ createItem: createChatGPTItem, renderQueue: renderChatGPTQueue, saveQueue: saveChatGPTQueue, processQueue: processChatGPTQueue });
+    setupPanelControls({
+      createItem: createChatGPTItem,
+      renderQueue: renderChatGPTQueue,
+      saveQueue: saveChatGPTQueue,
+      processQueue: processChatGPTQueue,
+    });
     setupPanelDrag();
     renderChatGPTQueue();
     ensureChatGPTToolbarButton();
-    startDomObserver(
+    AIQueue.ui.startDomObserver(
       createChatGPTPanel,
-      () => setupPanelControls({ createItem: createChatGPTItem, renderQueue: renderChatGPTQueue, saveQueue: saveChatGPTQueue, processQueue: processChatGPTQueue }),
+      () =>
+        setupPanelControls({
+          createItem: createChatGPTItem,
+          renderQueue: renderChatGPTQueue,
+          saveQueue: saveChatGPTQueue,
+          processQueue: processChatGPTQueue,
+        }),
       setupPanelDrag,
       ensureChatGPTToolbarButton,
-      isOwnMutation
+      AIQueue.utils.isOwnMutation
     );
-    startUrlWatcher(
+    AIQueue.ui.startUrlWatcher(
       createChatGPTPanel,
-      () => setupPanelControls({ createItem: createChatGPTItem, renderQueue: renderChatGPTQueue, saveQueue: saveChatGPTQueue, processQueue: processChatGPTQueue }),
+      () =>
+        setupPanelControls({
+          createItem: createChatGPTItem,
+          renderQueue: renderChatGPTQueue,
+          saveQueue: saveChatGPTQueue,
+          processQueue: processChatGPTQueue,
+        }),
       setupPanelDrag,
       ensureChatGPTToolbarButton
     );

@@ -16,7 +16,7 @@ function setupPanelDrag() {
       window.pqPanelStartX = window.pqPanel.offsetLeft;
       window.pqPanelStartY = window.pqPanel.offsetTop;
 
-      log('panel drag started');
+      AIQueue.logging.log('panel drag started');
     },
     true
   );
@@ -36,7 +36,7 @@ function setupPanelDrag() {
   document.addEventListener('mouseup', () => {
     if (window.pqPanelDragging) {
       window.pqPanelDragging = false;
-      log('panel drag ended');
+      AIQueue.logging.log('panel drag ended');
     }
   });
 

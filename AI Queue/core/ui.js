@@ -1,12 +1,15 @@
-// UI helpers
-let repairTimer = null;
-let lastRepairAt = 0;
-let repairing = false;
-let urlWatcher = null;
-let lastKnownUrl = location.href;
-let mutationObserver = null;
+// UI helpers exported to AIQueue.ui
+window.AIQueue = window.AIQueue || {};
+window.AIQueue.ui = window.AIQueue.ui || {};
 
-function ensureToolbarStyles() {
+AIQueue.ui.repairTimer = AIQueue.ui.repairTimer || null;
+AIQueue.ui.lastRepairAt = AIQueue.ui.lastRepairAt || 0;
+AIQueue.ui.repairing = AIQueue.ui.repairing || false;
+AIQueue.ui.urlWatcher = AIQueue.ui.urlWatcher || null;
+AIQueue.ui.lastKnownUrl = AIQueue.ui.lastKnownUrl || location.href;
+AIQueue.ui.mutationObserver = AIQueue.ui.mutationObserver || null;
+
+AIQueue.ui.ensureToolbarStyles = function () {
   if (document.querySelector('#pq-styles')) return;
 
   const style = document.createElement('style');
@@ -19,9 +22,9 @@ function ensureToolbarStyles() {
     }
   `;
   document.head.appendChild(style);
-}
+};
 
-function togglePanel(panel, isPanelVisible) {
+AIQueue.ui.togglePanel = function (panel, isPanelVisible) {
   if (!panel) return;
 
   isPanelVisible = !isPanelVisible;
@@ -36,29 +39,29 @@ function togglePanel(panel, isPanelVisible) {
   panel.style.bottom = 'auto';
   panel.style.inset = 'unset';
 
-  log('panel visible', isPanelVisible);
+  AIQueue.logging.log('panel visible', isPanelVisible);
   return isPanelVisible;
-}
+};
 
-function updateToolbarButton(toolbarButton, queue, running) {
-  if (!toolbarButton || !isAttached(toolbarButton)) return;
+AIQueue.ui.updateToolbarButton = function (toolbarButton, queue, running) {
+  if (!toolbarButton || !AIQueue.utils.isAttached(toolbarButton)) return;
 
   const count = queue.length;
   toolbarButton.textContent = count > 0 ? `Queue (${count})` : 'Queue';
   toolbarButton.style.animation = running ? 'pq-pulse 1.2s infinite' : '';
   toolbarButton.style.opacity = running ? '1' : count > 0 ? '1' : '0.8';
-}
+};
 
-function repairUi(
+AIQueue.ui.repairUi = function (
   reason = 'repair',
   createPanel,
   setupPanelEvents,
   setupPanelDrag,
   ensureToolbarButton
 ) {
-  if (repairing) return;
+  if (AIQueue.ui.repairing) return;
 
-  repairing = true;
+  AIQueue.ui.repairing = true;
 
   try {
     createPanel();
@@ -66,11 +69,11 @@ function repairUi(
     setupPanelDrag?.();
     ensureToolbarButton?.();
   } finally {
-    repairing = false;
+    AIQueue.ui.repairing = false;
   }
-}
+};
 
-function requestRepair(
+AIQueue.ui.requestRepair = function (
   reason = 'repair',
   createPanel,
   setupPanelEvents,
@@ -78,39 +81,39 @@ function requestRepair(
   ensureToolbarButton
 ) {
   const now = Date.now();
-  const delay = Math.max(0, 2000 - (now - lastRepairAt));
+  const delay = Math.max(0, 2000 - (now - AIQueue.ui.lastRepairAt));
 
-  if (repairTimer) {
-    clearTimeout(repairTimer);
+  if (AIQueue.ui.repairTimer) {
+    clearTimeout(AIQueue.ui.repairTimer);
   }
 
-  repairTimer = setTimeout(() => {
-    lastRepairAt = Date.now();
-    repairUi(reason, createPanel, setupPanelEvents, setupPanelDrag, ensureToolbarButton);
+  AIQueue.ui.repairTimer = setTimeout(() => {
+    AIQueue.ui.lastRepairAt = Date.now();
+    AIQueue.ui.repairUi(reason, createPanel, setupPanelEvents, setupPanelDrag, ensureToolbarButton);
   }, delay);
-}
+};
 
-function startDomObserver(
+AIQueue.ui.startDomObserver = function (
   createPanel,
   setupPanelEvents,
   setupPanelDrag,
   ensureToolbarButton,
   isOwnMutation
 ) {
-  if (mutationObserver) return;
+  if (AIQueue.ui.mutationObserver) return;
 
   const target = document.body || document.documentElement;
   if (!target) return;
 
-  mutationObserver = new MutationObserver(mutations => {
+  AIQueue.ui.mutationObserver = new MutationObserver(mutations => {
     for (const mutation of mutations) {
       if (mutation.type === 'childList') {
         const hasExternalChange = [...mutation.addedNodes, ...mutation.removedNodes].some(
-          node => node && !isOwnMutation(node)
+          node => node && !AIQueue.utils.isOwnMutation(node)
         );
 
         if (hasExternalChange) {
-          requestRepair(
+          AIQueue.ui.requestRepair(
             'dom-mutation',
             createPanel,
             setupPanelEvents,
@@ -123,7 +126,7 @@ function startDomObserver(
 
       if (mutation.type === 'attributes') {
         if (!isOwnMutation(mutation.target)) {
-          requestRepair(
+          AIQueue.ui.requestRepair(
             'attribute-mutation',
             createPanel,
             setupPanelEvents,
@@ -136,46 +139,63 @@ function startDomObserver(
     }
   });
 
-  mutationObserver.observe(target, {
+  AIQueue.ui.mutationObserver.observe(target, {
     childList: true,
     subtree: true,
     attributes: true,
     attributeFilter: ['aria-busy', 'aria-disabled', 'disabled'],
   });
-}
+};
 
-function patchHistoryMethod(methodName) {
+AIQueue.ui.patchHistoryMethod = function (methodName) {
   const original = history[methodName];
 
   if (typeof original !== 'function' || original.__pqPatched) return;
 
   const patched = function (...args) {
     const result = original.apply(this, args);
-    requestRepair('history-' + methodName);
+    AIQueue.ui.requestRepair('history-' + methodName);
     return result;
   };
 
   patched.__pqPatched = true;
   history[methodName] = patched;
-}
+};
 
-function startUrlWatcher(createPanel, setupPanelEvents, setupPanelDrag, ensureToolbarButton) {
-  patchHistoryMethod('pushState');
-  patchHistoryMethod('replaceState');
+AIQueue.ui.startUrlWatcher = function (
+  createPanel,
+  setupPanelEvents,
+  setupPanelDrag,
+  ensureToolbarButton
+) {
+  AIQueue.ui.patchHistoryMethod('pushState');
+  AIQueue.ui.patchHistoryMethod('replaceState');
 
   window.addEventListener('popstate', () =>
-    requestRepair('popstate', createPanel, setupPanelEvents, setupPanelDrag, ensureToolbarButton)
+    AIQueue.ui.requestRepair(
+      'popstate',
+      createPanel,
+      setupPanelEvents,
+      setupPanelDrag,
+      ensureToolbarButton
+    )
   );
   window.addEventListener('hashchange', () =>
-    requestRepair('hashchange', createPanel, setupPanelEvents, setupPanelDrag, ensureToolbarButton)
+    AIQueue.ui.requestRepair(
+      'hashchange',
+      createPanel,
+      setupPanelEvents,
+      setupPanelDrag,
+      ensureToolbarButton
+    )
   );
 
-  if (urlWatcher) clearInterval(urlWatcher);
+  if (AIQueue.ui.urlWatcher) clearInterval(AIQueue.ui.urlWatcher);
 
-  urlWatcher = setInterval(() => {
-    if (location.href !== lastKnownUrl) {
-      lastKnownUrl = location.href;
-      requestRepair(
+  AIQueue.ui.urlWatcher = setInterval(() => {
+    if (location.href !== AIQueue.ui.lastKnownUrl) {
+      AIQueue.ui.lastKnownUrl = location.href;
+      AIQueue.ui.requestRepair(
         'url-change',
         createPanel,
         setupPanelEvents,
@@ -184,4 +204,4 @@ function startUrlWatcher(createPanel, setupPanelEvents, setupPanelDrag, ensureTo
       );
     }
   }, 1000);
-}
+};

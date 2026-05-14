@@ -6,9 +6,9 @@ function saveQueue(queue, failedQueue, storageKey = 'pq-queue-state') {
       failedQueue: failedQueue,
     };
     localStorage.setItem(storageKey, JSON.stringify(data));
-    log('queue saved to storage');
+    AIQueue.logging.log('queue saved to storage');
   } catch (err) {
-    error('Failed to save queue:', err);
+    AIQueue.logging.error('Failed to save queue:', err);
   }
 }
 
@@ -23,9 +23,9 @@ function loadQueue(queue, failedQueue, storageKey = 'pq-queue-state') {
       if (Array.isArray(data.failedQueue) && failedQueue) {
         failedQueue.push(...data.failedQueue);
       }
-      log('queue loaded from storage', queue.length, 'items');
+      AIQueue.logging.log('queue loaded from storage', queue.length, 'items');
     }
   } catch (err) {
-    error('Failed to load queue:', err);
+    AIQueue.logging.error('Failed to load queue:', err);
   }
 }

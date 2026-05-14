@@ -28,7 +28,7 @@ function renderGeminiQueue() {
     }
 
     text.addEventListener('dblclick', () => {
-      editQueueItem(item.id, window.aiQueue.queue, (id, prompt) => {
+      AIQueue.queue.editQueueItem(item.id, window.aiQueue.queue, (id, prompt) => {
         window.aiQueue.editingId = id;
         window.pqInput.value = prompt;
         window.pqAddBtn.textContent = 'Save Changes';
@@ -40,7 +40,7 @@ function renderGeminiQueue() {
     });
 
     editBtn.addEventListener('click', () => {
-      editQueueItem(item.id, window.aiQueue.queue, (id, prompt) => {
+      AIQueue.queue.editQueueItem(item.id, window.aiQueue.queue, (id, prompt) => {
         window.aiQueue.editingId = id;
         window.pqInput.value = prompt;
         window.pqAddBtn.textContent = 'Save Changes';
@@ -50,7 +50,12 @@ function renderGeminiQueue() {
     });
 
     deleteBtn.addEventListener('click', () => {
-      deleteQueueItem(item.id, window.aiQueue.queue, renderGeminiQueue, saveGeminiQueue);
+      AIQueue.queue.deleteQueueItem(
+        item.id,
+        window.aiQueue.queue,
+        renderGeminiQueue,
+        saveGeminiQueue
+      );
     });
 
     list.appendChild(li);
@@ -109,7 +114,12 @@ function renderGeminiQueue() {
       deleteBtn.style.fontSize = '12px';
 
       deleteBtn.addEventListener('click', () => {
-        deleteQueueItem(item.id, window.aiQueue.failedQueue, renderGeminiQueue, saveGeminiQueue);
+        AIQueue.queue.deleteQueueItem(
+          item.id,
+          window.aiQueue.failedQueue,
+          renderGeminiQueue,
+          saveGeminiQueue
+        );
       });
 
       row.appendChild(text);
@@ -121,8 +131,12 @@ function renderGeminiQueue() {
     });
   }
 
-  updateToolbarButton(window.pqToolbarButton, window.aiQueue.queue, window.aiQueue.running);
-  log('queue rendered safely');
+  AIQueue.ui.updateToolbarButton(
+    window.pqToolbarButton,
+    window.aiQueue.queue,
+    window.aiQueue.running
+  );
+  AIQueue.logging.log('queue rendered safely');
 }
 
 function saveGeminiQueue() {

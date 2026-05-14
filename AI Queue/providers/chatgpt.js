@@ -24,7 +24,7 @@ function renderChatGPTQueue() {
     }
 
     text.addEventListener('dblclick', () => {
-      editQueueItem(item.id, window.aiQueue.queue, (id, prompt) => {
+      AIQueue.queue.editQueueItem(item.id, window.aiQueue.queue, (id, prompt) => {
         window.aiQueue.editingId = id;
         window.pqInput.value = prompt;
         window.pqAddBtn.textContent = 'Save Changes';
@@ -36,7 +36,7 @@ function renderChatGPTQueue() {
     });
 
     editBtn.addEventListener('click', () => {
-      editQueueItem(item.id, window.aiQueue.queue, (id, prompt) => {
+      AIQueue.queue.editQueueItem(item.id, window.aiQueue.queue, (id, prompt) => {
         window.aiQueue.editingId = id;
         window.pqInput.value = prompt;
         window.pqAddBtn.textContent = 'Save Changes';
@@ -46,13 +46,22 @@ function renderChatGPTQueue() {
     });
 
     deleteBtn.addEventListener('click', () => {
-      deleteQueueItem(item.id, window.aiQueue.queue, renderChatGPTQueue, saveChatGPTQueue);
+      AIQueue.queue.deleteQueueItem(
+        item.id,
+        window.aiQueue.queue,
+        renderChatGPTQueue,
+        saveChatGPTQueue
+      );
     });
 
     list.appendChild(li);
   });
 
-  updateToolbarButton(window.pqToolbarButton, window.aiQueue.queue, window.aiQueue.running);
+  AIQueue.ui.updateToolbarButton(
+    window.pqToolbarButton,
+    window.aiQueue.queue,
+    window.aiQueue.running
+  );
 }
 
 function saveChatGPTQueue() {

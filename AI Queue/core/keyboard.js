@@ -17,7 +17,7 @@ function dispatchEnterKey(target) {
 // Set editor value
 function setEditorValue(editor, prompt) {
   if (!editor) throwError('Editor not found');
-  if (!isAttached(editor)) throwError('Editor is detached');
+  if (!AIQueue.utils.isAttached(editor)) AIQueue.logging.throwError('Editor is detached');
 
   editor.focus?.({ preventScroll: true });
 
@@ -88,7 +88,7 @@ function setEditorValue(editor, prompt) {
 
 // Send prompt
 async function sendPrompt(prompt) {
-  const editor = await waitForElement(() => getComposerEditor(), {
+  const editor = await AIQueue.dom.waitForElement(() => AIQueue.dom.getComposerEditor(), {
     timeoutMs: 15000,
     intervalMs: 200,
     description: 'Composer editor',
@@ -97,9 +97,9 @@ async function sendPrompt(prompt) {
   setEditorValue(editor, prompt);
 
   try {
-    await waitForCondition(
+    await AIQueue.dom.waitForCondition(
       () => {
-        const btn = getSendButton();
+        const btn = AIQueue.dom.getSendButton();
         return btn && !btn.disabled;
       },
       {
@@ -109,13 +109,13 @@ async function sendPrompt(prompt) {
       }
     );
 
-    const sendButton = getSendButton();
+    const sendButton = AIQueue.dom.getSendButton();
     if (sendButton) {
-      safeClick(sendButton);
-      await sleep(100);
+      AIQueue.dom.safeClick(sendButton);
+      await AIQueue.utils.sleep(100);
     }
   } catch (err) {
-    log('send button unavailable, falling back to Enter', err.message);
+    AIQueue.logging.log('send button unavailable, falling back to Enter', err.message);
   }
 
   dispatchEnterKey(editor);
