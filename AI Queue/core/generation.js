@@ -1,12 +1,22 @@
-// Generation state detection
+import { log } from './logging.js';
+import {
+  findStopButton,
+  getComposerEditor,
+  getEditorText,
+  getSendButton,
+  hasBusyIndicators,
+  waitForCondition,
+} from './dom.js';
+import { sleep } from './utils.js';
+
 let lastGenerationLabel = '';
 
-function getGenerationState() {
-  const editor = AIQueue.dom.getComposerEditor();
-  const sendButton = AIQueue.dom.getSendButton({ includeDisabled: true });
-  const stopButton = AIQueue.dom.findStopButton();
-  const hasPrompt = !!AIQueue.dom.getEditorText(editor).trim();
-  const busyIndicators = AIQueue.dom.hasBusyIndicators();
+export function getGenerationState() {
+  const editor = getComposerEditor();
+  const sendButton = getSendButton({ includeDisabled: true });
+  const stopButton = findStopButton();
+  const hasPrompt = !!getEditorText(editor).trim();
+  const busyIndicators = hasBusyIndicators();
   const generating = Boolean(
     stopButton || busyIndicators || (sendButton && sendButton.disabled && hasPrompt)
   );
@@ -21,7 +31,7 @@ function getGenerationState() {
 
   if (label !== lastGenerationLabel) {
     lastGenerationLabel = label;
-    AIQueue.logging.log('generation state', {
+    log('generation state', {
       generating,
       hasPrompt,
       busyIndicators,
@@ -33,14 +43,14 @@ function getGenerationState() {
   return { generating, editor, sendButton, stopButton, busyIndicators, hasPrompt };
 }
 
-function isGenerating() {
+export function isGenerating() {
   return getGenerationState().generating;
 }
 
 // Wait for idle
-async function waitForIdle({ timeoutMs = 60000, intervalMs = 200 } = {}) {
+export async function waitForIdle({ timeoutMs = 60000, intervalMs = 200 } = {}) {
   try {
-    await AIQueue.dom.waitForCondition(
+    await waitForCondition(
       async () => {
         const { generating } = getGenerationState();
         return !generating;
@@ -52,16 +62,16 @@ async function waitForIdle({ timeoutMs = 60000, intervalMs = 200 } = {}) {
       }
     );
 
-    await AIQueue.utils.sleep(300);
+    await sleep(300);
   } catch (err) {
-    AIQueue.logging.log('waitForIdle timed out:', err.message);
-    await AIQueue.utils.sleep(300);
+    log('waitForIdle timed out:', err.message);
+    await sleep(300);
   }
 }
 
 // Wait for generation start
-async function waitForGenerationStart({ timeoutMs = 8000, intervalMs = 100 } = {}) {
-  return AIQueue.dom.waitForCondition(() => getGenerationState().generating, {
+export async function waitForGenerationStart({ timeoutMs = 8000, intervalMs = 100 } = {}) {
+  return waitForCondition(() => getGenerationState().generating, {
     timeoutMs,
     intervalMs,
     description: 'Generation to start',
@@ -69,11 +79,11 @@ async function waitForGenerationStart({ timeoutMs = 8000, intervalMs = 100 } = {
 }
 
 // Wait for prompt processing
-async function waitForPromptProcessing() {
+export async function waitForPromptProcessing() {
   try {
     await waitForGenerationStart();
   } catch (err) {
-    AIQueue.logging.log('Generation did not start:', err.message);
+    log('Generation did not start:', err.message);
   }
 
   await waitForIdle();

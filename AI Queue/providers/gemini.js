@@ -1,78 +1,105 @@
-// Gemini-specific panel creation
-function createGeminiPanel() {
-  createBasePanel('Gemini Prompt Queue', true);
+import { queueState } from '../core/state.js';
+import { createBasePanel } from '../core/panel.js';
+import { createQueueItemElement } from '../core/queue-ui.js';
+import { deleteQueueItem, editQueueItem } from '../core/queue.js';
+import { saveQueue, loadQueue } from '../core/storage.js';
+import { updateToolbarButton, showPanel, ensureToolbarStyles } from '../core/ui.js';
+import { setupPanelControls } from '../core/panel-controls.js';
+import { setupPanelDrag } from '../core/drag.js';
+import { getComposerHost } from '../core/dom.js';
+import { log, error } from '../core/logging.js';
+import { setStatus } from '../core/queue.js';
+import { sendPrompt } from '../core/keyboard.js';
+import { waitForIdle, waitForPromptProcessing } from '../core/generation.js';
+import { bootstrapQueueApp } from '../core/bootstrap.js';
+
+function queryPanel() {
+  return document.querySelector('#pq-panel');
 }
 
-// Using shared drag handler (window.setupPanelDrag)
+function queryInput() {
+  return queryPanel()?.querySelector('#pq-input');
+}
 
-// Gemini-specific rendering with failed queue
-function renderGeminiQueue() {
-  const list = window.pqPanel.querySelector('#pq-list');
-  const failedList = window.pqPanel.querySelector('#pq-failed-list');
-  const failedTitle = window.pqPanel.querySelector('#pq-failed-title');
+function queryAddButton() {
+  return queryPanel()?.querySelector('#pq-add');
+}
+
+export function createGeminiPanel() {
+  return createBasePanel('Gemini Prompt Queue', true);
+}
+
+export function renderGeminiQueue() {
+  const panel = queryPanel();
+  if (!panel) return;
+
+  const list = panel.querySelector('#pq-list');
+  const failedList = panel.querySelector('#pq-failed-list');
+  const failedTitle = panel.querySelector('#pq-failed-title');
+
+  if (!list) return;
 
   while (list.firstChild) {
     list.removeChild(list.firstChild);
   }
 
-  window.aiQueue.queue.forEach((item, index) => {
-    const { li, text, editBtn, deleteBtn } = window.createQueueItemElement(item, {
+  queueState.queue.forEach((item) => {
+    const { li, text, editBtn, deleteBtn } = createQueueItemElement(item, {
       renderQueue: renderGeminiQueue,
       saveQueue: saveGeminiQueue,
     });
 
-    if (window.aiQueue.editingId == item.id) {
+    if (queueState.editingId == item.id) {
       li.querySelector('div').style.backgroundColor = '#333';
       li.querySelector('div').style.padding = '4px';
       li.querySelector('div').style.borderRadius = '4px';
     }
 
     text.addEventListener('dblclick', () => {
-      AIQueue.queue.editQueueItem(item.id, window.aiQueue.queue, (id, prompt) => {
-        window.aiQueue.editingId = id;
-        window.pqInput.value = prompt;
-        window.pqAddBtn.textContent = 'Save Changes';
-        window.pqInput.focus();
-        window.pqInput.selectionStart = window.pqInput.selectionEnd = window.pqInput.value.length;
+      editQueueItem(item.id, queueState.queue, (id, prompt) => {
+        queueState.editingId = id;
+        const input = queryInput();
+        const addButton = queryAddButton();
+        if (input && addButton) {
+          input.value = prompt;
+          addButton.textContent = 'Save Changes';
+          input.focus();
+          input.selectionStart = input.selectionEnd = input.value.length;
+        }
         editBtn.style.display = 'inline-block';
         deleteBtn.style.display = 'inline-block';
       });
     });
 
     editBtn.addEventListener('click', () => {
-      AIQueue.queue.editQueueItem(item.id, window.aiQueue.queue, (id, prompt) => {
-        window.aiQueue.editingId = id;
-        window.pqInput.value = prompt;
-        window.pqAddBtn.textContent = 'Save Changes';
-        window.pqInput.focus();
-        window.pqInput.selectionStart = window.pqInput.selectionEnd = window.pqInput.value.length;
+      editQueueItem(item.id, queueState.queue, (id, prompt) => {
+        queueState.editingId = id;
+        const input = queryInput();
+        const addButton = queryAddButton();
+        if (input && addButton) {
+          input.value = prompt;
+          addButton.textContent = 'Save Changes';
+          input.focus();
+          input.selectionStart = input.selectionEnd = input.value.length;
+        }
       });
     });
 
     deleteBtn.addEventListener('click', () => {
-      AIQueue.queue.deleteQueueItem(
-        item.id,
-        window.aiQueue.queue,
-        renderGeminiQueue,
-        saveGeminiQueue
-      );
+      deleteQueueItem(item.id, queueState.queue, renderGeminiQueue, saveGeminiQueue);
     });
 
     list.appendChild(li);
   });
 
-  if (failedList) {
+  if (failedList && failedTitle) {
     while (failedList.firstChild) {
       failedList.removeChild(failedList.firstChild);
     }
 
-    if (window.aiQueue.failedQueue.length > 0) {
-      failedTitle.style.display = 'block';
-    } else {
-      failedTitle.style.display = 'none';
-    }
+    failedTitle.style.display = queueState.failedQueue.length > 0 ? 'block' : 'none';
 
-    window.aiQueue.failedQueue.forEach(item => {
+    queueState.failedQueue.forEach((item) => {
       const li = document.createElement('li');
       li.style.marginBottom = '8px';
       li.style.color = '#ff9999';
@@ -96,11 +123,11 @@ function renderGeminiQueue() {
       retryBtn.style.fontSize = '12px';
 
       retryBtn.addEventListener('click', () => {
-        const index = window.aiQueue.failedQueue.findIndex(i => i.id === item.id);
+        const index = queueState.failedQueue.findIndex((i) => i.id === item.id);
         if (index !== -1) {
-          const [retryItem] = window.aiQueue.failedQueue.splice(index, 1);
+          const [retryItem] = queueState.failedQueue.splice(index, 1);
           retryItem.attempts = 0;
-          window.aiQueue.queue.push(retryItem);
+          queueState.queue.push(retryItem);
           renderGeminiQueue();
           saveGeminiQueue();
         }
@@ -114,12 +141,7 @@ function renderGeminiQueue() {
       deleteBtn.style.fontSize = '12px';
 
       deleteBtn.addEventListener('click', () => {
-        AIQueue.queue.deleteQueueItem(
-          item.id,
-          window.aiQueue.failedQueue,
-          renderGeminiQueue,
-          saveGeminiQueue
-        );
+        deleteQueueItem(item.id, queueState.failedQueue, renderGeminiQueue, saveGeminiQueue);
       });
 
       row.appendChild(text);
@@ -131,27 +153,123 @@ function renderGeminiQueue() {
     });
   }
 
-  AIQueue.ui.updateToolbarButton(
-    window.pqToolbarButton,
-    window.aiQueue.queue,
-    window.aiQueue.running
+  updateToolbarButton(
+    document.querySelector('#pq-toolbar-button'),
+    queueState.queue,
+    queueState.running
   );
-  AIQueue.logging.log('queue rendered safely');
+  log('queue rendered safely');
 }
 
-function saveGeminiQueue() {
-  saveQueue(window.aiQueue.queue, window.aiQueue.failedQueue, 'pq-gemini-queue');
+export function saveGeminiQueue() {
+  saveQueue(queueState.queue, queueState.failedQueue, 'pq-gemini-queue');
 }
 
-function loadGeminiQueue() {
-  loadQueue(window.aiQueue.queue, window.aiQueue.failedQueue, 'pq-gemini-queue');
+export function loadGeminiQueue() {
+  loadQueue(queueState.queue, queueState.failedQueue, 'pq-gemini-queue');
 }
 
-// Export for main script
-window.GeminiQueueProvider = {
+export async function processGeminiQueue() {
+  const panel = queryPanel();
+  if (!panel) return;
+
+  setStatus(panel, 'Running');
+
+  while (queueState.queue.length > 0 && queueState.running) {
+    await waitForIdle();
+
+    const item = queueState.queue.shift();
+    const prompt = item.prompt;
+
+    updateToolbarButton(
+      document.querySelector('#pq-toolbar-button'),
+      queueState.queue,
+      queueState.running
+    );
+    renderGeminiQueue();
+
+    setStatus(panel, `Sending: ${prompt.slice(0, 40)}...`);
+
+    try {
+      await sendPrompt(prompt);
+      await waitForPromptProcessing();
+      item.attempts = 0;
+    } catch (err) {
+      error('Failed to send prompt:', err.message);
+      item.attempts = (item.attempts || 0) + 1;
+
+      if (item.attempts < 3) {
+        queueState.queue.push(item);
+      } else {
+        queueState.failedQueue.push(item);
+      }
+    }
+
+    saveGeminiQueue();
+  }
+
+  setStatus(panel, queueState.running ? 'Finished' : 'Stopped');
+  queueState.running = false;
+  updateToolbarButton(
+    document.querySelector('#pq-toolbar-button'),
+    queueState.queue,
+    queueState.running
+  );
+}
+
+export function ensureGeminiToolbarButton() {
+  ensureToolbarStyles();
+
+  let button = document.querySelector('#pq-toolbar-button');
+  if (!button) {
+    button = document.createElement('button');
+    button.id = 'pq-toolbar-button';
+    button.classList.add('pq-toolbar');
+    button.type = 'button';
+    button.textContent = 'Queue';
+    button.addEventListener('click', () => showPanel(() => createGeminiPanel()));
+  }
+
+  button.className = 'pq-toolbar';
+  Object.assign(button.style, {
+    position: 'fixed',
+    bottom: '24px',
+    right: '24px',
+    padding: '10px 14px',
+    borderRadius: '9999px',
+    background: '#1f1f1f',
+    color: '#fff',
+    border: '1px solid #555',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+    zIndex: '2147483647',
+    cursor: 'pointer',
+  });
+
+  if (button.parentElement !== document.body) {
+    document.body.appendChild(button);
+  }
+}
+
+export const geminiProvider = {
+  includeFailedQueue: true,
+  createItem(text) {
+    return {
+      id: crypto.randomUUID(),
+      prompt: text,
+      attempts: 0,
+    };
+  },
   createPanel: createGeminiPanel,
-  setupPanelDrag: window.setupPanelDrag,
   renderQueue: renderGeminiQueue,
   saveQueue: saveGeminiQueue,
   loadQueue: loadGeminiQueue,
+  processQueue: processGeminiQueue,
+  setupPanelControls,
+  setupPanelDrag,
+  ensureToolbarButton: ensureGeminiToolbarButton,
+  isOwnMutation(target) {
+    return !!target && (target.closest?.('#pq-panel') || target.closest?.('.pq-toolbar'));
+  },
 };
+
+bootstrapQueueApp(geminiProvider);

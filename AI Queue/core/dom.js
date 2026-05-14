@@ -1,8 +1,7 @@
-// DOM helpers exported to AIQueue.dom
-window.AIQueue = window.AIQueue || {};
-window.AIQueue.dom = window.AIQueue.dom || {};
+import { log } from './logging.js';
+import { isActionButtonElement, isAttached, isVisible } from './utils.js';
 
-AIQueue.dom.waitForCondition = function (
+export function waitForCondition(
   predicate,
   { timeoutMs = 10000, intervalMs = 100, description = 'condition' } = {}
 ) {
@@ -17,7 +16,7 @@ AIQueue.dom.waitForCondition = function (
           return;
         }
       } catch (err) {
-        AIQueue.logging.log('waitForCondition check error:', err);
+        log('waitForCondition check error:', err);
       }
 
       const elapsed = Date.now() - startedAt;
@@ -31,14 +30,14 @@ AIQueue.dom.waitForCondition = function (
 
     check();
   });
-};
+}
 
-AIQueue.dom.waitForElement = function (getter, options = {}) {
-  return AIQueue.dom.waitForCondition(() => getter(), options);
-};
+export function waitForElement(getter, options = {}) {
+  return waitForCondition(() => getter(), options);
+}
 
-AIQueue.dom.safeClick = function (element) {
-  if (!AIQueue.utils.isAttached(element) || !AIQueue.utils.isVisible(element)) return false;
+export function safeClick(element) {
+  if (!isAttached(element) || !isVisible(element)) return false;
 
   element.scrollIntoView({ block: 'center', inline: 'center' });
   element.focus?.({ preventScroll: true });
@@ -56,19 +55,19 @@ AIQueue.dom.safeClick = function (element) {
   );
   element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
   return true;
-};
+}
 
-AIQueue.dom.getEditorText = function (editor) {
+export function getEditorText(editor) {
   if (!editor) return '';
   if ('value' in editor) return String(editor.value || '');
   return String(editor.textContent || '');
-};
+}
 
-AIQueue.dom.isEditableCandidate = function (element) {
+export function isEditableCandidate(element) {
   if (!element) return false;
   if (!(element instanceof HTMLElement)) return false;
-  if (!AIQueue.utils.isAttached(element)) return false;
-  if (!AIQueue.utils.isVisible(element)) return false;
+  if (!isAttached(element)) return false;
+  if (!isVisible(element)) return false;
 
   const isTextarea = element instanceof HTMLTextAreaElement;
   const isContentEditable =
@@ -81,9 +80,9 @@ AIQueue.dom.isEditableCandidate = function (element) {
   if (element.closest('#pq-panel')) return false;
 
   return true;
-};
+}
 
-AIQueue.dom.scoreEditor = function (editor) {
+export function scoreEditor(editor) {
   const rect = editor.getBoundingClientRect();
   let score = rect.top;
 
@@ -96,14 +95,14 @@ AIQueue.dom.scoreEditor = function (editor) {
   if (rect.bottom > window.innerHeight * 0.5) score += 50;
 
   return score;
-};
+}
 
-AIQueue.dom.getComposerEditor = function () {
+export function getComposerEditor() {
   const activeElement = document.activeElement;
 
-  if (AIQueue.dom.isEditableCandidate(activeElement)) {
-    if (AIQueue.utils.isActionButtonElement(activeElement)) return null;
-    AIQueue.logging.log('editor found', activeElement);
+  if (isEditableCandidate(activeElement)) {
+    if (isActionButtonElement(activeElement)) return null;
+    log('editor found', activeElement);
     return activeElement;
   }
 
@@ -112,21 +111,19 @@ AIQueue.dom.getComposerEditor = function () {
       'textarea:not(#pq-input), [contenteditable="true"][role="textbox"], [contenteditable="true"]'
     ),
   ]
-    .filter(AIQueue.dom.isEditableCandidate)
-    .sort((left, right) => AIQueue.dom.scoreEditor(right) - AIQueue.dom.scoreEditor(left));
+    .filter(isEditableCandidate)
+    .sort((left, right) => scoreEditor(right) - scoreEditor(left));
 
-  candidates.forEach(candidate =>
-    AIQueue.logging.log('editor candidate', candidate.tagName, candidate)
-  );
+  candidates.forEach((candidate) => log('editor candidate', candidate.tagName, candidate));
 
   const editor = candidates[0] || null;
   if (editor && editor.matches('button, [role="button"]')) return null;
-  if (editor) AIQueue.logging.log('editor found', editor);
+  if (editor) log('editor found', editor);
 
   return editor;
-};
+}
 
-AIQueue.dom.getComposerHost = function (editor = AIQueue.dom.getComposerEditor()) {
+export function getComposerHost(editor = getComposerEditor()) {
   if (!editor) return null;
 
   const host =
@@ -146,22 +143,22 @@ AIQueue.dom.getComposerHost = function (editor = AIQueue.dom.getComposerEditor()
     return null;
 
   return host;
-};
+}
 
-AIQueue.dom.getButtonLabel = function (button) {
+export function getButtonLabel(button) {
   return [button.getAttribute('aria-label'), button.getAttribute('title'), button.textContent]
     .filter(Boolean)
     .join(' ')
     .replace(/\s+/g, ' ')
     .trim();
-};
+}
 
-AIQueue.dom.isActionButtonVisible = function (button) {
-  return AIQueue.utils.isAttached(button) && AIQueue.utils.isVisible(button);
-};
+export function isActionButtonVisible(button) {
+  return isAttached(button) && isVisible(button);
+}
 
-AIQueue.dom.getSendButton = function ({ includeDisabled = false } = {}) {
-  const host = AIQueue.dom.getComposerHost();
+export function getSendButton({ includeDisabled = false } = {}) {
+  const host = getComposerHost();
   const selectors = [
     'button[data-testid="send-button"]',
     '[role="button"][data-testid="send-button"]',
@@ -181,11 +178,11 @@ AIQueue.dom.getSendButton = function ({ includeDisabled = false } = {}) {
   }
 
   const button =
-    candidates.find(candidate => {
+    candidates.find((candidate) => {
       if (!candidate || !(candidate instanceof HTMLElement)) return false;
-      if (!AIQueue.dom.isActionButtonVisible(candidate)) return false;
+      if (!isActionButtonVisible(candidate)) return false;
 
-      const label = AIQueue.dom.getButtonLabel(candidate);
+      const label = getButtonLabel(candidate);
       const exactSend = candidate.matches('[data-testid="send-button"]');
       const looksLikeSend = /\bsend\b/i.test(label) || /\bsubmit\b/i.test(label);
 
@@ -195,11 +192,11 @@ AIQueue.dom.getSendButton = function ({ includeDisabled = false } = {}) {
       return true;
     }) || null;
 
-  if (button) AIQueue.logging.log('send button found', button);
+  if (button) log('send button found', button);
   return button;
-};
+}
 
-AIQueue.dom.findStopButton = function () {
+export function findStopButton() {
   const selectors = [
     'button[data-testid="stop-button"]',
     '[role="button"][data-testid="stop-button"]',
@@ -210,19 +207,18 @@ AIQueue.dom.findStopButton = function () {
   ];
 
   for (const selector of selectors) {
-    const button =
-      [...document.querySelectorAll(selector)].find(AIQueue.dom.isActionButtonVisible) || null;
+    const button = [...document.querySelectorAll(selector)].find(isActionButtonVisible) || null;
     if (button) {
-      AIQueue.logging.log('stop button found', button);
+      log('stop button found', button);
       return button;
     }
   }
 
   return null;
-};
+}
 
-AIQueue.dom.hasBusyIndicators = function () {
+export function hasBusyIndicators() {
   return [
     ...document.querySelectorAll('[aria-busy="true"], [data-loading="true"], [role="progressbar"]'),
-  ].some(AIQueue.dom.isActionButtonVisible);
-};
+  ].some(isActionButtonVisible);
+}

@@ -1,5 +1,9 @@
+import { log } from './logging.js';
+import { moveQueueItem } from './queue.js';
+import { queueState } from './state.js';
+
 // Shared queue item UI factory
-function createQueueItemElement(item, { renderQueue, saveQueue }) {
+export function createQueueItemElement(item, { renderQueue, saveQueue }) {
   const li = document.createElement('li');
   li.style.marginBottom = '10px';
   li.draggable = false;
@@ -38,28 +42,26 @@ function createQueueItemElement(item, { renderQueue, saveQueue }) {
   dragHandle.title = 'Drag to reorder';
   dragHandle.style.cursor = 'grab';
   dragHandle.style.userSelect = 'none';
-  dragHandle.style.marginRight = '6px';
   dragHandle.style.alignSelf = 'center';
   dragHandle.style.marginLeft = '6px';
-
-  dragHandle.addEventListener('dragstart', e => {
-  // hide by default; show on hover
   dragHandle.style.display = 'none';
-    window.aiQueue.draggedId = item.id;
+
+  dragHandle.addEventListener('dragstart', (e) => {
+    queueState.draggedId = item.id;
     try {
       e.dataTransfer.setData('text/plain', item.id);
       e.dataTransfer.effectAllowed = 'move';
-    } catch (err) {}
+    } catch (error) {
+      log('Drag start dataTransfer error:', error);
+    }
     li.style.opacity = '0.6';
   });
 
-    dragHandle.style.display = 'inline-block';
   dragHandle.addEventListener('dragend', () => {
-    window.aiQueue.draggedId = null;
+    queueState.draggedId = null;
     li.style.opacity = '';
   });
 
-  row.insertBefore(dragHandle, row.firstChild);
   // place drag handle on the right
   row.appendChild(dragHandle);
   li.appendChild(row);
@@ -68,41 +70,40 @@ function createQueueItemElement(item, { renderQueue, saveQueue }) {
   li.addEventListener('mouseenter', () => {
     editBtn.style.display = 'inline-block';
     deleteBtn.style.display = 'inline-block';
-  });
     dragHandle.style.display = 'inline-block';
+  });
   li.addEventListener('mouseleave', () => {
-    if (window.aiQueue.editingId === item.id) return;
+    if (queueState.editingId === item.id) return;
     editBtn.style.display = 'none';
     deleteBtn.style.display = 'none';
-  });
-    // keep visible while dragging
-    if (window.aiQueue.draggedId === item.id) return;
+    if (queueState.draggedId === item.id) return;
     dragHandle.style.display = 'none';
+  });
 
   // drag/drop
-  li.addEventListener('dragover', e => {
+  li.addEventListener('dragover', (e) => {
     e.preventDefault();
     try {
       e.dataTransfer.dropEffect = 'move';
-    } catch (err) {}
+    } catch (error) {
+      log('Drag over dataTransfer error:', error);
+    }
     li.style.borderTop = '2px solid #7dd3fc';
   });
   li.addEventListener('dragleave', () => {
     li.style.borderTop = '';
   });
-  li.addEventListener('drop', e => {
+  li.addEventListener('drop', (e) => {
     e.preventDefault();
     li.style.borderTop = '';
     const draggedId =
-      window.aiQueue.draggedId ||
+      queueState.draggedId ||
       (e.dataTransfer && e.dataTransfer.getData && e.dataTransfer.getData('text/plain'));
     if (draggedId && draggedId !== item.id) {
-      AIQueue.queue.moveQueueItem(draggedId, item.id, window.aiQueue.queue, renderQueue, saveQueue);
+      moveQueueItem(draggedId, item.id, queueState.queue, renderQueue, saveQueue);
     }
   });
 
   // expose controls for provider to wire
   return { li, text, editBtn, deleteBtn };
 }
-
-window.createQueueItemElement = createQueueItemElement;

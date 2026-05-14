@@ -1,40 +1,42 @@
-// Shared controls wiring for panel: add/start/stop
-function setupPanelControls({ createItem, renderQueue, saveQueue, processQueue }) {
-  const input = window.pqPanel.querySelector('#pq-input');
-  const addBtn = window.pqPanel.querySelector('#pq-add');
-  const startBtn = window.pqPanel.querySelector('#pq-start');
+import { error } from './logging.js';
+import { setStatus } from './queue.js';
+import { updateToolbarButton, getPanel } from './ui.js';
+import { queueState } from './state.js';
 
-  window.pqInput = input;
-  window.pqAddBtn = addBtn;
+export function setupPanelControls({ createItem, renderQueue, saveQueue, processQueue }) {
+  const panel = getPanel();
+  if (!panel) return;
+
+  const input = panel.querySelector('#pq-input');
+  const addBtn = panel.querySelector('#pq-add');
+  const startBtn = panel.querySelector('#pq-start');
+
+  const getToolbarButton = () => document.querySelector('#pq-toolbar-button');
 
   const handleAddClick = () => {
     const text = input.value.trim();
 
     if (!text) {
-      AIQueue.logging.error('Empty prompt, not adding to queue');
+      error('Empty prompt, not adding to queue');
       return;
     }
 
-    if (window.aiQueue.editingId !== null) {
-      const item = window.aiQueue.queue.find(item => item.id === window.aiQueue.editingId);
+    if (queueState.editingId !== null) {
+      const item = queueState.queue.find((item) => item.id === queueState.editingId);
 
       if (!item) {
-        AIQueue.logging.error('Editing item not found in queue:', window.aiQueue.editingId);
+        error('Editing item not found in queue:', queueState.editingId);
         return;
       }
 
       item.prompt = text;
-      window.aiQueue.editingId = null;
+      queueState.editingId = null;
       addBtn.textContent = 'Add To Queue';
     } else {
-      window.aiQueue.queue.push(createItem(text));
+      queueState.queue.push(createItem(text));
     }
 
-    AIQueue.ui.updateToolbarButton(
-      window.pqToolbarButton,
-      window.aiQueue.queue,
-      window.aiQueue.running
-    );
+    updateToolbarButton(getToolbarButton(), queueState.queue, queueState.running);
     input.value = '';
     renderQueue();
     saveQueue();
@@ -42,7 +44,7 @@ function setupPanelControls({ createItem, renderQueue, saveQueue, processQueue }
 
   addBtn.addEventListener('click', handleAddClick);
 
-  input.addEventListener('keydown', e => {
+  input.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       handleAddClick();
@@ -51,48 +53,34 @@ function setupPanelControls({ createItem, renderQueue, saveQueue, processQueue }
 
   function updateStartStopButtons() {
     if (!startBtn) return;
-    startBtn.textContent = window.aiQueue.running ? 'Stop Queue' : 'Start Queue';
+    startBtn.textContent = queueState.running ? 'Stop Queue' : 'Start Queue';
     startBtn.disabled = false;
   }
 
   startBtn.addEventListener('click', async () => {
-    if (window.aiQueue.running) {
+    if (queueState.running) {
       // act as Stop button
-      window.aiQueue.running = false;
-      AIQueue.queue.setStatus(window.pqPanel, 'Stopped');
+      queueState.running = false;
+      setStatus(panel, 'Stopped');
       updateStartStopButtons();
-      AIQueue.ui.updateToolbarButton(
-        window.pqToolbarButton,
-        window.aiQueue.queue,
-        window.aiQueue.running
-      );
+      updateToolbarButton(getToolbarButton(), queueState.queue, queueState.running);
       return;
     }
 
     // act as Start button
-    window.aiQueue.running = true;
+    queueState.running = true;
     updateStartStopButtons();
-    AIQueue.ui.updateToolbarButton(
-      window.pqToolbarButton,
-      window.aiQueue.queue,
-      window.aiQueue.running
-    );
+    updateToolbarButton(getToolbarButton(), queueState.queue, queueState.running);
     try {
       await processQueue();
     } catch (err) {
-      AIQueue.logging.error('Queue processor error:', err);
+      error('Queue processor error:', err);
     } finally {
-      window.aiQueue.running = false;
+      queueState.running = false;
       updateStartStopButtons();
-      AIQueue.ui.updateToolbarButton(
-        window.pqToolbarButton,
-        window.aiQueue.queue,
-        window.aiQueue.running
-      );
+      updateToolbarButton(getToolbarButton(), queueState.queue, queueState.running);
     }
   });
   // initialize button state
   updateStartStopButtons();
 }
-
-window.setupPanelControls = setupPanelControls;

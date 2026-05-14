@@ -1,5 +1,14 @@
-// Keyboard event helpers
-function dispatchEnterKey(target) {
+import { log, throwError } from './logging.js';
+import { isAttached } from './utils.js';
+import {
+  getComposerEditor,
+  getSendButton,
+  safeClick,
+  waitForCondition,
+  waitForElement,
+} from './dom.js';
+
+export function dispatchEnterKey(target) {
   const eventInit = {
     bubbles: true,
     cancelable: true,
@@ -15,9 +24,9 @@ function dispatchEnterKey(target) {
 }
 
 // Set editor value
-function setEditorValue(editor, prompt) {
+export function setEditorValue(editor, prompt) {
   if (!editor) throwError('Editor not found');
-  if (!AIQueue.utils.isAttached(editor)) AIQueue.logging.throwError('Editor is detached');
+  if (!isAttached(editor)) throwError('Editor is detached');
 
   editor.focus?.({ preventScroll: true });
 
@@ -87,8 +96,8 @@ function setEditorValue(editor, prompt) {
 }
 
 // Send prompt
-async function sendPrompt(prompt) {
-  const editor = await AIQueue.dom.waitForElement(() => AIQueue.dom.getComposerEditor(), {
+export async function sendPrompt(prompt) {
+  const editor = await waitForElement(() => getComposerEditor(), {
     timeoutMs: 15000,
     intervalMs: 200,
     description: 'Composer editor',
@@ -97,9 +106,9 @@ async function sendPrompt(prompt) {
   setEditorValue(editor, prompt);
 
   try {
-    await AIQueue.dom.waitForCondition(
+    await waitForCondition(
       () => {
-        const btn = AIQueue.dom.getSendButton();
+        const btn = getSendButton();
         return btn && !btn.disabled;
       },
       {
@@ -109,13 +118,13 @@ async function sendPrompt(prompt) {
       }
     );
 
-    const sendButton = AIQueue.dom.getSendButton();
+    const sendButton = getSendButton();
     if (sendButton) {
-      AIQueue.dom.safeClick(sendButton);
-      await AIQueue.utils.sleep(100);
+      safeClick(sendButton);
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
   } catch (err) {
-    AIQueue.logging.log('send button unavailable, falling back to Enter', err.message);
+    log('send button unavailable, falling back to Enter', err.message);
   }
 
   dispatchEnterKey(editor);

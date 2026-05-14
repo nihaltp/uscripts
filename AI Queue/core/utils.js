@@ -1,26 +1,22 @@
-// Utility functions exported to AIQueue.utils
-window.AIQueue = window.AIQueue || {};
-window.AIQueue.utils = window.AIQueue.utils || {};
+export function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-AIQueue.utils.sleep = function (ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-};
-
-AIQueue.utils.debounce = function (fn, waitMs = 200) {
+export function debounce(fn, waitMs = 200) {
   let timeoutId = null;
 
   return (...args) => {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => fn(...args), waitMs);
   };
-};
+}
 
-AIQueue.utils.isAttached = function (element) {
+export function isAttached(element) {
   return !!element && document.contains(element);
-};
+}
 
-AIQueue.utils.isVisible = function (element) {
-  if (!AIQueue.utils.isAttached(element)) return false;
+export function isVisible(element) {
+  if (!isAttached(element)) return false;
   if (!(element instanceof HTMLElement)) return false;
 
   const style = window.getComputedStyle(element);
@@ -39,19 +35,19 @@ AIQueue.utils.isVisible = function (element) {
     rect.top < window.innerHeight &&
     rect.left < window.innerWidth
   );
-};
+}
 
-AIQueue.utils.isActionButtonElement = function (element) {
+export function isActionButtonElement(element) {
   return (
     !!element &&
     element instanceof HTMLElement &&
     element.matches('button, [role="button"], input[type="button"], input[type="submit"]')
   );
-};
+}
 
-AIQueue.utils.isOwnMutation = function (target) {
+export function isOwnMutation(target) {
   return (
     !!target &&
     (target.closest?.('#pq-panel') || target.closest?.('.pq-toolbar') || target.id === 'pq-panel')
   );
-};
+}

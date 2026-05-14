@@ -1,24 +1,19 @@
-// Shared panel creation helper for providers
-function createBasePanel(titleText, includeFailedList = false) {
-  if (window.pqPanel && AIQueue.utils.isAttached(window.pqPanel)) {
-    return;
-  }
+import { ensurePanelAttached } from './ui.js';
+import { log } from './logging.js';
 
-  if (window.pqPanel && !AIQueue.utils.isAttached(window.pqPanel)) {
-    if (document.body) {
-      document.body.appendChild(window.pqPanel);
-    }
-    return;
-  }
+export function createBasePanel(titleText, includeFailedList = false) {
+  log('createBasePanel called');
 
-  if (!window.pqPanel) {
-    window.pqPanel = document.createElement('div');
-    window.pqPanel.id = 'pq-panel';
+  let panel = document.querySelector('#pq-panel');
 
-    Object.assign(window.pqPanel.style, {
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'pq-panel';
+
+    Object.assign(panel.style, {
       position: 'fixed',
-      top: '100px',
-      left: '100px',
+      top: '80px',
+      left: '24px',
       bottom: 'auto',
       right: 'auto',
       width: '320px',
@@ -33,6 +28,7 @@ function createBasePanel(titleText, includeFailedList = false) {
       zIndex: '2147483647',
       boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
       display: 'none',
+      transform: 'none',
     });
 
     const title = document.createElement('div');
@@ -78,12 +74,12 @@ function createBasePanel(titleText, includeFailedList = false) {
     list.style.marginTop = '10px';
     list.style.paddingLeft = '20px';
 
-    window.pqPanel.appendChild(title);
-    window.pqPanel.appendChild(textarea);
-    window.pqPanel.appendChild(addBtn);
-    window.pqPanel.appendChild(startBtn);
-    window.pqPanel.appendChild(status);
-    window.pqPanel.appendChild(list);
+    panel.appendChild(title);
+    panel.appendChild(textarea);
+    panel.appendChild(addBtn);
+    panel.appendChild(startBtn);
+    panel.appendChild(status);
+    panel.appendChild(list);
 
     if (includeFailedList) {
       const failedTitle = document.createElement('div');
@@ -98,17 +94,26 @@ function createBasePanel(titleText, includeFailedList = false) {
       failedList.style.marginTop = '6px';
       failedList.style.paddingLeft = '20px';
 
-      window.pqPanel.appendChild(failedTitle);
-      window.pqPanel.appendChild(failedList);
+      panel.appendChild(failedTitle);
+      panel.appendChild(failedList);
     }
 
-    if (document.body) {
-      document.body.appendChild(window.pqPanel);
+    const root = document.documentElement || document.body;
+    if (root) {
+      root.appendChild(panel);
     }
-
-    window.pqPanelInitialized = true;
+  } else {
+    ensurePanelAttached(panel);
   }
-}
 
-// Export on window for provider scripts to call
-window.createBasePanel = createBasePanel;
+  log('createBasePanel panel', panel);
+  setTimeout(() => {
+    log('panel element', panel);
+    log('computed display', getComputedStyle(panel).display);
+    log('computed visibility', getComputedStyle(panel).visibility);
+    log('rect', panel.getBoundingClientRect());
+    log('parent', panel.parentElement);
+  }, 0);
+
+  return panel;
+}

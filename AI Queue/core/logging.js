@@ -1,17 +1,17 @@
-// Logging helpers
-window.AIQueue = window.AIQueue || {};
-window.AIQueue.logging = window.AIQueue.logging || {};
+function isDebugEnabled() {
+  return Boolean(globalThis.aiQueueDebug);
+}
 
-AIQueue.logging.log = function (...args) {
-  if (!window.aiQueueDebug) return;
+export function log(...args) {
+  if (!isDebugEnabled()) return;
   console.log('[AI QUEUE]', ...args);
-};
+}
 
-AIQueue.logging.error = function (...args) {
+export function error(...args) {
   console.error('[AI QUEUE]', ...args);
-};
+}
 
-AIQueue.logging.throwError = function (...args) {
-  AIQueue.logging.error(...args);
+export function throwError(...args) {
+  error(...args);
   throw new Error(args.join(' '));
-};
+}
