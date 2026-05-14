@@ -1,0 +1,32 @@
+{
+  "name": "uscripts",
+  "version": "1.0.0",
+  "description": "Userscripts for various websites",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build-aiqueue": "node \"AI Queue/build.js\"",
+    "format": "prettier . --write",
+    "check-format": "prettier . --check",
+    "lint": "eslint .",
+    "lint-fix": "eslint . --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nihaltp/uscripts.git"
+  },
+  "author": "nihaltp",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nihaltp/uscripts/issues"
+  },
+  "homepage": "https://github.com/nihaltp/uscripts#readme",
+  "dependencies": {
+    "esbuild": "^0.28.0"
+  },
+  "devDependencies": {
+    "eslint": "^10.3.0",
+    "globals": "^16.5.0",
+    "prettier": "^3.8.3"
+  }
+}
