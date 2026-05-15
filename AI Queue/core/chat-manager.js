@@ -191,6 +191,26 @@ function ensureManagerStyles(doc) {
       justify-content: space-between;
       gap: 8px;
     }
+    .chat-title .chat-controls {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .chat-delete {
+      appearance: none;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--pq-manager-muted);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .chat-delete:hover {
+      color: var(--pq-manager-accent);
+      border-color: rgba(96,165,250,0.12);
+      background: rgba(96,165,250,0.03);
+    }
     .chat-list {
       list-style: none;
       margin: 0;
@@ -390,8 +410,34 @@ function renderCards(grid, storageKey, state, rerender) {
     const count = doc.createElement('span');
     count.textContent = String(state.groups[chatKey].length);
 
+    const controls = doc.createElement('span');
+    controls.className = 'chat-controls';
+    // Delete button to remove all prompts for this chat
+    const deleteButton = doc.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'chat-delete';
+    deleteButton.textContent = 'Delete';
+    deleteButton.title = 'Delete all prompts in this chat';
+
+    deleteButton.addEventListener('click', () => {
+      const chatName = chatLabel(chatKey);
+      // eslint-disable-next-line no-alert
+      if (!doc.defaultView?.confirm(`Delete all prompts in "${chatName}"? This cannot be undone.`)) return;
+
+      // remove the group and persist
+      if (state.groups[chatKey]) {
+        delete state.groups[chatKey];
+      }
+
+      persistState(storageKey, state);
+      rerender();
+    });
+
+    controls.appendChild(count);
+    controls.appendChild(deleteButton);
+
     title.appendChild(label);
-    title.appendChild(count);
+    title.appendChild(controls);
 
     const list = doc.createElement('ul');
     list.className = 'chat-list';
