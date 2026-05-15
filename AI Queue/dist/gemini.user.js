@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.4
+// @version      3.0.5
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -1149,66 +1149,12 @@
     await waitForIdle();
   }
 
-  // AI Queue/core/bootstrap.js
-  function bootstrapQueueApp(provider) {
-    globalThis.aiQueue = queueState;
-    const refreshForCurrentUrl = () => {
-      if (queueState.running) {
-        queueState.running = false;
-      }
-      resetQueueState({ includeFailedQueue: !!provider.includeFailedQueue });
-      provider.loadQueue?.();
-      provider.renderQueue?.();
-      provider.ensureToolbarButton?.();
-    };
-    resetQueueState({ includeFailedQueue: !!provider.includeFailedQueue });
-    provider.loadQueue?.();
-    provider.createPanel();
-    provider.setupPanelControls?.({
-      createItem: provider.createItem,
-      renderQueue: provider.renderQueue,
-      saveQueue: provider.saveQueue,
-      processQueue: provider.processQueue,
-      openChatManager: provider.openChatManager,
-    });
-    provider.setupPanelDrag?.();
-    provider.renderQueue?.();
-    provider.ensureToolbarButton?.();
-    startDomObserver(
-      provider.createPanel,
-      () =>
-        provider.setupPanelControls?.({
-          createItem: provider.createItem,
-          renderQueue: provider.renderQueue,
-          saveQueue: provider.saveQueue,
-          processQueue: provider.processQueue,
-          openChatManager: provider.openChatManager,
-        }),
-      provider.setupPanelDrag,
-      provider.ensureToolbarButton,
-      provider.isOwnMutation
-    );
-    startUrlWatcher(
-      provider.createPanel,
-      () =>
-        provider.setupPanelControls?.({
-          createItem: provider.createItem,
-          renderQueue: provider.renderQueue,
-          saveQueue: provider.saveQueue,
-          processQueue: provider.processQueue,
-          openChatManager: provider.openChatManager,
-        }),
-      provider.setupPanelDrag,
-      provider.ensureToolbarButton,
-      refreshForCurrentUrl
-    );
-  }
-
   // AI Queue/core/chat-manager.js
   var GLOBAL_CHAT_KEY = '__global__';
   var MANAGER_PANEL_ID = 'pq-chat-manager-panel';
   var MANAGER_GRID_ID = 'pq-chat-manager-grid';
   var MANAGER_BODY_ID = 'pq-chat-manager-body';
+  var activeManagers = /* @__PURE__ */ new Map();
   function toChatKey(chatCode) {
     return typeof chatCode === 'string' && chatCode.trim() ? chatCode.trim() : GLOBAL_CHAT_KEY;
   }
@@ -1655,6 +1601,91 @@
     }
     panel.scrollIntoView?.({ block: 'start', inline: 'nearest', behavior: 'smooth' });
     log('chat manager opened in-page', { storageKey });
+    activeManagers.set(storageKey, {
+      panel,
+      state,
+      title,
+      rerender,
+    });
+  }
+  function refreshChatManager(storageKey) {
+    const manager = activeManagers.get(storageKey);
+    if (!manager || !manager.panel || manager.panel.hidden) return false;
+    const refreshedData = readScopedQueueData(storageKey);
+    manager.state.data = refreshedData;
+    manager.state.groups = groupItems(refreshedData.items);
+    manager.state.drag = null;
+    const grid = manager.panel.querySelector(`#${MANAGER_GRID_ID}`);
+    renderCards(grid, storageKey, manager.state, manager.rerender);
+    return true;
+  }
+
+  // AI Queue/core/bootstrap.js
+  function bootstrapQueueApp(provider) {
+    globalThis.aiQueue = queueState;
+    const storageKey = provider.storageKey;
+    const syncFromStorage = () => {
+      resetQueueState({ includeFailedQueue: !!provider.includeFailedQueue });
+      provider.loadQueue?.();
+      provider.renderQueue?.();
+      provider.ensureToolbarButton?.();
+      if (storageKey) {
+        refreshChatManager(storageKey);
+      }
+    };
+    const refreshForCurrentUrl = () => {
+      if (queueState.running) {
+        queueState.running = false;
+      }
+      syncFromStorage();
+    };
+    syncFromStorage();
+    provider.createPanel();
+    provider.setupPanelControls?.({
+      createItem: provider.createItem,
+      renderQueue: provider.renderQueue,
+      saveQueue: provider.saveQueue,
+      processQueue: provider.processQueue,
+      openChatManager: provider.openChatManager,
+    });
+    provider.setupPanelDrag?.();
+    provider.renderQueue?.();
+    provider.ensureToolbarButton?.();
+    if (storageKey) {
+      window.addEventListener('storage', (event) => {
+        if (event.storageArea !== localStorage) return;
+        if (event.key !== storageKey) return;
+        syncFromStorage();
+      });
+    }
+    startDomObserver(
+      provider.createPanel,
+      () =>
+        provider.setupPanelControls?.({
+          createItem: provider.createItem,
+          renderQueue: provider.renderQueue,
+          saveQueue: provider.saveQueue,
+          processQueue: provider.processQueue,
+          openChatManager: provider.openChatManager,
+        }),
+      provider.setupPanelDrag,
+      provider.ensureToolbarButton,
+      provider.isOwnMutation
+    );
+    startUrlWatcher(
+      provider.createPanel,
+      () =>
+        provider.setupPanelControls?.({
+          createItem: provider.createItem,
+          renderQueue: provider.renderQueue,
+          saveQueue: provider.saveQueue,
+          processQueue: provider.processQueue,
+          openChatManager: provider.openChatManager,
+        }),
+      provider.setupPanelDrag,
+      provider.ensureToolbarButton,
+      refreshForCurrentUrl
+    );
   }
 
   // AI Queue/providers/gemini.js
@@ -1881,6 +1912,7 @@
     }
   }
   var geminiProvider = {
+    storageKey: STORAGE_KEY,
     includeFailedQueue: true,
     createItem(text) {
       const chatCode = getCurrentGeminiChatCode();

@@ -285,6 +285,7 @@ export function ensureGeminiToolbarButton() {
 }
 
 export const geminiProvider = {
+  storageKey: STORAGE_KEY,
   includeFailedQueue: true,
   createItem(text) {
     const chatCode = getCurrentGeminiChatCode();

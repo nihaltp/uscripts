@@ -5,6 +5,7 @@ const GLOBAL_CHAT_KEY = '__global__';
 const MANAGER_PANEL_ID = 'pq-chat-manager-panel';
 const MANAGER_GRID_ID = 'pq-chat-manager-grid';
 const MANAGER_BODY_ID = 'pq-chat-manager-body';
+const activeManagers = new Map();
 
 function toChatKey(chatCode) {
   return typeof chatCode === 'string' && chatCode.trim() ? chatCode.trim() : GLOBAL_CHAT_KEY;
@@ -529,4 +530,25 @@ export function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Man
 
   panel.scrollIntoView?.({ block: 'start', inline: 'nearest', behavior: 'smooth' });
   log('chat manager opened in-page', { storageKey });
+
+  activeManagers.set(storageKey, {
+    panel,
+    state,
+    title,
+    rerender,
+  });
+}
+
+export function refreshChatManager(storageKey) {
+  const manager = activeManagers.get(storageKey);
+  if (!manager || !manager.panel || manager.panel.hidden) return false;
+
+  const refreshedData = readScopedQueueData(storageKey);
+  manager.state.data = refreshedData;
+  manager.state.groups = groupItems(refreshedData.items);
+  manager.state.drag = null;
+
+  const grid = manager.panel.querySelector(`#${MANAGER_GRID_ID}`);
+  renderCards(grid, storageKey, manager.state, manager.rerender);
+  return true;
 }

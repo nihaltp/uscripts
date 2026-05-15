@@ -205,6 +205,7 @@ export function ensureChatGPTToolbarButton() {
 }
 
 export const chatgptProvider = {
+  storageKey: STORAGE_KEY,
   includeFailedQueue: false,
   createItem(text) {
     const chatCode = getCurrentChatGPTChatCode();
