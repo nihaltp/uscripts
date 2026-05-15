@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.3
+// @version      3.0.4
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -1206,7 +1206,9 @@
 
   // AI Queue/core/chat-manager.js
   var GLOBAL_CHAT_KEY = '__global__';
-  var MANAGER_WINDOW_NAME = 'pq-chat-manager';
+  var MANAGER_PANEL_ID = 'pq-chat-manager-panel';
+  var MANAGER_GRID_ID = 'pq-chat-manager-grid';
+  var MANAGER_BODY_ID = 'pq-chat-manager-body';
   function toChatKey(chatCode) {
     return typeof chatCode === 'string' && chatCode.trim() ? chatCode.trim() : GLOBAL_CHAT_KEY;
   }
@@ -1263,57 +1265,113 @@
     const list = groups[chatKey] || [];
     return list.findIndex((item) => item.id === itemId);
   }
-  function ensureBaseMarkup(doc, title) {
-    doc.title = title;
-    doc.body.innerHTML = '';
+  function ensureManagerStyles(doc) {
+    if (doc.querySelector('#pq-chat-manager-styles')) return;
     const style = doc.createElement('style');
+    style.id = 'pq-chat-manager-styles';
     style.textContent = `
     :root {
       color-scheme: dark;
-      --bg: #111827;
-      --panel: #1f2937;
-      --card: #243042;
-      --text: #f3f4f6;
-      --muted: #9ca3af;
-      --accent: #22c55e;
-      --border: #374151;
-      --drag: #60a5fa;
+      --pq-manager-bg: #0b1220;
+      --pq-manager-panel: rgba(17, 24, 39, 0.96);
+      --pq-manager-card: rgba(31, 41, 55, 0.96);
+      --pq-manager-text: #f3f4f6;
+      --pq-manager-muted: #9ca3af;
+      --pq-manager-border: #374151;
+      --pq-manager-accent: #60a5fa;
+      --pq-manager-accent-strong: #22c55e;
     }
-    body {
-      margin: 0;
-      background: radial-gradient(circle at top right, #1f2937, #0b1220 60%);
-      color: var(--text);
-      font-family: 'Segoe UI', Tahoma, sans-serif;
+    #${MANAGER_PANEL_ID} {
+      position: fixed;
+      top: 6vh;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(1100px, calc(100vw - 32px));
+      height: min(760px, calc(100vh - 32px));
+      z-index: 2147483647;
+      display: flex;
+      flex-direction: column;
+      background: radial-gradient(circle at top right, rgba(31, 41, 55, 0.95), rgba(11, 18, 32, 0.98) 60%);
+      color: var(--pq-manager-text);
+      border: 1px solid var(--pq-manager-border);
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
     }
-    .wrap {
-      padding: 16px;
+    .pq-manager-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
     }
-    .title {
-      font-size: 20px;
+    .pq-manager-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--pq-manager-border);
+      background: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.82));
+    }
+    .pq-manager-title {
+      font-size: 18px;
       font-weight: 700;
-      margin-bottom: 4px;
+      line-height: 1.2;
+      margin: 0;
     }
-    .subtitle {
-      color: var(--muted);
-      margin-bottom: 16px;
+    .pq-manager-subtitle {
+      margin-top: 4px;
+      color: var(--pq-manager-muted);
       font-size: 13px;
+      line-height: 1.4;
+      max-width: 72ch;
     }
-    .grid {
+    .pq-manager-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .pq-manager-actions button {
+      appearance: none;
+      border: 1px solid var(--pq-manager-border);
+      background: rgba(31, 41, 55, 0.95);
+      color: var(--pq-manager-text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+    .pq-manager-actions button:hover {
+      border-color: var(--pq-manager-accent);
+    }
+    .pq-manager-body {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 16px 18px 18px;
+      gap: 12px;
+      overflow: hidden;
+    }
+    .pq-manager-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
       gap: 12px;
       align-items: start;
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 4px;
     }
     .chat-card {
-      background: linear-gradient(180deg, var(--panel), var(--card));
-      border: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--pq-manager-panel), var(--pq-manager-card));
+      border: 1px solid var(--pq-manager-border);
       border-radius: 12px;
       overflow: hidden;
       min-height: 140px;
     }
     .chat-title {
       padding: 10px 12px;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid var(--pq-manager-border);
       font-size: 12px;
       letter-spacing: 0.2px;
       text-transform: uppercase;
@@ -1345,45 +1403,93 @@
     }
     .chat-list.drag-over,
     .chat-item.drag-over {
-      outline: 2px dashed var(--drag);
+      outline: 2px dashed var(--pq-manager-accent);
       outline-offset: 2px;
     }
     .empty {
-      color: var(--muted);
+      color: var(--pq-manager-muted);
       font-size: 12px;
       padding: 8px;
-      border: 1px dashed var(--border);
+      border: 1px dashed var(--pq-manager-border);
       border-radius: 8px;
       text-align: center;
     }
-    .footer {
-      margin-top: 14px;
-      color: var(--muted);
+    .pq-manager-footer {
+      color: var(--pq-manager-muted);
       font-size: 12px;
+      border-top: 1px solid var(--pq-manager-border);
+      padding-top: 12px;
     }
   `;
-    const wrap = doc.createElement('div');
-    wrap.className = 'wrap';
-    const header = doc.createElement('div');
-    header.className = 'title';
-    header.textContent = title;
-    const subtitle = doc.createElement('div');
-    subtitle.className = 'subtitle';
-    subtitle.textContent =
-      'Drag prompts to reorder within a chat, or drop them into another chat card to move between chats.';
-    const grid = doc.createElement('div');
-    grid.className = 'grid';
-    grid.id = 'pq-chat-grid';
-    const footer = doc.createElement('div');
-    footer.className = 'footer';
-    footer.textContent = 'Changes are saved immediately to localStorage.';
-    wrap.appendChild(header);
-    wrap.appendChild(subtitle);
-    wrap.appendChild(grid);
-    wrap.appendChild(footer);
-    doc.head.innerHTML = '';
     doc.head.appendChild(style);
-    doc.body.appendChild(wrap);
+  }
+  function ensureManagerShell(doc, title) {
+    ensureManagerStyles(doc);
+    let panel = doc.getElementById(MANAGER_PANEL_ID);
+    if (!panel) {
+      panel = doc.createElement('section');
+      panel.id = MANAGER_PANEL_ID;
+      const shell = doc.createElement('div');
+      shell.className = 'pq-manager-shell';
+      const header = doc.createElement('div');
+      header.className = 'pq-manager-header';
+      const titleWrap = doc.createElement('div');
+      const heading = doc.createElement('div');
+      heading.className = 'pq-manager-title';
+      const subtitle = doc.createElement('div');
+      subtitle.className = 'pq-manager-subtitle';
+      titleWrap.appendChild(heading);
+      titleWrap.appendChild(subtitle);
+      const actions = doc.createElement('div');
+      actions.className = 'pq-manager-actions';
+      const refreshButton = doc.createElement('button');
+      refreshButton.type = 'button';
+      refreshButton.id = 'pq-chat-manager-refresh';
+      refreshButton.textContent = 'Refresh';
+      const closeButton = doc.createElement('button');
+      closeButton.type = 'button';
+      closeButton.id = 'pq-chat-manager-close';
+      closeButton.textContent = 'Close';
+      actions.appendChild(refreshButton);
+      actions.appendChild(closeButton);
+      header.appendChild(titleWrap);
+      header.appendChild(actions);
+      const body = doc.createElement('div');
+      body.className = 'pq-manager-body';
+      body.id = MANAGER_BODY_ID;
+      const grid = doc.createElement('div');
+      grid.className = 'pq-manager-grid';
+      grid.id = MANAGER_GRID_ID;
+      const footer = doc.createElement('div');
+      footer.className = 'pq-manager-footer';
+      footer.textContent =
+        'Drag prompts between chats. Changes are saved immediately to localStorage.';
+      body.appendChild(grid);
+      body.appendChild(footer);
+      shell.appendChild(header);
+      shell.appendChild(body);
+      panel.appendChild(shell);
+      closeButton.addEventListener('click', () => {
+        panel.hidden = true;
+        panel.style.display = 'none';
+      });
+    }
+    const titleNode = panel.querySelector('.pq-manager-title');
+    const subtitleNode = panel.querySelector('.pq-manager-subtitle');
+    if (titleNode) {
+      titleNode.textContent = title;
+    }
+    if (subtitleNode) {
+      subtitleNode.textContent =
+        'Reorder prompts within a chat or move them into another chat card. This panel stays inside the page instead of opening a popup.';
+    }
+    const root = doc.documentElement || doc.body;
+    if (root && !root.contains(panel)) {
+      root.appendChild(panel);
+    }
+    panel.hidden = false;
+    panel.style.display = 'flex';
+    return panel;
   }
   function moveByDrop(state, fromChatKey, itemId, toChatKey2, toIndex) {
     const fromList = state.groups[fromChatKey] || [];
@@ -1413,18 +1519,19 @@
     state.data.items = flattenGroups(state.groups);
     writeScopedQueueData(storageKey, state.data);
   }
-  function renderCards(doc, storageKey, state, rerender) {
-    const grid = doc.querySelector('#pq-chat-grid');
+  function renderCards(grid, storageKey, state, rerender) {
     if (!grid) return;
-    grid.innerHTML = '';
+    grid.replaceChildren();
     const keys = orderedKeys(state.groups);
     if (keys.length === 0) {
-      const empty = doc.createElement('div');
+      const doc2 = grid.ownerDocument;
+      const empty = doc2.createElement('div');
       empty.className = 'empty';
       empty.textContent = 'No prompts found in storage.';
       grid.appendChild(empty);
       return;
     }
+    const doc = grid.ownerDocument;
     keys.forEach((chatKey) => {
       const card = doc.createElement('section');
       card.className = 'chat-card';
@@ -1466,9 +1573,9 @@
           entry.addEventListener('dragend', () => {
             state.drag = null;
             entry.classList.remove('dragging');
-            doc
-              .querySelectorAll('.drag-over')
-              .forEach((element) => element.classList.remove('drag-over'));
+            doc.querySelectorAll(`#${MANAGER_PANEL_ID} .drag-over`).forEach((element) => {
+              element.classList.remove('drag-over');
+            });
           });
           entry.addEventListener('dragover', (event) => {
             event.preventDefault();
@@ -1523,24 +1630,31 @@
     });
   }
   function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Manager') {
-    const popup = window.open('', MANAGER_WINDOW_NAME, 'width=1100,height=760,resizable=yes');
-    if (!popup) {
-      error('Failed to open chat manager window. Pop-up may be blocked.');
-      return;
-    }
     const data = readScopedQueueData(storageKey);
     const state = {
       data,
       groups: groupItems(data.items),
       drag: null,
     };
+    const panel = ensureManagerShell(document, title);
+    panel.dataset.storageKey = storageKey;
     const rerender = () => {
-      ensureBaseMarkup(popup.document, title);
-      renderCards(popup.document, storageKey, state, rerender);
+      const grid = panel.querySelector(`#${MANAGER_GRID_ID}`);
+      renderCards(grid, storageKey, state, rerender);
     };
     rerender();
-    popup.focus();
-    log('chat manager opened', { storageKey });
+    const refreshButton = panel.querySelector('#pq-chat-manager-refresh');
+    if (refreshButton) {
+      refreshButton.onclick = () => {
+        const refreshedData = readScopedQueueData(storageKey);
+        state.data = refreshedData;
+        state.groups = groupItems(refreshedData.items);
+        state.drag = null;
+        rerender();
+      };
+    }
+    panel.scrollIntoView?.({ block: 'start', inline: 'nearest', behavior: 'smooth' });
+    log('chat manager opened in-page', { storageKey });
   }
 
   // AI Queue/providers/gemini.js
