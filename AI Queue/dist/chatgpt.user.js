@@ -10,7 +10,7 @@
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.0.0
+// @version      3.0.1
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
@@ -539,10 +539,12 @@
       if (stored) {
         const data = JSON.parse(stored);
         if (Array.isArray(data.queue)) {
-          queue.push(...data.queue);
+          queue.push(...data.queue.filter((item) => item && typeof item.prompt === 'string'));
         }
         if (Array.isArray(data.failedQueue) && failedQueue) {
-          failedQueue.push(...data.failedQueue);
+          failedQueue.push(
+            ...data.failedQueue.filter((item) => item && typeof item.prompt === 'string')
+          );
         }
         log('queue loaded from storage', queue.length, 'items');
       }

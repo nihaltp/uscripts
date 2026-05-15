@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.0
+// @version      3.0.1
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -538,10 +538,12 @@
       if (stored) {
         const data = JSON.parse(stored);
         if (Array.isArray(data.queue)) {
-          queue.push(...data.queue);
+          queue.push(...data.queue.filter((item) => item && typeof item.prompt === 'string'));
         }
         if (Array.isArray(data.failedQueue) && failedQueue) {
-          failedQueue.push(...data.failedQueue);
+          failedQueue.push(
+            ...data.failedQueue.filter((item) => item && typeof item.prompt === 'string')
+          );
         }
         log('queue loaded from storage', queue.length, 'items');
       }
@@ -1211,6 +1213,10 @@
     while (queueState.queue.length > 0 && queueState.running) {
       await waitForIdle();
       const item = queueState.queue.shift();
+      if (!item || typeof item.prompt !== 'string') {
+        error('Skipping invalid queue item:', item);
+        continue;
+      }
       const prompt = item.prompt;
       updateToolbarButton(
         document.querySelector('#pq-toolbar-button'),

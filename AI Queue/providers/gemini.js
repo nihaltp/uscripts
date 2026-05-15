@@ -179,6 +179,11 @@ export async function processGeminiQueue() {
     await waitForIdle();
 
     const item = queueState.queue.shift();
+    if (!item || typeof item.prompt !== 'string') {
+      error('Skipping invalid queue item:', item);
+      continue;
+    }
+
     const prompt = item.prompt;
 
     updateToolbarButton(

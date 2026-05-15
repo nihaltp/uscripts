@@ -19,10 +19,14 @@ export function loadQueue(queue, failedQueue, storageKey = 'pq-queue-state') {
     if (stored) {
       const data = JSON.parse(stored);
       if (Array.isArray(data.queue)) {
-        queue.push(...data.queue);
+        queue.push(
+          ...data.queue.filter((item) => item && typeof item.prompt === 'string')
+        );
       }
       if (Array.isArray(data.failedQueue) && failedQueue) {
-        failedQueue.push(...data.failedQueue);
+        failedQueue.push(
+          ...data.failedQueue.filter((item) => item && typeof item.prompt === 'string')
+        );
       }
       log('queue loaded from storage', queue.length, 'items');
     }
