@@ -3,9 +3,12 @@ import { setStatus } from './queue.js';
 import { updateToolbarButton, getPanel } from './ui.js';
 import { queueState } from './state.js';
 
+const boundPanels = new WeakSet();
+
 export function setupPanelControls({ createItem, renderQueue, saveQueue, processQueue }) {
   const panel = getPanel();
   if (!panel) return;
+  if (boundPanels.has(panel)) return;
 
   const input = panel.querySelector('#pq-input');
   const addBtn = panel.querySelector('#pq-add');
@@ -81,6 +84,8 @@ export function setupPanelControls({ createItem, renderQueue, saveQueue, process
       updateToolbarButton(getToolbarButton(), queueState.queue, queueState.running);
     }
   });
+
+  boundPanels.add(panel);
   // initialize button state
   updateStartStopButtons();
 }

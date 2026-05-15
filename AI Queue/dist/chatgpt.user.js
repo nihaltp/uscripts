@@ -10,7 +10,7 @@
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.0.1
+// @version      3.0.2
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
@@ -554,9 +554,11 @@
   }
 
   // AI Queue/core/panel-controls.js
+  var boundPanels = /* @__PURE__ */ new WeakSet();
   function setupPanelControls({ createItem, renderQueue, saveQueue: saveQueue2, processQueue }) {
     const panel = getPanel();
     if (!panel) return;
+    if (boundPanels.has(panel)) return;
     const input = panel.querySelector('#pq-input');
     const addBtn = panel.querySelector('#pq-add');
     const startBtn = panel.querySelector('#pq-start');
@@ -617,6 +619,7 @@
         updateToolbarButton(getToolbarButton(), queueState.queue, queueState.running);
       }
     });
+    boundPanels.add(panel);
     updateStartStopButtons();
   }
 
