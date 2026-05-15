@@ -1,0 +1,191 @@
+:root {
+  color-scheme: dark;
+  --pq-manager-bg: #0b1220;
+  --pq-manager-panel: rgba(17, 24, 39, 0.96);
+  --pq-manager-card: rgba(31, 41, 55, 0.96);
+  --pq-manager-text: #f3f4f6;
+  --pq-manager-muted: #9ca3af;
+  --pq-manager-border: #374151;
+  --pq-manager-accent: #60a5fa;
+  --pq-manager-accent-strong: #22c55e;
+}
+
+#pq-chat-manager-panel {
+  position: fixed;
+  top: 6vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1100px, calc(100vw - 32px));
+  height: min(760px, calc(100vh - 32px));
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(circle at top right, rgba(31, 41, 55, 0.95), rgba(11, 18, 32, 0.98) 60%);
+  color: var(--pq-manager-text);
+  border: 1px solid var(--pq-manager-border);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.pq-manager-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.pq-manager-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--pq-manager-border);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.82));
+}
+
+.pq-manager-title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.pq-manager-subtitle {
+  margin-top: 4px;
+  color: var(--pq-manager-muted);
+  font-size: 13px;
+  line-height: 1.4;
+  max-width: 72ch;
+}
+
+.pq-manager-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.pq-manager-actions button {
+  appearance: none;
+  border: 1px solid var(--pq-manager-border);
+  background: rgba(31, 41, 55, 0.95);
+  color: var(--pq-manager-text);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pq-manager-actions button:hover {
+  border-color: var(--pq-manager-accent);
+}
+
+.pq-manager-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px 18px 18px;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.pq-manager-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  align-items: start;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.chat-card {
+  background: linear-gradient(180deg, var(--pq-manager-panel), var(--pq-manager-card));
+  border: 1px solid var(--pq-manager-border);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 140px;
+}
+
+.chat-title {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--pq-manager-border);
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  color: #d1d5db;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chat-title .chat-controls {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.chat-delete {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--pq-manager-muted);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chat-delete:hover {
+  color: var(--pq-manager-accent);
+  border-color: rgba(96, 165, 250, 0.12);
+  background: rgba(96, 165, 250, 0.03);
+}
+
+.chat-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  min-height: 90px;
+}
+
+.chat-item {
+  background: rgba(17, 24, 39, 0.7);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  cursor: grab;
+  user-select: none;
+  font-size: 13px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.chat-item.dragging {
+  opacity: 0.5;
+}
+
+.chat-list.drag-over,
+.chat-item.drag-over {
+  outline: 2px dashed var(--pq-manager-accent);
+  outline-offset: 2px;
+}
+
+.empty {
+  color: var(--pq-manager-muted);
+  font-size: 12px;
+  padding: 8px;
+  border: 1px dashed var(--pq-manager-border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.pq-manager-footer {
+  color: var(--pq-manager-muted);
+  font-size: 12px;
+  border-top: 1px solid var(--pq-manager-border);
+  padding-top: 12px;
+}

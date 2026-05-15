@@ -67,6 +67,9 @@ ${grantLines}
       banner: {
         js: banner,
       },
+      loader: {
+        '.css': 'text',
+      },
     });
 
     const outputPath = path.resolve(rootDir, app.outfile);

@@ -1,5 +1,6 @@
 import { log, error } from './logging.js';
 import { isAttached, isOwnMutation } from './utils.js';
+import toolbarStyles from '../styles/ui.css';
 
 let repairTimer = null;
 let lastRepairAt = 0;
@@ -13,13 +14,7 @@ export function ensureToolbarStyles() {
 
   const style = document.createElement('style');
   style.id = 'pq-styles';
-  style.textContent = `
-    @keyframes pq-pulse {
-      0% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.06); opacity: 0.75; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-  `;
+  style.textContent = toolbarStyles;
   document.head.appendChild(style);
 }
 

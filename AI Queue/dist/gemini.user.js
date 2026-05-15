@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.7
+// @version      3.0.8
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -89,6 +89,10 @@
     );
   }
 
+  // AI Queue/styles/ui.css
+  var ui_default =
+    '@keyframes pq-pulse {\r\n  0% {\r\n    transform: scale(1);\r\n    opacity: 1;\r\n  }\r\n\r\n  50% {\r\n    transform: scale(1.06);\r\n    opacity: 0.75;\r\n  }\r\n\r\n  100% {\r\n    transform: scale(1);\r\n    opacity: 1;\r\n  }\r\n}';
+
   // AI Queue/core/ui.js
   var repairTimer = null;
   var lastRepairAt = 0;
@@ -100,13 +104,7 @@
     if (document.querySelector('#pq-styles')) return;
     const style = document.createElement('style');
     style.id = 'pq-styles';
-    style.textContent = `
-    @keyframes pq-pulse {
-      0% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.06); opacity: 0.75; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-  `;
+    style.textContent = ui_default;
     document.head.appendChild(style);
   }
   function getPanel() {
@@ -1177,6 +1175,10 @@
     await waitForIdle();
   }
 
+  // AI Queue/styles/chat-manager.css
+  var chat_manager_default =
+    ':root {\r\n  color-scheme: dark;\r\n  --pq-manager-bg: #0b1220;\r\n  --pq-manager-panel: rgba(17, 24, 39, 0.96);\r\n  --pq-manager-card: rgba(31, 41, 55, 0.96);\r\n  --pq-manager-text: #f3f4f6;\r\n  --pq-manager-muted: #9ca3af;\r\n  --pq-manager-border: #374151;\r\n  --pq-manager-accent: #60a5fa;\r\n  --pq-manager-accent-strong: #22c55e;\r\n}\r\n\r\n#pq-chat-manager-panel {\r\n  position: fixed;\r\n  top: 6vh;\r\n  left: 50%;\r\n  transform: translateX(-50%);\r\n  width: min(1100px, calc(100vw - 32px));\r\n  height: min(760px, calc(100vh - 32px));\r\n  z-index: 2147483647;\r\n  display: flex;\r\n  flex-direction: column;\r\n  background: radial-gradient(circle at top right, rgba(31, 41, 55, 0.95), rgba(11, 18, 32, 0.98) 60%);\r\n  color: var(--pq-manager-text);\r\n  border: 1px solid var(--pq-manager-border);\r\n  border-radius: 16px;\r\n  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);\r\n  overflow: hidden;\r\n}\r\n\r\n.pq-manager-shell {\r\n  display: flex;\r\n  flex-direction: column;\r\n  height: 100%;\r\n  min-height: 0;\r\n}\r\n\r\n.pq-manager-header {\r\n  display: flex;\r\n  align-items: flex-start;\r\n  justify-content: space-between;\r\n  gap: 16px;\r\n  padding: 16px 18px 12px;\r\n  border-bottom: 1px solid var(--pq-manager-border);\r\n  background: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.82));\r\n}\r\n\r\n.pq-manager-title {\r\n  font-size: 18px;\r\n  font-weight: 700;\r\n  line-height: 1.2;\r\n  margin: 0;\r\n}\r\n\r\n.pq-manager-subtitle {\r\n  margin-top: 4px;\r\n  color: var(--pq-manager-muted);\r\n  font-size: 13px;\r\n  line-height: 1.4;\r\n  max-width: 72ch;\r\n}\r\n\r\n.pq-manager-actions {\r\n  display: flex;\r\n  gap: 8px;\r\n  flex-shrink: 0;\r\n}\r\n\r\n.pq-manager-actions button {\r\n  appearance: none;\r\n  border: 1px solid var(--pq-manager-border);\r\n  background: rgba(31, 41, 55, 0.95);\r\n  color: var(--pq-manager-text);\r\n  border-radius: 999px;\r\n  padding: 8px 12px;\r\n  font: inherit;\r\n  cursor: pointer;\r\n}\r\n\r\n.pq-manager-actions button:hover {\r\n  border-color: var(--pq-manager-accent);\r\n}\r\n\r\n.pq-manager-body {\r\n  display: flex;\r\n  flex-direction: column;\r\n  min-height: 0;\r\n  padding: 16px 18px 18px;\r\n  gap: 12px;\r\n  overflow: hidden;\r\n}\r\n\r\n.pq-manager-grid {\r\n  display: grid;\r\n  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));\r\n  gap: 12px;\r\n  align-items: start;\r\n  flex: 1;\r\n  min-height: 0;\r\n  overflow: auto;\r\n  padding-right: 4px;\r\n}\r\n\r\n.chat-card {\r\n  background: linear-gradient(180deg, var(--pq-manager-panel), var(--pq-manager-card));\r\n  border: 1px solid var(--pq-manager-border);\r\n  border-radius: 12px;\r\n  overflow: hidden;\r\n  min-height: 140px;\r\n}\r\n\r\n.chat-title {\r\n  padding: 10px 12px;\r\n  border-bottom: 1px solid var(--pq-manager-border);\r\n  font-size: 12px;\r\n  letter-spacing: 0.2px;\r\n  text-transform: uppercase;\r\n  color: #d1d5db;\r\n  display: flex;\r\n  justify-content: space-between;\r\n  gap: 8px;\r\n}\r\n\r\n.chat-title .chat-controls {\r\n  display: inline-flex;\r\n  gap: 8px;\r\n  align-items: center;\r\n}\r\n\r\n.chat-delete {\r\n  appearance: none;\r\n  border: 1px solid transparent;\r\n  background: transparent;\r\n  color: var(--pq-manager-muted);\r\n  border-radius: 8px;\r\n  padding: 4px 8px;\r\n  font-size: 12px;\r\n  cursor: pointer;\r\n}\r\n\r\n.chat-delete:hover {\r\n  color: var(--pq-manager-accent);\r\n  border-color: rgba(96, 165, 250, 0.12);\r\n  background: rgba(96, 165, 250, 0.03);\r\n}\r\n\r\n.chat-list {\r\n  list-style: none;\r\n  margin: 0;\r\n  padding: 8px;\r\n  min-height: 90px;\r\n}\r\n\r\n.chat-item {\r\n  background: rgba(17, 24, 39, 0.7);\r\n  border: 1px solid #334155;\r\n  border-radius: 8px;\r\n  padding: 8px;\r\n  margin-bottom: 8px;\r\n  cursor: grab;\r\n  user-select: none;\r\n  font-size: 13px;\r\n  line-height: 1.35;\r\n  word-break: break-word;\r\n}\r\n\r\n.chat-item.dragging {\r\n  opacity: 0.5;\r\n}\r\n\r\n.chat-list.drag-over,\r\n.chat-item.drag-over {\r\n  outline: 2px dashed var(--pq-manager-accent);\r\n  outline-offset: 2px;\r\n}\r\n\r\n.empty {\r\n  color: var(--pq-manager-muted);\r\n  font-size: 12px;\r\n  padding: 8px;\r\n  border: 1px dashed var(--pq-manager-border);\r\n  border-radius: 8px;\r\n  text-align: center;\r\n}\r\n\r\n.pq-manager-footer {\r\n  color: var(--pq-manager-muted);\r\n  font-size: 12px;\r\n  border-top: 1px solid var(--pq-manager-border);\r\n  padding-top: 12px;\r\n}';
+
   // AI Queue/core/chat-manager.js
   var GLOBAL_CHAT_KEY = '__global__';
   var MANAGER_PANEL_ID = 'pq-chat-manager-panel';
@@ -1243,178 +1245,7 @@
     if (doc.querySelector('#pq-chat-manager-styles')) return;
     const style = doc.createElement('style');
     style.id = 'pq-chat-manager-styles';
-    style.textContent = `
-    :root {
-      color-scheme: dark;
-      --pq-manager-bg: #0b1220;
-      --pq-manager-panel: rgba(17, 24, 39, 0.96);
-      --pq-manager-card: rgba(31, 41, 55, 0.96);
-      --pq-manager-text: #f3f4f6;
-      --pq-manager-muted: #9ca3af;
-      --pq-manager-border: #374151;
-      --pq-manager-accent: #60a5fa;
-      --pq-manager-accent-strong: #22c55e;
-    }
-    #${MANAGER_PANEL_ID} {
-      position: fixed;
-      top: 6vh;
-      left: 50%;
-      transform: translateX(-50%);
-      width: min(1100px, calc(100vw - 32px));
-      height: min(760px, calc(100vh - 32px));
-      z-index: 2147483647;
-      display: flex;
-      flex-direction: column;
-      background: radial-gradient(circle at top right, rgba(31, 41, 55, 0.95), rgba(11, 18, 32, 0.98) 60%);
-      color: var(--pq-manager-text);
-      border: 1px solid var(--pq-manager-border);
-      border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-      overflow: hidden;
-    }
-    .pq-manager-shell {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      min-height: 0;
-    }
-    .pq-manager-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 16px 18px 12px;
-      border-bottom: 1px solid var(--pq-manager-border);
-      background: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.82));
-    }
-    .pq-manager-title {
-      font-size: 18px;
-      font-weight: 700;
-      line-height: 1.2;
-      margin: 0;
-    }
-    .pq-manager-subtitle {
-      margin-top: 4px;
-      color: var(--pq-manager-muted);
-      font-size: 13px;
-      line-height: 1.4;
-      max-width: 72ch;
-    }
-    .pq-manager-actions {
-      display: flex;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-    .pq-manager-actions button {
-      appearance: none;
-      border: 1px solid var(--pq-manager-border);
-      background: rgba(31, 41, 55, 0.95);
-      color: var(--pq-manager-text);
-      border-radius: 999px;
-      padding: 8px 12px;
-      font: inherit;
-      cursor: pointer;
-    }
-    .pq-manager-actions button:hover {
-      border-color: var(--pq-manager-accent);
-    }
-    .pq-manager-body {
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-      padding: 16px 18px 18px;
-      gap: 12px;
-      overflow: hidden;
-    }
-    .pq-manager-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 12px;
-      align-items: start;
-      flex: 1;
-      min-height: 0;
-      overflow: auto;
-      padding-right: 4px;
-    }
-    .chat-card {
-      background: linear-gradient(180deg, var(--pq-manager-panel), var(--pq-manager-card));
-      border: 1px solid var(--pq-manager-border);
-      border-radius: 12px;
-      overflow: hidden;
-      min-height: 140px;
-    }
-    .chat-title {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--pq-manager-border);
-      font-size: 12px;
-      letter-spacing: 0.2px;
-      text-transform: uppercase;
-      color: #d1d5db;
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    .chat-title .chat-controls {
-      display: inline-flex;
-      gap: 8px;
-      align-items: center;
-    }
-    .chat-delete {
-      appearance: none;
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--pq-manager-muted);
-      border-radius: 8px;
-      padding: 4px 8px;
-      font-size: 12px;
-      cursor: pointer;
-    }
-    .chat-delete:hover {
-      color: var(--pq-manager-accent);
-      border-color: rgba(96,165,250,0.12);
-      background: rgba(96,165,250,0.03);
-    }
-    .chat-list {
-      list-style: none;
-      margin: 0;
-      padding: 8px;
-      min-height: 90px;
-    }
-    .chat-item {
-      background: rgba(17, 24, 39, 0.7);
-      border: 1px solid #334155;
-      border-radius: 8px;
-      padding: 8px;
-      margin-bottom: 8px;
-      cursor: grab;
-      user-select: none;
-      font-size: 13px;
-      line-height: 1.35;
-      word-break: break-word;
-    }
-    .chat-item.dragging {
-      opacity: 0.5;
-    }
-    .chat-list.drag-over,
-    .chat-item.drag-over {
-      outline: 2px dashed var(--pq-manager-accent);
-      outline-offset: 2px;
-    }
-    .empty {
-      color: var(--pq-manager-muted);
-      font-size: 12px;
-      padding: 8px;
-      border: 1px dashed var(--pq-manager-border);
-      border-radius: 8px;
-      text-align: center;
-    }
-    .pq-manager-footer {
-      color: var(--pq-manager-muted);
-      font-size: 12px;
-      border-top: 1px solid var(--pq-manager-border);
-      padding-top: 12px;
-    }
-  `;
+    style.textContent = chat_manager_default;
     doc.head.appendChild(style);
   }
   function ensureManagerShell(doc, title) {
