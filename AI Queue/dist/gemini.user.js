@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.5
+// @version      3.0.6
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -154,6 +154,13 @@
       });
       return;
     }
+    panel.hidden = true;
+    panel.style.setProperty('display', 'none', 'important');
+    panel.style.setProperty('pointer-events', 'none', 'important');
+    log('panel hidden');
+  }
+  function hidePanel(panel = getPanel()) {
+    if (!panel) return;
     panel.hidden = true;
     panel.style.setProperty('display', 'none', 'important');
     panel.style.setProperty('pointer-events', 'none', 'important');
@@ -313,10 +320,31 @@
         transform: 'none',
       });
       const title = document.createElement('div');
+      title.style.display = 'flex';
+      title.style.alignItems = 'center';
+      title.style.justifyContent = 'space-between';
+      title.style.gap = '12px';
       title.style.fontSize = '18px';
       title.style.fontWeight = 'bold';
       title.style.marginBottom = '10px';
-      title.textContent = titleText;
+      const titleLabel = document.createElement('span');
+      titleLabel.textContent = titleText;
+      const closeBtn = document.createElement('button');
+      closeBtn.id = 'pq-close';
+      closeBtn.type = 'button';
+      closeBtn.textContent = 'Close';
+      Object.assign(closeBtn.style, {
+        flexShrink: '0',
+        padding: '4px 10px',
+        borderRadius: '9999px',
+        border: '1px solid #555',
+        background: '#2a2a2a',
+        color: '#fff',
+        cursor: 'pointer',
+      });
+      closeBtn.addEventListener('click', () => hidePanel(panel));
+      title.appendChild(titleLabel);
+      title.appendChild(closeBtn);
       const textarea = document.createElement('textarea');
       textarea.id = 'pq-input';
       textarea.placeholder = 'Enter prompt...';

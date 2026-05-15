@@ -1,4 +1,4 @@
-import { ensurePanelAttached } from './ui.js';
+import { ensurePanelAttached, hidePanel } from './ui.js';
 import { log } from './logging.js';
 
 export function createBasePanel(titleText, includeFailedList = false) {
@@ -32,10 +32,35 @@ export function createBasePanel(titleText, includeFailedList = false) {
     });
 
     const title = document.createElement('div');
+    title.style.display = 'flex';
+    title.style.alignItems = 'center';
+    title.style.justifyContent = 'space-between';
+    title.style.gap = '12px';
     title.style.fontSize = '18px';
     title.style.fontWeight = 'bold';
     title.style.marginBottom = '10px';
-    title.textContent = titleText;
+
+    const titleLabel = document.createElement('span');
+    titleLabel.textContent = titleText;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.id = 'pq-close';
+    closeBtn.type = 'button';
+    closeBtn.textContent = 'Close';
+    Object.assign(closeBtn.style, {
+      flexShrink: '0',
+      padding: '4px 10px',
+      borderRadius: '9999px',
+      border: '1px solid #555',
+      background: '#2a2a2a',
+      color: '#fff',
+      cursor: 'pointer',
+    });
+
+    closeBtn.addEventListener('click', () => hidePanel(panel));
+
+    title.appendChild(titleLabel);
+    title.appendChild(closeBtn);
 
     const textarea = document.createElement('textarea');
     textarea.id = 'pq-input';

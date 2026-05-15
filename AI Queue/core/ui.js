@@ -98,6 +98,15 @@ export function showPanel(createPanel) {
   log('panel hidden');
 }
 
+export function hidePanel(panel = getPanel()) {
+  if (!panel) return;
+
+  panel.hidden = true;
+  panel.style.setProperty('display', 'none', 'important');
+  panel.style.setProperty('pointer-events', 'none', 'important');
+  log('panel hidden');
+}
+
 export function updateToolbarButton(toolbarButton, queue, running) {
   if (!toolbarButton || !isAttached(toolbarButton)) return;
 
