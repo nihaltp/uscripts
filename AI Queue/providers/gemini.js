@@ -12,6 +12,31 @@ import { setStatus } from '../core/queue.js';
 import { sendPrompt } from '../core/keyboard.js';
 import { waitForIdle, waitForPromptProcessing } from '../core/generation.js';
 import { bootstrapQueueApp } from '../core/bootstrap.js';
+import { openChatManagerWindow } from '../core/chat-manager.js';
+
+const STORAGE_KEY = 'pq-gemini-queue';
+const DOMAINS = ['gemini.google.com'];
+
+function normalizeCode(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+export function getCurrentGeminiChatCode(url = globalThis.location?.href || '') {
+  try {
+    const parsedUrl = new URL(url, globalThis.location?.origin || 'https://example.com');
+    if (!DOMAINS.includes(parsedUrl.hostname.toLowerCase())) {
+      return null;
+    }
+
+    const segments = parsedUrl.pathname.split('/').filter(Boolean);
+    if (segments[0] !== 'app') return null;
+    return normalizeCode(segments[1]);
+  } catch {
+    return null;
+  }
+}
 
 function queryPanel() {
   return document.querySelector('#pq-panel');
@@ -162,11 +187,15 @@ export function renderGeminiQueue() {
 }
 
 export function saveGeminiQueue() {
-  saveQueue(queueState.queue, queueState.failedQueue, 'pq-gemini-queue');
+  saveQueue(queueState.queue, queueState.failedQueue, STORAGE_KEY, getCurrentGeminiChatCode());
 }
 
 export function loadGeminiQueue() {
-  loadQueue(queueState.queue, queueState.failedQueue, 'pq-gemini-queue');
+  loadQueue(queueState.queue, queueState.failedQueue, STORAGE_KEY, getCurrentGeminiChatCode());
+}
+
+export function openGeminiChatManager() {
+  openChatManagerWindow(STORAGE_KEY, 'Gemini Chat Prompt Manager');
 }
 
 export async function processGeminiQueue() {
@@ -258,10 +287,12 @@ export function ensureGeminiToolbarButton() {
 export const geminiProvider = {
   includeFailedQueue: true,
   createItem(text) {
+    const chatCode = getCurrentGeminiChatCode();
     return {
       id: crypto.randomUUID(),
       prompt: text,
       attempts: 0,
+      ...(chatCode ? { chatCode } : {}),
     };
   },
   createPanel: createGeminiPanel,
@@ -272,6 +303,7 @@ export const geminiProvider = {
   setupPanelControls,
   setupPanelDrag,
   ensureToolbarButton: ensureGeminiToolbarButton,
+  openChatManager: openGeminiChatManager,
   isOwnMutation(target) {
     return !!target && (target.closest?.('#pq-panel') || target.closest?.('.pq-toolbar'));
   },

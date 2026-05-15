@@ -5,13 +5,14 @@ import { queueState } from './state.js';
 
 const boundPanels = new WeakSet();
 
-export function setupPanelControls({ createItem, renderQueue, saveQueue, processQueue }) {
+export function setupPanelControls({ createItem, renderQueue, saveQueue, processQueue, openChatManager }) {
   const panel = getPanel();
   if (!panel) return;
   if (boundPanels.has(panel)) return;
 
   const input = panel.querySelector('#pq-input');
   const addBtn = panel.querySelector('#pq-add');
+  const manageChatsBtn = panel.querySelector('#pq-manage-chats');
   const startBtn = panel.querySelector('#pq-start');
 
   const getToolbarButton = () => document.querySelector('#pq-toolbar-button');
@@ -46,6 +47,12 @@ export function setupPanelControls({ createItem, renderQueue, saveQueue, process
   };
 
   addBtn.addEventListener('click', handleAddClick);
+
+  if (manageChatsBtn) {
+    manageChatsBtn.addEventListener('click', () => {
+      openChatManager?.();
+    });
+  }
 
   input.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {

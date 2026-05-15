@@ -4,6 +4,17 @@ import { startDomObserver, startUrlWatcher } from './ui.js';
 export function bootstrapQueueApp(provider) {
   globalThis.aiQueue = queueState;
 
+  const refreshForCurrentUrl = () => {
+    if (queueState.running) {
+      queueState.running = false;
+    }
+
+    resetQueueState({ includeFailedQueue: !!provider.includeFailedQueue });
+    provider.loadQueue?.();
+    provider.renderQueue?.();
+    provider.ensureToolbarButton?.();
+  };
+
   resetQueueState({ includeFailedQueue: !!provider.includeFailedQueue });
 
   provider.loadQueue?.();
@@ -13,6 +24,7 @@ export function bootstrapQueueApp(provider) {
     renderQueue: provider.renderQueue,
     saveQueue: provider.saveQueue,
     processQueue: provider.processQueue,
+    openChatManager: provider.openChatManager,
   });
   provider.setupPanelDrag?.();
   provider.renderQueue?.();
@@ -26,6 +38,7 @@ export function bootstrapQueueApp(provider) {
         renderQueue: provider.renderQueue,
         saveQueue: provider.saveQueue,
         processQueue: provider.processQueue,
+        openChatManager: provider.openChatManager,
       }),
     provider.setupPanelDrag,
     provider.ensureToolbarButton,
@@ -39,8 +52,10 @@ export function bootstrapQueueApp(provider) {
         renderQueue: provider.renderQueue,
         saveQueue: provider.saveQueue,
         processQueue: provider.processQueue,
+        openChatManager: provider.openChatManager,
       }),
     provider.setupPanelDrag,
-    provider.ensureToolbarButton
+    provider.ensureToolbarButton,
+    refreshForCurrentUrl
   );
 }

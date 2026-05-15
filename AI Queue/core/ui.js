@@ -222,30 +222,26 @@ export function startUrlWatcher(
   createPanel,
   setupPanelEvents,
   setupPanelDrag,
-  ensureToolbarButton
+  ensureToolbarButton,
+  onUrlChange
 ) {
+  const handleUrlChange = (reason) => {
+    onUrlChange?.();
+    requestRepair(reason, createPanel, setupPanelEvents, setupPanelDrag, ensureToolbarButton);
+  };
+
   patchHistoryMethod('pushState');
   patchHistoryMethod('replaceState');
 
-  window.addEventListener('popstate', () =>
-    requestRepair('popstate', createPanel, setupPanelEvents, setupPanelDrag, ensureToolbarButton)
-  );
-  window.addEventListener('hashchange', () =>
-    requestRepair('hashchange', createPanel, setupPanelEvents, setupPanelDrag, ensureToolbarButton)
-  );
+  window.addEventListener('popstate', () => handleUrlChange('popstate'));
+  window.addEventListener('hashchange', () => handleUrlChange('hashchange'));
 
   if (urlWatcher) clearInterval(urlWatcher);
 
   urlWatcher = setInterval(() => {
     if (location.href !== lastKnownUrl) {
       lastKnownUrl = location.href;
-      requestRepair(
-        'url-change',
-        createPanel,
-        setupPanelEvents,
-        setupPanelDrag,
-        ensureToolbarButton
-      );
+      handleUrlChange('url-change');
     }
   }, 1000);
 }

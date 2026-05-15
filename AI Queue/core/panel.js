@@ -58,6 +58,12 @@ export function createBasePanel(titleText, includeFailedList = false) {
     addBtn.style.width = '100%';
     addBtn.textContent = 'Add To Queue';
 
+    const manageChatsBtn = document.createElement('button');
+    manageChatsBtn.id = 'pq-manage-chats';
+    manageChatsBtn.style.marginTop = '10px';
+    manageChatsBtn.style.width = '100%';
+    manageChatsBtn.textContent = 'Manage Chat Prompts';
+
     const startBtn = document.createElement('button');
     startBtn.id = 'pq-start';
     startBtn.style.marginTop = '10px';
@@ -77,6 +83,7 @@ export function createBasePanel(titleText, includeFailedList = false) {
     panel.appendChild(title);
     panel.appendChild(textarea);
     panel.appendChild(addBtn);
+    panel.appendChild(manageChatsBtn);
     panel.appendChild(startBtn);
     panel.appendChild(status);
     panel.appendChild(list);

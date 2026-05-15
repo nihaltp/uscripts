@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.2
+// @version      3.0.3
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -261,32 +261,26 @@
     patched.__pqPatched = true;
     history[methodName] = patched;
   }
-  function startUrlWatcher(createPanel, setupPanelEvents, setupPanelDrag2, ensureToolbarButton) {
+  function startUrlWatcher(
+    createPanel,
+    setupPanelEvents,
+    setupPanelDrag2,
+    ensureToolbarButton,
+    onUrlChange
+  ) {
+    const handleUrlChange = (reason) => {
+      onUrlChange?.();
+      requestRepair(reason, createPanel, setupPanelEvents, setupPanelDrag2, ensureToolbarButton);
+    };
     patchHistoryMethod('pushState');
     patchHistoryMethod('replaceState');
-    window.addEventListener('popstate', () =>
-      requestRepair('popstate', createPanel, setupPanelEvents, setupPanelDrag2, ensureToolbarButton)
-    );
-    window.addEventListener('hashchange', () =>
-      requestRepair(
-        'hashchange',
-        createPanel,
-        setupPanelEvents,
-        setupPanelDrag2,
-        ensureToolbarButton
-      )
-    );
+    window.addEventListener('popstate', () => handleUrlChange('popstate'));
+    window.addEventListener('hashchange', () => handleUrlChange('hashchange'));
     if (urlWatcher) clearInterval(urlWatcher);
     urlWatcher = setInterval(() => {
       if (location.href !== lastKnownUrl) {
         lastKnownUrl = location.href;
-        requestRepair(
-          'url-change',
-          createPanel,
-          setupPanelEvents,
-          setupPanelDrag2,
-          ensureToolbarButton
-        );
+        handleUrlChange('url-change');
       }
     }, 1e3);
   }
@@ -342,6 +336,11 @@
       addBtn.style.marginTop = '10px';
       addBtn.style.width = '100%';
       addBtn.textContent = 'Add To Queue';
+      const manageChatsBtn = document.createElement('button');
+      manageChatsBtn.id = 'pq-manage-chats';
+      manageChatsBtn.style.marginTop = '10px';
+      manageChatsBtn.style.width = '100%';
+      manageChatsBtn.textContent = 'Manage Chat Prompts';
       const startBtn = document.createElement('button');
       startBtn.id = 'pq-start';
       startBtn.style.marginTop = '10px';
@@ -358,6 +357,7 @@
       panel.appendChild(title);
       panel.appendChild(textarea);
       panel.appendChild(addBtn);
+      panel.appendChild(manageChatsBtn);
       panel.appendChild(startBtn);
       panel.appendChild(status);
       panel.appendChild(list);
@@ -520,33 +520,132 @@
   }
 
   // AI Queue/core/storage.js
-  function saveQueue(queue, failedQueue, storageKey = 'pq-queue-state') {
-    try {
-      const data = {
-        queue,
-        failedQueue,
+  function toChatCode(value) {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim();
+    return normalized ? normalized : null;
+  }
+  function generateId() {
+    if (globalThis.crypto?.randomUUID) {
+      return globalThis.crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+  function sanitizeItem(item) {
+    if (!item || typeof item.prompt !== 'string') return null;
+    const normalized = {
+      id: typeof item.id === 'string' && item.id ? item.id : generateId(),
+      prompt: item.prompt,
+    };
+    if (item.attempts !== void 0) {
+      const attempts = Number(item.attempts);
+      if (Number.isFinite(attempts)) {
+        normalized.attempts = attempts;
+      }
+    }
+    const chatCode = toChatCode(item.chatCode);
+    if (chatCode) {
+      normalized.chatCode = chatCode;
+    }
+    return normalized;
+  }
+  function sanitizeItems(items) {
+    if (!Array.isArray(items)) return [];
+    return items.map((item) => sanitizeItem(item)).filter(Boolean);
+  }
+  function buildLegacyData(parsed) {
+    return {
+      items: sanitizeItems(parsed?.queue),
+      failedItems: sanitizeItems(parsed?.failedQueue),
+    };
+  }
+  function normalizeData(parsed) {
+    if (!parsed || typeof parsed !== 'object') {
+      return { items: [], failedItems: [] };
+    }
+    if (Array.isArray(parsed.items) || Array.isArray(parsed.failedItems)) {
+      return {
+        items: sanitizeItems(parsed.items),
+        failedItems: sanitizeItems(parsed.failedItems),
       };
-      localStorage.setItem(storageKey, JSON.stringify(data));
-      log('queue saved to storage');
+    }
+    return buildLegacyData(parsed);
+  }
+  function matchesCurrentChat(item, currentChatCode) {
+    const itemChatCode = toChatCode(item.chatCode);
+    if (!itemChatCode) {
+      return true;
+    }
+    if (!currentChatCode) {
+      return false;
+    }
+    return itemChatCode === currentChatCode;
+  }
+  function readScopedQueueData(storageKey = 'pq-queue-state') {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (!stored) {
+        return { items: [], failedItems: [] };
+      }
+      const parsed = JSON.parse(stored);
+      return normalizeData(parsed);
+    } catch (err) {
+      error('Failed to read queue storage:', err);
+      return { items: [], failedItems: [] };
+    }
+  }
+  function writeScopedQueueData(storageKey = 'pq-queue-state', data = {}) {
+    try {
+      const normalized = normalizeData(data);
+      localStorage.setItem(storageKey, JSON.stringify(normalized));
+    } catch (err) {
+      error('Failed to write queue storage:', err);
+    }
+  }
+  function saveQueue(queue, failedQueue, storageKey = 'pq-queue-state', currentChatCode = null) {
+    try {
+      const chatCode = toChatCode(currentChatCode);
+      const data = readScopedQueueData(storageKey);
+      const keepOtherChatItems = (item) => !matchesCurrentChat(item, chatCode);
+      const visibleQueueItems = sanitizeItems(queue || []);
+      const nextItems = [...data.items.filter(keepOtherChatItems), ...visibleQueueItems];
+      let nextFailedItems = data.failedItems;
+      if (Array.isArray(failedQueue)) {
+        const visibleFailedItems = sanitizeItems(failedQueue || []);
+        nextFailedItems = [...data.failedItems.filter(keepOtherChatItems), ...visibleFailedItems];
+      }
+      writeScopedQueueData(storageKey, {
+        items: nextItems,
+        failedItems: nextFailedItems,
+      });
+      log('queue saved to storage', {
+        storageKey,
+        currentChatCode: chatCode,
+        visibleItems: visibleQueueItems.length,
+      });
     } catch (err) {
       error('Failed to save queue:', err);
     }
   }
-  function loadQueue(queue, failedQueue, storageKey = 'pq-queue-state') {
+  function loadQueue(queue, failedQueue, storageKey = 'pq-queue-state', currentChatCode = null) {
     try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const data = JSON.parse(stored);
-        if (Array.isArray(data.queue)) {
-          queue.push(...data.queue.filter((item) => item && typeof item.prompt === 'string'));
-        }
-        if (Array.isArray(data.failedQueue) && failedQueue) {
-          failedQueue.push(
-            ...data.failedQueue.filter((item) => item && typeof item.prompt === 'string')
-          );
-        }
-        log('queue loaded from storage', queue.length, 'items');
+      const chatCode = toChatCode(currentChatCode);
+      const data = readScopedQueueData(storageKey);
+      const visibleQueueItems = data.items
+        .filter((item) => matchesCurrentChat(item, chatCode))
+        .map((item) => ({ ...item }));
+      queue.push(...visibleQueueItems);
+      if (Array.isArray(failedQueue)) {
+        const visibleFailedItems = data.failedItems
+          .filter((item) => matchesCurrentChat(item, chatCode))
+          .map((item) => ({ ...item }));
+        failedQueue.push(...visibleFailedItems);
       }
+      log('queue loaded from storage', {
+        storageKey,
+        currentChatCode: chatCode,
+        visibleItems: visibleQueueItems.length,
+      });
     } catch (err) {
       error('Failed to load queue:', err);
     }
@@ -554,12 +653,19 @@
 
   // AI Queue/core/panel-controls.js
   var boundPanels = /* @__PURE__ */ new WeakSet();
-  function setupPanelControls({ createItem, renderQueue, saveQueue: saveQueue2, processQueue }) {
+  function setupPanelControls({
+    createItem,
+    renderQueue,
+    saveQueue: saveQueue2,
+    processQueue,
+    openChatManager,
+  }) {
     const panel = getPanel();
     if (!panel) return;
     if (boundPanels.has(panel)) return;
     const input = panel.querySelector('#pq-input');
     const addBtn = panel.querySelector('#pq-add');
+    const manageChatsBtn = panel.querySelector('#pq-manage-chats');
     const startBtn = panel.querySelector('#pq-start');
     const getToolbarButton = () => document.querySelector('#pq-toolbar-button');
     const handleAddClick = () => {
@@ -586,6 +692,11 @@
       saveQueue2();
     };
     addBtn.addEventListener('click', handleAddClick);
+    if (manageChatsBtn) {
+      manageChatsBtn.addEventListener('click', () => {
+        openChatManager?.();
+      });
+    }
     input.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
@@ -1041,6 +1152,15 @@
   // AI Queue/core/bootstrap.js
   function bootstrapQueueApp(provider) {
     globalThis.aiQueue = queueState;
+    const refreshForCurrentUrl = () => {
+      if (queueState.running) {
+        queueState.running = false;
+      }
+      resetQueueState({ includeFailedQueue: !!provider.includeFailedQueue });
+      provider.loadQueue?.();
+      provider.renderQueue?.();
+      provider.ensureToolbarButton?.();
+    };
     resetQueueState({ includeFailedQueue: !!provider.includeFailedQueue });
     provider.loadQueue?.();
     provider.createPanel();
@@ -1049,6 +1169,7 @@
       renderQueue: provider.renderQueue,
       saveQueue: provider.saveQueue,
       processQueue: provider.processQueue,
+      openChatManager: provider.openChatManager,
     });
     provider.setupPanelDrag?.();
     provider.renderQueue?.();
@@ -1061,6 +1182,7 @@
           renderQueue: provider.renderQueue,
           saveQueue: provider.saveQueue,
           processQueue: provider.processQueue,
+          openChatManager: provider.openChatManager,
         }),
       provider.setupPanelDrag,
       provider.ensureToolbarButton,
@@ -1074,13 +1196,374 @@
           renderQueue: provider.renderQueue,
           saveQueue: provider.saveQueue,
           processQueue: provider.processQueue,
+          openChatManager: provider.openChatManager,
         }),
       provider.setupPanelDrag,
-      provider.ensureToolbarButton
+      provider.ensureToolbarButton,
+      refreshForCurrentUrl
     );
   }
 
+  // AI Queue/core/chat-manager.js
+  var GLOBAL_CHAT_KEY = '__global__';
+  var MANAGER_WINDOW_NAME = 'pq-chat-manager';
+  function toChatKey(chatCode) {
+    return typeof chatCode === 'string' && chatCode.trim() ? chatCode.trim() : GLOBAL_CHAT_KEY;
+  }
+  function toChatCode2(chatKey) {
+    return chatKey === GLOBAL_CHAT_KEY ? null : chatKey;
+  }
+  function chatLabel(chatKey) {
+    if (chatKey === GLOBAL_CHAT_KEY) {
+      return 'Global (all chats)';
+    }
+    return chatKey;
+  }
+  function cloneItem(item) {
+    return { ...item };
+  }
+  function groupItems(items) {
+    const grouped = { [GLOBAL_CHAT_KEY]: [] };
+    items.forEach((item) => {
+      const key = toChatKey(item.chatCode);
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(cloneItem(item));
+    });
+    return grouped;
+  }
+  function orderedKeys(groups) {
+    const keys = Object.keys(groups).filter((key) => groups[key]?.length > 0);
+    const nonGlobal = keys
+      .filter((key) => key !== GLOBAL_CHAT_KEY)
+      .sort((a, b) => a.localeCompare(b));
+    if (groups[GLOBAL_CHAT_KEY]?.length > 0) {
+      return [GLOBAL_CHAT_KEY, ...nonGlobal];
+    }
+    return nonGlobal;
+  }
+  function flattenGroups(groups) {
+    const flat = [];
+    orderedKeys(groups).forEach((key) => {
+      groups[key].forEach((item) => {
+        const normalized = cloneItem(item);
+        const chatCode = toChatCode2(key);
+        if (chatCode) {
+          normalized.chatCode = chatCode;
+        } else {
+          delete normalized.chatCode;
+        }
+        flat.push(normalized);
+      });
+    });
+    return flat;
+  }
+  function findItemIndex(groups, chatKey, itemId) {
+    const list = groups[chatKey] || [];
+    return list.findIndex((item) => item.id === itemId);
+  }
+  function ensureBaseMarkup(doc, title) {
+    doc.title = title;
+    doc.body.innerHTML = '';
+    const style = doc.createElement('style');
+    style.textContent = `
+    :root {
+      color-scheme: dark;
+      --bg: #111827;
+      --panel: #1f2937;
+      --card: #243042;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --accent: #22c55e;
+      --border: #374151;
+      --drag: #60a5fa;
+    }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top right, #1f2937, #0b1220 60%);
+      color: var(--text);
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+    }
+    .wrap {
+      padding: 16px;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+      align-items: start;
+    }
+    .chat-card {
+      background: linear-gradient(180deg, var(--panel), var(--card));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      min-height: 140px;
+    }
+    .chat-title {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+      color: #d1d5db;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .chat-list {
+      list-style: none;
+      margin: 0;
+      padding: 8px;
+      min-height: 90px;
+    }
+    .chat-item {
+      background: rgba(17, 24, 39, 0.7);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+      cursor: grab;
+      user-select: none;
+      font-size: 13px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    .chat-item.dragging {
+      opacity: 0.5;
+    }
+    .chat-list.drag-over,
+    .chat-item.drag-over {
+      outline: 2px dashed var(--drag);
+      outline-offset: 2px;
+    }
+    .empty {
+      color: var(--muted);
+      font-size: 12px;
+      padding: 8px;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      text-align: center;
+    }
+    .footer {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+  `;
+    const wrap = doc.createElement('div');
+    wrap.className = 'wrap';
+    const header = doc.createElement('div');
+    header.className = 'title';
+    header.textContent = title;
+    const subtitle = doc.createElement('div');
+    subtitle.className = 'subtitle';
+    subtitle.textContent =
+      'Drag prompts to reorder within a chat, or drop them into another chat card to move between chats.';
+    const grid = doc.createElement('div');
+    grid.className = 'grid';
+    grid.id = 'pq-chat-grid';
+    const footer = doc.createElement('div');
+    footer.className = 'footer';
+    footer.textContent = 'Changes are saved immediately to localStorage.';
+    wrap.appendChild(header);
+    wrap.appendChild(subtitle);
+    wrap.appendChild(grid);
+    wrap.appendChild(footer);
+    doc.head.innerHTML = '';
+    doc.head.appendChild(style);
+    doc.body.appendChild(wrap);
+  }
+  function moveByDrop(state, fromChatKey, itemId, toChatKey2, toIndex) {
+    const fromList = state.groups[fromChatKey] || [];
+    const fromIndex = findItemIndex(state.groups, fromChatKey, itemId);
+    if (fromIndex === -1) {
+      return false;
+    }
+    const [movedItem] = fromList.splice(fromIndex, 1);
+    if (!state.groups[toChatKey2]) {
+      state.groups[toChatKey2] = [];
+    }
+    const targetList = state.groups[toChatKey2];
+    let normalizedIndex = Number.isInteger(toIndex) ? toIndex : targetList.length;
+    if (normalizedIndex < 0) normalizedIndex = 0;
+    if (normalizedIndex > targetList.length) normalizedIndex = targetList.length;
+    if (fromChatKey === toChatKey2 && normalizedIndex > fromIndex) {
+      normalizedIndex -= 1;
+    }
+    movedItem.chatCode = toChatCode2(toChatKey2) || void 0;
+    targetList.splice(normalizedIndex, 0, movedItem);
+    if (fromChatKey !== GLOBAL_CHAT_KEY && (state.groups[fromChatKey] || []).length === 0) {
+      delete state.groups[fromChatKey];
+    }
+    return true;
+  }
+  function persistState(storageKey, state) {
+    state.data.items = flattenGroups(state.groups);
+    writeScopedQueueData(storageKey, state.data);
+  }
+  function renderCards(doc, storageKey, state, rerender) {
+    const grid = doc.querySelector('#pq-chat-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    const keys = orderedKeys(state.groups);
+    if (keys.length === 0) {
+      const empty = doc.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'No prompts found in storage.';
+      grid.appendChild(empty);
+      return;
+    }
+    keys.forEach((chatKey) => {
+      const card = doc.createElement('section');
+      card.className = 'chat-card';
+      const title = doc.createElement('div');
+      title.className = 'chat-title';
+      const label = doc.createElement('span');
+      label.textContent = chatLabel(chatKey);
+      const count = doc.createElement('span');
+      count.textContent = String(state.groups[chatKey].length);
+      title.appendChild(label);
+      title.appendChild(count);
+      const list = doc.createElement('ul');
+      list.className = 'chat-list';
+      list.dataset.chatKey = chatKey;
+      const items = state.groups[chatKey];
+      if (!items || items.length === 0) {
+        const empty = doc.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'Drop a prompt here.';
+        list.appendChild(empty);
+      } else {
+        items.forEach((item, index) => {
+          const entry = doc.createElement('li');
+          entry.className = 'chat-item';
+          entry.draggable = true;
+          entry.dataset.chatKey = chatKey;
+          entry.dataset.itemId = item.id;
+          entry.dataset.index = String(index);
+          entry.textContent = item.prompt;
+          entry.addEventListener('dragstart', (event) => {
+            state.drag = {
+              itemId: item.id,
+              fromChatKey: chatKey,
+            };
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', item.id);
+            entry.classList.add('dragging');
+          });
+          entry.addEventListener('dragend', () => {
+            state.drag = null;
+            entry.classList.remove('dragging');
+            doc
+              .querySelectorAll('.drag-over')
+              .forEach((element) => element.classList.remove('drag-over'));
+          });
+          entry.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            entry.classList.add('drag-over');
+          });
+          entry.addEventListener('dragleave', () => {
+            entry.classList.remove('drag-over');
+          });
+          entry.addEventListener('drop', (event) => {
+            event.preventDefault();
+            entry.classList.remove('drag-over');
+            if (!state.drag) return;
+            const moved = moveByDrop(
+              state,
+              state.drag.fromChatKey,
+              state.drag.itemId,
+              chatKey,
+              Number(entry.dataset.index)
+            );
+            if (!moved) return;
+            persistState(storageKey, state);
+            rerender();
+          });
+          list.appendChild(entry);
+        });
+      }
+      list.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        list.classList.add('drag-over');
+      });
+      list.addEventListener('dragleave', () => {
+        list.classList.remove('drag-over');
+      });
+      list.addEventListener('drop', (event) => {
+        event.preventDefault();
+        list.classList.remove('drag-over');
+        if (!state.drag) return;
+        const moved = moveByDrop(
+          state,
+          state.drag.fromChatKey,
+          state.drag.itemId,
+          chatKey,
+          state.groups[chatKey]?.length
+        );
+        if (!moved) return;
+        persistState(storageKey, state);
+        rerender();
+      });
+      card.appendChild(title);
+      card.appendChild(list);
+      grid.appendChild(card);
+    });
+  }
+  function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Manager') {
+    const popup = window.open('', MANAGER_WINDOW_NAME, 'width=1100,height=760,resizable=yes');
+    if (!popup) {
+      error('Failed to open chat manager window. Pop-up may be blocked.');
+      return;
+    }
+    const data = readScopedQueueData(storageKey);
+    const state = {
+      data,
+      groups: groupItems(data.items),
+      drag: null,
+    };
+    const rerender = () => {
+      ensureBaseMarkup(popup.document, title);
+      renderCards(popup.document, storageKey, state, rerender);
+    };
+    rerender();
+    popup.focus();
+    log('chat manager opened', { storageKey });
+  }
+
   // AI Queue/providers/gemini.js
+  var STORAGE_KEY = 'pq-gemini-queue';
+  var DOMAINS = ['gemini.google.com'];
+  function normalizeCode(value) {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+  function getCurrentGeminiChatCode(url = globalThis.location?.href || '') {
+    try {
+      const parsedUrl = new URL(url, globalThis.location?.origin || 'https://example.com');
+      if (!DOMAINS.includes(parsedUrl.hostname.toLowerCase())) {
+        return null;
+      }
+      const segments = parsedUrl.pathname.split('/').filter(Boolean);
+      if (segments[0] !== 'app') return null;
+      return normalizeCode(segments[1]);
+    } catch {
+      return null;
+    }
+  }
   function queryPanel() {
     return document.querySelector('#pq-panel');
   }
@@ -1204,10 +1687,13 @@
     log('queue rendered safely');
   }
   function saveGeminiQueue() {
-    saveQueue(queueState.queue, queueState.failedQueue, 'pq-gemini-queue');
+    saveQueue(queueState.queue, queueState.failedQueue, STORAGE_KEY, getCurrentGeminiChatCode());
   }
   function loadGeminiQueue() {
-    loadQueue(queueState.queue, queueState.failedQueue, 'pq-gemini-queue');
+    loadQueue(queueState.queue, queueState.failedQueue, STORAGE_KEY, getCurrentGeminiChatCode());
+  }
+  function openGeminiChatManager() {
+    openChatManagerWindow(STORAGE_KEY, 'Gemini Chat Prompt Manager');
   }
   async function processGeminiQueue() {
     const panel = queryPanel();
@@ -1283,10 +1769,12 @@
   var geminiProvider = {
     includeFailedQueue: true,
     createItem(text) {
+      const chatCode = getCurrentGeminiChatCode();
       return {
         id: crypto.randomUUID(),
         prompt: text,
         attempts: 0,
+        ...(chatCode ? { chatCode } : {}),
       };
     },
     createPanel: createGeminiPanel,
@@ -1297,6 +1785,7 @@
     setupPanelControls,
     setupPanelDrag,
     ensureToolbarButton: ensureGeminiToolbarButton,
+    openChatManager: openGeminiChatManager,
     isOwnMutation(target) {
       return !!target && (target.closest?.('#pq-panel') || target.closest?.('.pq-toolbar'));
     },

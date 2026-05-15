@@ -11,6 +11,32 @@ import { sendPrompt } from '../core/keyboard.js';
 import { waitForIdle, waitForPromptProcessing } from '../core/generation.js';
 import { error } from '../core/logging.js';
 import { bootstrapQueueApp } from '../core/bootstrap.js';
+import { openChatManagerWindow } from '../core/chat-manager.js';
+
+const STORAGE_KEY = 'pq-chatgpt-queue';
+const DOMAINS = ['chatgpt.com', 'chat.openai.com'];
+
+function normalizeCode(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+export function getCurrentChatGPTChatCode(url = globalThis.location?.href || '') {
+  try {
+    const parsedUrl = new URL(url, globalThis.location?.origin || 'https://example.com');
+    const host = parsedUrl.hostname.toLowerCase();
+    if (!DOMAINS.includes(host)) {
+      return null;
+    }
+
+    const segments = parsedUrl.pathname.split('/').filter(Boolean);
+    if (segments[0] !== 'c') return null;
+    return normalizeCode(segments[1]);
+  } catch {
+    return null;
+  }
+}
 
 function queryPanel() {
   return document.querySelector('#pq-panel');
@@ -96,11 +122,15 @@ export function renderChatGPTQueue() {
 }
 
 export function saveChatGPTQueue() {
-  saveQueue(queueState.queue, null, 'pq-chatgpt-queue');
+  saveQueue(queueState.queue, null, STORAGE_KEY, getCurrentChatGPTChatCode());
 }
 
 export function loadChatGPTQueue() {
-  loadQueue(queueState.queue, null, 'pq-chatgpt-queue');
+  loadQueue(queueState.queue, null, STORAGE_KEY, getCurrentChatGPTChatCode());
+}
+
+export function openChatGPTChatManager() {
+  openChatManagerWindow(STORAGE_KEY, 'ChatGPT Chat Prompt Manager');
 }
 
 export async function processChatGPTQueue() {
@@ -177,9 +207,11 @@ export function ensureChatGPTToolbarButton() {
 export const chatgptProvider = {
   includeFailedQueue: false,
   createItem(text) {
+    const chatCode = getCurrentChatGPTChatCode();
     return {
       id: crypto.randomUUID(),
       prompt: text,
+      ...(chatCode ? { chatCode } : {}),
     };
   },
   createPanel: createChatGPTPanel,
@@ -190,6 +222,7 @@ export const chatgptProvider = {
   setupPanelControls,
   setupPanelDrag,
   ensureToolbarButton: ensureChatGPTToolbarButton,
+  openChatManager: openChatGPTChatManager,
   isOwnMutation(target) {
     return !!target && (target.closest?.('#pq-panel') || target.closest?.('.pq-toolbar'));
   },
