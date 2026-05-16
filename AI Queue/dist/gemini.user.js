@@ -9,7 +9,7 @@
 // @license      MIT
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.8
+// @version      3.0.9
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -704,9 +704,10 @@
         const item = queueState.queue.find((item2) => item2.id === queueState.editingId);
         if (!item) {
           error('Editing item not found in queue:', queueState.editingId);
-          return;
+          queueState.queue.push(createItem(text));
+        } else {
+          item.prompt = text;
         }
-        item.prompt = text;
         queueState.editingId = null;
         addBtn.textContent = 'Add To Queue';
       } else {

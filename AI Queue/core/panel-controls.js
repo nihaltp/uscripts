@@ -30,10 +30,11 @@ export function setupPanelControls({ createItem, renderQueue, saveQueue, process
 
       if (!item) {
         error('Editing item not found in queue:', queueState.editingId);
-        return;
+        queueState.queue.push(createItem(text));
+      } else {
+        item.prompt = text;
       }
 
-      item.prompt = text;
       queueState.editingId = null;
       addBtn.textContent = 'Add To Queue';
     } else {
