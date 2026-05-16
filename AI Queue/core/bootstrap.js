@@ -1,9 +1,11 @@
+import { log } from './logging.js';
 import { queueState, resetQueueState } from './state.js';
 import { startDomObserver, startUrlWatcher } from './ui.js';
 import { refreshChatManager } from './chat-manager.js';
 
 export function bootstrapQueueApp(provider) {
   globalThis.aiQueue = queueState;
+  log('AI Queue running', true);
 
   const storageKey = provider.storageKey;
 

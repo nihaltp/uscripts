@@ -1,9 +1,12 @@
+window.aiQueueDebug = false; // Set to true to enable debug logging
+
 function isDebugEnabled() {
   return Boolean(globalThis.aiQueueDebug);
 }
 
 export function log(...args) {
-  if (!isDebugEnabled()) return;
+  const force = typeof args[args.length - 1] === 'boolean' ? args.pop() : false;
+  if (!force && !isDebugEnabled()) return;
   console.log('[AI QUEUE]', ...args);
 }
 

@@ -177,7 +177,7 @@ export function ensureChatGPTToolbarButton() {
   ensureToolbarStyles();
 
   installSelectionPromptMenu({
-    createItem,
+    createItem: chatgptProvider.createItem,
     renderQueue: renderChatGPTQueue,
     saveQueue: saveChatGPTQueue,
     updateToolbarButton,

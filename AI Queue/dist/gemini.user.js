@@ -10,7 +10,7 @@
 // @match        https://gemini.google.com/app
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.13
+// @version      3.0.14
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -37,11 +37,13 @@
   }
 
   // AI Queue/core/logging.js
+  window.aiQueueDebug = false;
   function isDebugEnabled() {
     return Boolean(globalThis.aiQueueDebug);
   }
   function log(...args) {
-    if (!isDebugEnabled()) return;
+    const force = typeof args[args.length - 1] === 'boolean' ? args.pop() : false;
+    if (!force && !isDebugEnabled()) return;
     console.log('[AI QUEUE]', ...args);
   }
   function error(...args) {
@@ -681,7 +683,7 @@
   // AI Queue/core/panel-controls.js
   var boundPanels = /* @__PURE__ */ new WeakSet();
   function setupPanelControls({
-    createItem: createItem2,
+    createItem,
     renderQueue,
     saveQueue: saveQueue2,
     processQueue,
@@ -705,14 +707,14 @@
         const item = queueState.queue.find((item2) => item2.id === queueState.editingId);
         if (!item) {
           log('Editing item not found in queue:', queueState.editingId);
-          queueState.queue.push(createItem2(text));
+          queueState.queue.push(createItem(text));
         } else {
           item.prompt = text;
         }
         queueState.editingId = null;
         addBtn.textContent = 'Add To Queue';
       } else {
-        queueState.queue.push(createItem2(text));
+        queueState.queue.push(createItem(text));
       }
       updateToolbarButton(getToolbarButton(), queueState.queue, queueState.running);
       input.value = '';
@@ -1526,6 +1528,7 @@
   // AI Queue/core/bootstrap.js
   function bootstrapQueueApp(provider) {
     globalThis.aiQueue = queueState;
+    log('AI Queue running', true);
     const storageKey = provider.storageKey;
     const syncFromStorage = () => {
       resetQueueState({ includeFailedQueue: !!provider.includeFailedQueue });
@@ -1646,11 +1649,11 @@
     menu.hidden = false;
     menu.style.display = 'block';
   }
-  function addSelectionToQueue(createItem2, renderQueue, saveQueue2, updateToolbarButton2) {
+  function addSelectionToQueue(createItem, renderQueue, saveQueue2, updateToolbarButton2) {
     return (selectionText) => {
       const prompt = selectionText.trim();
       if (!prompt) return;
-      queueState.queue.push(createItem2(prompt));
+      queueState.queue.push(createItem(prompt));
       updateToolbarButton2(
         document.querySelector('#pq-toolbar-button'),
         queueState.queue,
@@ -1661,7 +1664,7 @@
     };
   }
   function installSelectionPromptMenu({
-    createItem: createItem2,
+    createItem,
     renderQueue,
     saveQueue: saveQueue2,
     updateToolbarButton: updateToolbarButton2,
@@ -1669,7 +1672,7 @@
     if (installed) return;
     installed = true;
     const onAddSelection = addSelectionToQueue(
-      createItem2,
+      createItem,
       renderQueue,
       saveQueue2,
       updateToolbarButton2
@@ -1901,7 +1904,7 @@
   function ensureGeminiToolbarButton() {
     ensureToolbarStyles();
     installSelectionPromptMenu({
-      createItem,
+      createItem: geminiProvider.createItem,
       renderQueue: renderGeminiQueue,
       saveQueue: saveGeminiQueue,
       updateToolbarButton,

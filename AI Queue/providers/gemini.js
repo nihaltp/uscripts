@@ -255,7 +255,7 @@ export function ensureGeminiToolbarButton() {
   ensureToolbarStyles();
 
   installSelectionPromptMenu({
-    createItem,
+    createItem: geminiProvider.createItem,
     renderQueue: renderGeminiQueue,
     saveQueue: saveGeminiQueue,
     updateToolbarButton,
