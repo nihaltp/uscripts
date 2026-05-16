@@ -24,7 +24,7 @@ const builds = [
     id: 'gemini',
     name: 'Gemini Prompt Queue',
     description: 'A userscript to manage a queue of prompts for Gemini.',
-    matches: ['https://gemini.google.com/app/*'],
+    matches: ['https://gemini.google.com/app', 'https://gemini.google.com/app/*'],
     icon: 'https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com',
     grants: ['none'],
     runAt: 'document-idle',
