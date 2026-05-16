@@ -22,7 +22,7 @@ function normalizeCode(value) {
   return trimmed ? trimmed : null;
 }
 
-export function getCurrentChatGPTChatCode(url = globalThis.location?.href || '') {
+export function getCurrentChatGPTScope(url = globalThis.location?.href || '') {
   try {
     const parsedUrl = new URL(url, globalThis.location?.origin || 'https://example.com');
     const host = parsedUrl.hostname.toLowerCase();
@@ -31,11 +31,29 @@ export function getCurrentChatGPTChatCode(url = globalThis.location?.href || '')
     }
 
     const segments = parsedUrl.pathname.split('/').filter(Boolean);
-    if (segments[0] !== 'c') return null;
-    return normalizeCode(segments[1]);
-  } catch {
+    if (segments[0] === 'g' && segments[2] === 'c') {
+      return {
+        groupId: normalizeCode(segments[1]),
+        chatId: normalizeCode(segments[3]),
+      };
+    }
+
+    if (segments[0] === 'c') {
+      return {
+        chatId: normalizeCode(segments[1]),
+      };
+    }
+
+    return null;
+  } catch (err) {
+    error('Failed to parse URL for chat code:', err.message);
     return null;
   }
+}
+
+export function getCurrentChatGPTChatCode(url = globalThis.location?.href || '') {
+  const scope = getCurrentChatGPTScope(url);
+  return scope?.groupId || scope?.chatId || null;
 }
 
 function queryPanel() {
@@ -122,11 +140,11 @@ export function renderChatGPTQueue() {
 }
 
 export function saveChatGPTQueue() {
-  saveQueue(queueState.queue, null, STORAGE_KEY, getCurrentChatGPTChatCode());
+  saveQueue(queueState.queue, null, STORAGE_KEY, getCurrentChatGPTScope());
 }
 
 export function loadChatGPTQueue() {
-  loadQueue(queueState.queue, null, STORAGE_KEY, getCurrentChatGPTChatCode());
+  loadQueue(queueState.queue, null, STORAGE_KEY, getCurrentChatGPTScope());
 }
 
 export function openChatGPTChatManager() {
@@ -215,14 +233,20 @@ export const chatgptProvider = {
   storageKey: STORAGE_KEY,
   includeFailedQueue: false,
   createItem(text) {
-    const chatCode = getCurrentChatGPTChatCode();
+    const scope = getCurrentChatGPTScope();
     return {
       id: crypto.randomUUID(),
       prompt: text,
       attempts: 0,
       status: 'queued',
       createdAt: Date.now(),
-      ...(chatCode ? { chatCode } : {}),
+      ...(scope?.chatId
+        ? {
+            chatId: scope.chatId,
+            chatCode: scope.chatId,
+          }
+        : {}),
+      ...(scope?.groupId ? { groupId: scope.groupId } : {}),
     };
   },
   createPanel: createChatGPTPanel,

@@ -10,6 +10,35 @@ function toChatCode(value) {
   return normalized ? normalized : null;
 }
 
+function resolveScope(currentScope = null) {
+  if (typeof currentScope === 'string') {
+    return {
+      chatId: toChatCode(currentScope),
+      groupId: null,
+    };
+  }
+
+  if (!currentScope || typeof currentScope !== 'object') {
+    return {
+      chatId: null,
+      groupId: null,
+    };
+  }
+
+  const chatId = toChatCode(currentScope.chatId || currentScope.chatCode || null);
+  const groupId = toChatCode(currentScope.groupId || null);
+
+  return {
+    chatId,
+    groupId,
+  };
+}
+
+function resolveScopeKeys(currentScope = null) {
+  const scope = resolveScope(currentScope);
+  return [...new Set([scope.groupId, scope.chatId].filter(Boolean))];
+}
+
 function toChatKey(value) {
   return toChatCode(value) || GLOBAL_CHAT_KEY;
 }
@@ -29,13 +58,27 @@ function toCreatedAt(value) {
 function sanitizeItem(item, defaultStatus = DEFAULT_ITEM_STATUS) {
   if (!item || typeof item.prompt !== 'string') return null;
 
-  return {
+  const chatId = toChatCode(item.chatId || item.chatCode || null);
+  const groupId = toChatCode(item.groupId || null);
+
+  const normalized = {
     id: typeof item.id === 'string' && item.id ? item.id : generateId(),
     prompt: item.prompt,
     attempts: Number.isFinite(Number(item.attempts)) ? Number(item.attempts) : 0,
     status: typeof item.status === 'string' && item.status.trim() ? item.status.trim() : defaultStatus,
     createdAt: toCreatedAt(item.createdAt),
   };
+
+  if (chatId) {
+    normalized.chatId = chatId;
+    normalized.chatCode = chatId;
+  }
+
+  if (groupId) {
+    normalized.groupId = groupId;
+  }
+
+  return normalized;
 }
 
 function sanitizeItems(items, defaultStatus = DEFAULT_ITEM_STATUS) {
@@ -74,6 +117,19 @@ function addLegacyItem(chats, item, defaultStatus, bucketName) {
   }
 
   chats[chatKey][bucketName].push(normalizedItem);
+}
+
+function mergeUniqueItems(itemsA, itemsB) {
+  const merged = new Map();
+
+  [...(itemsA || []), ...(itemsB || [])].forEach((item) => {
+    if (!item || typeof item.id !== 'string') return;
+    if (!merged.has(item.id)) {
+      merged.set(item.id, { ...item });
+    }
+  });
+
+  return [...merged.values()];
 }
 
 function buildLegacyData(parsed) {
@@ -136,30 +192,60 @@ export function saveQueue(
   queue,
   failedQueue,
   storageKey = 'pq-queue-state',
-  currentChatCode = null
+  currentScope = null
 ) {
   try {
-    const chatKey = toChatKey(currentChatCode);
+    const scope = resolveScope(currentScope);
+    const scopeKeys = resolveScopeKeys(currentScope);
     const data = readScopedQueueData(storageKey);
-    const existingBucket = data.chats[chatKey] || { items: [], failedItems: [] };
+    const existingBuckets = scopeKeys.map((scopeKey) => data.chats[scopeKey] || { items: [], failedItems: [] });
+
+    const nextItems = sanitizeItems(queue || [], DEFAULT_ITEM_STATUS).map((item) => ({
+      ...item,
+      ...(scope.chatId
+        ? {
+            chatId: scope.chatId,
+            chatCode: scope.chatId,
+          }
+        : {}),
+      ...(scope.groupId ? { groupId: scope.groupId } : {}),
+    }));
+
+    const nextFailedItems = Array.isArray(failedQueue)
+      ? sanitizeItems(failedQueue || [], DEFAULT_FAILED_STATUS).map((item) => ({
+          ...item,
+          ...(scope.chatId
+            ? {
+                chatId: scope.chatId,
+                chatCode: scope.chatId,
+              }
+            : {}),
+          ...(scope.groupId ? { groupId: scope.groupId } : {}),
+        }))
+      : mergeUniqueItems(
+          ...existingBuckets.map((bucket) => sanitizeItems(bucket.failedItems, DEFAULT_FAILED_STATUS))
+        );
 
     const nextBucket = {
-      items: sanitizeItems(queue || [], DEFAULT_ITEM_STATUS),
-      failedItems: Array.isArray(failedQueue)
-        ? sanitizeItems(failedQueue || [], DEFAULT_FAILED_STATUS)
-        : sanitizeItems(existingBucket.failedItems, DEFAULT_FAILED_STATUS),
+      items: nextItems,
+      failedItems: nextFailedItems,
     };
 
+    const nextChats = { ...data.chats };
+    scopeKeys.forEach((scopeKey) => {
+      nextChats[scopeKey] = {
+        items: nextItems.map((item) => ({ ...item })),
+        failedItems: nextFailedItems.map((item) => ({ ...item })),
+      };
+    });
+
     writeScopedQueueData(storageKey, {
-      chats: {
-        ...data.chats,
-        [chatKey]: nextBucket,
-      },
+      chats: nextChats,
     });
 
     log('queue saved to storage', {
       storageKey,
-      currentChatCode: chatKey,
+      currentChatCode: scopeKeys,
       visibleItems: nextBucket.items.length,
     });
   } catch (err) {
@@ -171,23 +257,29 @@ export function loadQueue(
   queue,
   failedQueue,
   storageKey = 'pq-queue-state',
-  currentChatCode = null
+  currentScope = null
 ) {
   try {
-    const chatKey = toChatKey(currentChatCode);
+    const scopeKeys = resolveScopeKeys(currentScope);
     const data = readScopedQueueData(storageKey);
-    const bucket = data.chats[chatKey] || { items: [], failedItems: [] };
+    const buckets = scopeKeys.map((scopeKey) => data.chats[scopeKey] || { items: [], failedItems: [] });
 
-    queue.push(...bucket.items.map((item) => ({ ...item })));
+    const visibleQueueItems = mergeUniqueItems(
+      ...buckets.map((bucket) => bucket.items)
+    );
+    queue.push(...visibleQueueItems.map((item) => ({ ...item })));
 
     if (Array.isArray(failedQueue)) {
-      failedQueue.push(...bucket.failedItems.map((item) => ({ ...item })));
+      const visibleFailedItems = mergeUniqueItems(
+        ...buckets.map((bucket) => bucket.failedItems)
+      );
+      failedQueue.push(...visibleFailedItems.map((item) => ({ ...item })));
     }
 
     log('queue loaded from storage', {
       storageKey,
-      currentChatCode: chatKey,
-      visibleItems: bucket.items.length,
+      currentChatCode: scopeKeys,
+      visibleItems: visibleQueueItems.length,
     });
   } catch (err) {
     error('Failed to load queue:', err);
