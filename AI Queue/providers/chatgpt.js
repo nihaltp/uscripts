@@ -130,7 +130,7 @@ export function loadChatGPTQueue() {
 }
 
 export function openChatGPTChatManager() {
-  openChatManagerWindow(STORAGE_KEY, 'ChatGPT Chat Prompt Manager');
+  openChatManagerWindow(STORAGE_KEY, 'ChatGPT Chat Prompt Manager', document.querySelector('#pq-panel'));
 }
 
 export async function processChatGPTQueue() {

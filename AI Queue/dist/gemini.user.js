@@ -10,7 +10,7 @@
 // @match        https://gemini.google.com/app
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.10
+// @version      3.0.11
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -1250,7 +1250,7 @@
     style.textContent = chat_manager_default;
     doc.head.appendChild(style);
   }
-  function ensureManagerShell(doc, title) {
+  function ensureManagerShell(doc, title, mountTarget) {
     ensureManagerStyles(doc);
     let panel = doc.getElementById(MANAGER_PANEL_ID);
     if (!panel) {
@@ -1310,7 +1310,7 @@
       subtitleNode.textContent =
         'Reorder prompts within a chat or move them into another chat card. This panel stays inside the page instead of opening a popup.';
     }
-    const root = doc.documentElement || doc.body;
+    const root = mountTarget || doc.documentElement || doc.body;
     if (root && !root.contains(panel)) {
       root.appendChild(panel);
     }
@@ -1477,14 +1477,15 @@
       grid.appendChild(card);
     });
   }
-  function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Manager') {
+  function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Manager', mountTarget) {
     const data = readScopedQueueData(storageKey);
     const state = {
       data,
       groups: groupItems(data.items),
       drag: null,
     };
-    const panel = ensureManagerShell(document, title);
+    const doc = mountTarget?.ownerDocument || document;
+    const panel = ensureManagerShell(doc, title, mountTarget);
     panel.dataset.storageKey = storageKey;
     const rerender = () => {
       const grid = panel.querySelector(`#${MANAGER_GRID_ID}`);

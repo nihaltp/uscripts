@@ -86,7 +86,7 @@ function ensureManagerStyles(doc) {
   doc.head.appendChild(style);
 }
 
-function ensureManagerShell(doc, title) {
+function ensureManagerShell(doc, title, mountTarget) {
   ensureManagerStyles(doc);
 
   let panel = doc.getElementById(MANAGER_PANEL_ID);
@@ -163,7 +163,7 @@ function ensureManagerShell(doc, title) {
       'Reorder prompts within a chat or move them into another chat card. This panel stays inside the page instead of opening a popup.';
   }
 
-  const root = doc.documentElement || doc.body;
+  const root = mountTarget || doc.documentElement || doc.body;
   if (root && !root.contains(panel)) {
     root.appendChild(panel);
   }
@@ -375,7 +375,7 @@ function renderCards(grid, storageKey, state, rerender) {
   });
 }
 
-export function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Manager') {
+export function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Manager', mountTarget) {
   const data = readScopedQueueData(storageKey);
   const state = {
     data,
@@ -383,7 +383,8 @@ export function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Man
     drag: null,
   };
 
-  const panel = ensureManagerShell(document, title);
+  const doc = mountTarget?.ownerDocument || document;
+  const panel = ensureManagerShell(doc, title, mountTarget);
   panel.dataset.storageKey = storageKey;
 
   const rerender = () => {
