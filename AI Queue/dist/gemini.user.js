@@ -10,7 +10,7 @@
 // @match        https://gemini.google.com/app
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.11
+// @version      3.0.12
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -681,7 +681,7 @@
   // AI Queue/core/panel-controls.js
   var boundPanels = /* @__PURE__ */ new WeakSet();
   function setupPanelControls({
-    createItem,
+    createItem: createItem2,
     renderQueue,
     saveQueue: saveQueue2,
     processQueue,
@@ -705,14 +705,14 @@
         const item = queueState.queue.find((item2) => item2.id === queueState.editingId);
         if (!item) {
           error('Editing item not found in queue:', queueState.editingId);
-          queueState.queue.push(createItem(text));
+          queueState.queue.push(createItem2(text));
         } else {
           item.prompt = text;
         }
         queueState.editingId = null;
         addBtn.textContent = 'Add To Queue';
       } else {
-        queueState.queue.push(createItem(text));
+        queueState.queue.push(createItem2(text));
       }
       updateToolbarButton(getToolbarButton(), queueState.queue, queueState.running);
       input.value = '';
@@ -1591,6 +1591,119 @@
     );
   }
 
+  // AI Queue/styles/selection-menu.css
+  var selection_menu_default =
+    '#pq-selection-menu {\r\n  position: fixed;\r\n  z-index: 2147483647;\r\n  display: none;\r\n  min-width: 180px;\r\n  padding: 6px;\r\n  border: 1px solid #444;\r\n  border-radius: 12px;\r\n  background: #202123;\r\n  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);\r\n}\r\n\r\n#pq-selection-menu button {\r\n  appearance: none;\r\n  display: block;\r\n  width: 100%;\r\n  padding: 8px 12px;\r\n  border: 1px solid #555;\r\n  border-radius: 10px;\r\n  background: #2a2a2a;\r\n  color: #fff;\r\n  cursor: pointer;\r\n  font: inherit;\r\n  text-align: left;\r\n}\r\n\r\n#pq-selection-menu button:hover {\r\n  background: #343434;\r\n}';
+
+  // AI Queue/core/selection-menu.js
+  var SELECTION_MENU_ID = 'pq-selection-menu';
+  var installed = false;
+  function getSelectedPageText() {
+    const selection = window.getSelection?.();
+    if (!selection || selection.isCollapsed) return '';
+    return selection.toString().trim();
+  }
+  function hideSelectionMenu() {
+    const menu = document.querySelector(`#${SELECTION_MENU_ID}`);
+    if (!menu) return;
+    menu.hidden = true;
+    menu.style.display = 'none';
+  }
+  function ensureSelectionMenu(onAddSelection) {
+    let menu = document.querySelector(`#${SELECTION_MENU_ID}`);
+    if (menu) return menu;
+    if (!document.querySelector('#pq-selection-menu-styles')) {
+      const style = document.createElement('style');
+      style.id = 'pq-selection-menu-styles';
+      style.textContent = selection_menu_default;
+      document.head.appendChild(style);
+    }
+    menu = document.createElement('div');
+    menu.id = SELECTION_MENU_ID;
+    menu.hidden = true;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Add to Prompt Queue';
+    button.addEventListener('click', () => {
+      const prompt = menu.dataset.prompt || '';
+      if (prompt) {
+        onAddSelection(prompt);
+      }
+      hideSelectionMenu();
+    });
+    menu.appendChild(button);
+    document.body.appendChild(menu);
+    return menu;
+  }
+  function showSelectionMenu(selectionText, x, y, onAddSelection) {
+    const menu = ensureSelectionMenu(onAddSelection);
+    menu.dataset.prompt = selectionText;
+    const margin = 12;
+    const left = Math.min(x + margin, window.innerWidth - 200);
+    const top = Math.min(y + margin, window.innerHeight - 64);
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.hidden = false;
+    menu.style.display = 'block';
+  }
+  function addSelectionToQueue(createItem2, renderQueue, saveQueue2, updateToolbarButton2) {
+    return (selectionText) => {
+      const prompt = selectionText.trim();
+      if (!prompt) return;
+      queueState.queue.push(createItem2(prompt));
+      updateToolbarButton2(
+        document.querySelector('#pq-toolbar-button'),
+        queueState.queue,
+        queueState.running
+      );
+      renderQueue?.();
+      saveQueue2();
+    };
+  }
+  function installSelectionPromptMenu({
+    createItem: createItem2,
+    renderQueue,
+    saveQueue: saveQueue2,
+    updateToolbarButton: updateToolbarButton2,
+  }) {
+    if (installed) return;
+    installed = true;
+    const onAddSelection = addSelectionToQueue(
+      createItem2,
+      renderQueue,
+      saveQueue2,
+      updateToolbarButton2
+    );
+    document.addEventListener(
+      'contextmenu',
+      (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest('#pq-panel') || target.closest(`#${SELECTION_MENU_ID}`)) {
+          hideSelectionMenu();
+          return;
+        }
+        const selectionText = getSelectedPageText();
+        if (!selectionText) {
+          hideSelectionMenu();
+          return;
+        }
+        event.preventDefault();
+        showSelectionMenu(selectionText, event.clientX, event.clientY, onAddSelection);
+      },
+      true
+    );
+    document.addEventListener('click', (event) => {
+      const menu = document.querySelector(`#${SELECTION_MENU_ID}`);
+      if (!menu) return;
+      if (menu.contains(event.target)) return;
+      hideSelectionMenu();
+    });
+    window.addEventListener('blur', hideSelectionMenu);
+    window.addEventListener('scroll', hideSelectionMenu, true);
+    window.addEventListener('resize', hideSelectionMenu);
+  }
+
   // AI Queue/providers/gemini.js
   var STORAGE_KEY = 'pq-gemini-queue';
   var DOMAINS = ['gemini.google.com'];
@@ -1787,6 +1900,12 @@
   }
   function ensureGeminiToolbarButton() {
     ensureToolbarStyles();
+    installSelectionPromptMenu({
+      createItem,
+      renderQueue: renderGeminiQueue,
+      saveQueue: saveGeminiQueue,
+      updateToolbarButton,
+    });
     let button = document.querySelector('#pq-toolbar-button');
     if (!button) {
       button = document.createElement('button');

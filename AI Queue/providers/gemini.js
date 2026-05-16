@@ -13,6 +13,7 @@ import { sendPrompt } from '../core/keyboard.js';
 import { waitForIdle, waitForPromptProcessing } from '../core/generation.js';
 import { bootstrapQueueApp } from '../core/bootstrap.js';
 import { openChatManagerWindow } from '../core/chat-manager.js';
+import { installSelectionPromptMenu } from '../core/selection-menu.js';
 
 const STORAGE_KEY = 'pq-gemini-queue';
 const DOMAINS = ['gemini.google.com'];
@@ -253,6 +254,13 @@ export async function processGeminiQueue() {
 
 export function ensureGeminiToolbarButton() {
   ensureToolbarStyles();
+
+  installSelectionPromptMenu({
+    createItem,
+    renderQueue: renderGeminiQueue,
+    saveQueue: saveGeminiQueue,
+    updateToolbarButton,
+  });
 
   let button = document.querySelector('#pq-toolbar-button');
   if (!button) {

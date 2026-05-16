@@ -12,10 +12,10 @@ import { waitForIdle, waitForPromptProcessing } from '../core/generation.js';
 import { error } from '../core/logging.js';
 import { bootstrapQueueApp } from '../core/bootstrap.js';
 import { openChatManagerWindow } from '../core/chat-manager.js';
+import { installSelectionPromptMenu } from '../core/selection-menu.js';
 
 const STORAGE_KEY = 'pq-chatgpt-queue';
 const DOMAINS = ['chatgpt.com', 'chat.openai.com'];
-
 function normalizeCode(value) {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -175,6 +175,13 @@ export async function processChatGPTQueue() {
 
 export function ensureChatGPTToolbarButton() {
   ensureToolbarStyles();
+
+  installSelectionPromptMenu({
+    createItem,
+    renderQueue: renderChatGPTQueue,
+    saveQueue: saveChatGPTQueue,
+    updateToolbarButton,
+  });
 
   let button = document.querySelector('#pq-toolbar-button');
   if (!button) {
