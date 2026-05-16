@@ -27,15 +27,18 @@ function cloneItem(item) {
   return { ...item };
 }
 
-function groupItems(items) {
+function cloneItems(items) {
+  return Array.isArray(items) ? items.map((item) => cloneItem(item)) : [];
+}
+
+function groupItems(chats) {
   const grouped = { [GLOBAL_CHAT_KEY]: [] };
 
-  items.forEach((item) => {
-    const key = toChatKey(item.chatCode);
-    if (!grouped[key]) {
-      grouped[key] = [];
+  Object.entries(chats || {}).forEach(([chatKey, bucket]) => {
+    if (!grouped[chatKey]) {
+      grouped[chatKey] = [];
     }
-    grouped[key].push(cloneItem(item));
+    grouped[chatKey].push(...cloneItems(bucket?.items));
   });
 
   return grouped;
@@ -52,23 +55,28 @@ function orderedKeys(groups) {
   return nonGlobal;
 }
 
-function flattenGroups(groups) {
-  const flat = [];
+function flattenGroups(groups, existingChats = {}) {
+  const nextChats = {};
 
   orderedKeys(groups).forEach((key) => {
-    groups[key].forEach((item) => {
-      const normalized = cloneItem(item);
-      const chatCode = toChatCode(key);
-      if (chatCode) {
-        normalized.chatCode = chatCode;
-      } else {
-        delete normalized.chatCode;
-      }
-      flat.push(normalized);
-    });
+    nextChats[key] = {
+      items: cloneItems(groups[key]),
+      failedItems: cloneItems(existingChats[key]?.failedItems),
+    };
   });
 
-  return flat;
+  Object.entries(existingChats).forEach(([chatKey, bucket]) => {
+    if (nextChats[chatKey]) return;
+
+    if (Array.isArray(bucket?.failedItems) && bucket.failedItems.length > 0) {
+      nextChats[chatKey] = {
+        items: [],
+        failedItems: cloneItems(bucket.failedItems),
+      };
+    }
+  });
+
+  return nextChats;
 }
 
 function findItemIndex(groups, chatKey, itemId) {
@@ -206,7 +214,7 @@ function moveByDrop(state, fromChatKey, itemId, toChatKey, toIndex) {
 }
 
 function persistState(storageKey, state) {
-  state.data.items = flattenGroups(state.groups);
+  state.data.chats = flattenGroups(state.groups, state.data.chats);
   writeScopedQueueData(storageKey, state.data);
 }
 
@@ -379,7 +387,7 @@ export function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Man
   const data = readScopedQueueData(storageKey);
   const state = {
     data,
-    groups: groupItems(data.items),
+    groups: groupItems(data.chats),
     drag: null,
   };
 
@@ -399,7 +407,7 @@ export function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Man
     refreshButton.onclick = () => {
       const refreshedData = readScopedQueueData(storageKey);
       state.data = refreshedData;
-      state.groups = groupItems(refreshedData.items);
+      state.groups = groupItems(refreshedData.chats);
       state.drag = null;
       rerender();
     };
@@ -422,7 +430,7 @@ export function refreshChatManager(storageKey) {
 
   const refreshedData = readScopedQueueData(storageKey);
   manager.state.data = refreshedData;
-  manager.state.groups = groupItems(refreshedData.items);
+  manager.state.groups = groupItems(refreshedData.chats);
   manager.state.drag = null;
 
   const grid = manager.panel.querySelector(`#${MANAGER_GRID_ID}`);

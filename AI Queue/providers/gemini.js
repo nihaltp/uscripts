@@ -152,6 +152,7 @@ export function renderGeminiQueue() {
         if (index !== -1) {
           const [retryItem] = queueState.failedQueue.splice(index, 1);
           retryItem.attempts = 0;
+          retryItem.status = 'queued';
           queueState.queue.push(retryItem);
           renderGeminiQueue();
           saveGeminiQueue();
@@ -230,9 +231,11 @@ export async function processGeminiQueue() {
       item.attempts = 0;
     } catch (err) {
       error('Failed to send prompt:', err.message);
+      item.status = 'failed';
       item.attempts = (item.attempts || 0) + 1;
 
       if (item.attempts < 3) {
+        item.status = 'queued';
         queueState.queue.push(item);
       } else {
         queueState.failedQueue.push(item);
@@ -300,6 +303,8 @@ export const geminiProvider = {
       id: crypto.randomUUID(),
       prompt: text,
       attempts: 0,
+      status: 'queued',
+      createdAt: Date.now(),
       ...(chatCode ? { chatCode } : {}),
     };
   },

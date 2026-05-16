@@ -219,6 +219,9 @@ export const chatgptProvider = {
     return {
       id: crypto.randomUUID(),
       prompt: text,
+      attempts: 0,
+      status: 'queued',
+      createdAt: Date.now(),
       ...(chatCode ? { chatCode } : {}),
     };
   },

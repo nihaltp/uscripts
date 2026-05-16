@@ -10,7 +10,7 @@
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.0.13
+// @version      3.0.14
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
@@ -549,10 +549,16 @@
   }
 
   // AI Queue/core/storage.js
+  var GLOBAL_CHAT_KEY = '__global__';
+  var DEFAULT_ITEM_STATUS = 'queued';
+  var DEFAULT_FAILED_STATUS = 'failed';
   function toChatCode(value) {
     if (typeof value !== 'string') return null;
     const normalized = value.trim();
     return normalized ? normalized : null;
+  }
+  function toChatKey(value) {
+    return toChatCode(value) || GLOBAL_CHAT_KEY;
   }
   function generateId() {
     if (globalThis.crypto?.randomUUID) {
@@ -560,67 +566,90 @@
     }
     return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
-  function sanitizeItem(item) {
+  function toCreatedAt(value) {
+    const timestamp = Number(value);
+    return Number.isFinite(timestamp) ? timestamp : Date.now();
+  }
+  function sanitizeItem(item, defaultStatus = DEFAULT_ITEM_STATUS) {
     if (!item || typeof item.prompt !== 'string') return null;
-    const normalized = {
+    return {
       id: typeof item.id === 'string' && item.id ? item.id : generateId(),
       prompt: item.prompt,
+      attempts: Number.isFinite(Number(item.attempts)) ? Number(item.attempts) : 0,
+      status:
+        typeof item.status === 'string' && item.status.trim() ? item.status.trim() : defaultStatus,
+      createdAt: toCreatedAt(item.createdAt),
     };
-    if (item.attempts !== void 0) {
-      const attempts = Number(item.attempts);
-      if (Number.isFinite(attempts)) {
-        normalized.attempts = attempts;
-      }
+  }
+  function sanitizeItems(items, defaultStatus = DEFAULT_ITEM_STATUS) {
+    if (!Array.isArray(items)) return [];
+    return items.map((item) => sanitizeItem(item, defaultStatus)).filter(Boolean);
+  }
+  function emptyChats() {
+    return {};
+  }
+  function sanitizeChatBuckets(chats) {
+    const normalized = emptyChats();
+    if (!chats || typeof chats !== 'object' || Array.isArray(chats)) {
+      return normalized;
     }
-    const chatCode = toChatCode(item.chatCode);
-    if (chatCode) {
-      normalized.chatCode = chatCode;
+    for (const [chatKey, bucket] of Object.entries(chats)) {
+      normalized[toChatKey(chatKey)] = {
+        items: sanitizeItems(bucket?.items, DEFAULT_ITEM_STATUS),
+        failedItems: sanitizeItems(bucket?.failedItems, DEFAULT_FAILED_STATUS),
+      };
     }
     return normalized;
   }
-  function sanitizeItems(items) {
-    if (!Array.isArray(items)) return [];
-    return items.map((item) => sanitizeItem(item)).filter(Boolean);
+  function addLegacyItem(chats, item, defaultStatus, bucketName) {
+    const normalizedItem = sanitizeItem(item, defaultStatus);
+    if (!normalizedItem) return;
+    const chatKey = toChatKey(item?.chatCode);
+    if (!chats[chatKey]) {
+      chats[chatKey] = { items: [], failedItems: [] };
+    }
+    chats[chatKey][bucketName].push(normalizedItem);
   }
   function buildLegacyData(parsed) {
-    return {
-      items: sanitizeItems(parsed?.queue),
-      failedItems: sanitizeItems(parsed?.failedQueue),
-    };
+    const chats = emptyChats();
+    if (Array.isArray(parsed?.items)) {
+      parsed.items.forEach((item) => addLegacyItem(chats, item, DEFAULT_ITEM_STATUS, 'items'));
+    } else if (Array.isArray(parsed?.queue)) {
+      parsed.queue.forEach((item) => addLegacyItem(chats, item, DEFAULT_ITEM_STATUS, 'items'));
+    }
+    if (Array.isArray(parsed?.failedItems)) {
+      parsed.failedItems.forEach((item) =>
+        addLegacyItem(chats, item, DEFAULT_FAILED_STATUS, 'failedItems')
+      );
+    } else if (Array.isArray(parsed?.failedQueue)) {
+      parsed.failedQueue.forEach((item) =>
+        addLegacyItem(chats, item, DEFAULT_FAILED_STATUS, 'failedItems')
+      );
+    }
+    return { chats };
   }
   function normalizeData(parsed) {
     if (!parsed || typeof parsed !== 'object') {
-      return { items: [], failedItems: [] };
+      return { chats: emptyChats() };
     }
-    if (Array.isArray(parsed.items) || Array.isArray(parsed.failedItems)) {
+    if (parsed.chats && typeof parsed.chats === 'object' && !Array.isArray(parsed.chats)) {
       return {
-        items: sanitizeItems(parsed.items),
-        failedItems: sanitizeItems(parsed.failedItems),
+        chats: sanitizeChatBuckets(parsed.chats),
       };
     }
     return buildLegacyData(parsed);
-  }
-  function matchesCurrentChat(item, currentChatCode) {
-    const itemChatCode = toChatCode(item.chatCode);
-    if (!itemChatCode) {
-      return true;
-    }
-    if (!currentChatCode) {
-      return false;
-    }
-    return itemChatCode === currentChatCode;
   }
   function readScopedQueueData(storageKey = 'pq-queue-state') {
     try {
       const stored = localStorage.getItem(storageKey);
       if (!stored) {
-        return { items: [], failedItems: [] };
+        return { chats: emptyChats() };
       }
       const parsed = JSON.parse(stored);
       return normalizeData(parsed);
     } catch (err) {
       error('Failed to read queue storage:', err);
-      return { items: [], failedItems: [] };
+      return { chats: emptyChats() };
     }
   }
   function writeScopedQueueData(storageKey = 'pq-queue-state', data = {}) {
@@ -633,24 +662,25 @@
   }
   function saveQueue(queue, failedQueue, storageKey = 'pq-queue-state', currentChatCode = null) {
     try {
-      const chatCode = toChatCode(currentChatCode);
+      const chatKey = toChatKey(currentChatCode);
       const data = readScopedQueueData(storageKey);
-      const keepOtherChatItems = (item) => !matchesCurrentChat(item, chatCode);
-      const visibleQueueItems = sanitizeItems(queue || []);
-      const nextItems = [...data.items.filter(keepOtherChatItems), ...visibleQueueItems];
-      let nextFailedItems = data.failedItems;
-      if (Array.isArray(failedQueue)) {
-        const visibleFailedItems = sanitizeItems(failedQueue || []);
-        nextFailedItems = [...data.failedItems.filter(keepOtherChatItems), ...visibleFailedItems];
-      }
+      const existingBucket = data.chats[chatKey] || { items: [], failedItems: [] };
+      const nextBucket = {
+        items: sanitizeItems(queue || [], DEFAULT_ITEM_STATUS),
+        failedItems: Array.isArray(failedQueue)
+          ? sanitizeItems(failedQueue || [], DEFAULT_FAILED_STATUS)
+          : sanitizeItems(existingBucket.failedItems, DEFAULT_FAILED_STATUS),
+      };
       writeScopedQueueData(storageKey, {
-        items: nextItems,
-        failedItems: nextFailedItems,
+        chats: {
+          ...data.chats,
+          [chatKey]: nextBucket,
+        },
       });
       log('queue saved to storage', {
         storageKey,
-        currentChatCode: chatCode,
-        visibleItems: visibleQueueItems.length,
+        currentChatCode: chatKey,
+        visibleItems: nextBucket.items.length,
       });
     } catch (err) {
       error('Failed to save queue:', err);
@@ -658,22 +688,17 @@
   }
   function loadQueue(queue, failedQueue, storageKey = 'pq-queue-state', currentChatCode = null) {
     try {
-      const chatCode = toChatCode(currentChatCode);
+      const chatKey = toChatKey(currentChatCode);
       const data = readScopedQueueData(storageKey);
-      const visibleQueueItems = data.items
-        .filter((item) => matchesCurrentChat(item, chatCode))
-        .map((item) => ({ ...item }));
-      queue.push(...visibleQueueItems);
+      const bucket = data.chats[chatKey] || { items: [], failedItems: [] };
+      queue.push(...bucket.items.map((item) => ({ ...item })));
       if (Array.isArray(failedQueue)) {
-        const visibleFailedItems = data.failedItems
-          .filter((item) => matchesCurrentChat(item, chatCode))
-          .map((item) => ({ ...item }));
-        failedQueue.push(...visibleFailedItems);
+        failedQueue.push(...bucket.failedItems.map((item) => ({ ...item })));
       }
       log('queue loaded from storage', {
         storageKey,
-        currentChatCode: chatCode,
-        visibleItems: visibleQueueItems.length,
+        currentChatCode: chatKey,
+        visibleItems: bucket.items.length,
       });
     } catch (err) {
       error('Failed to load queue:', err);
@@ -1184,19 +1209,16 @@
     ':root {\r\n  color-scheme: dark;\r\n  --pq-manager-bg: #0b1220;\r\n  --pq-manager-panel: rgba(17, 24, 39, 0.96);\r\n  --pq-manager-card: rgba(31, 41, 55, 0.96);\r\n  --pq-manager-text: #f3f4f6;\r\n  --pq-manager-muted: #9ca3af;\r\n  --pq-manager-border: #374151;\r\n  --pq-manager-accent: #60a5fa;\r\n  --pq-manager-accent-strong: #22c55e;\r\n}\r\n\r\n#pq-chat-manager-panel {\r\n  position: fixed;\r\n  top: 6vh;\r\n  left: 50%;\r\n  transform: translateX(-50%);\r\n  width: min(1100px, calc(100vw - 32px));\r\n  height: min(760px, calc(100vh - 32px));\r\n  z-index: 2147483647;\r\n  display: flex;\r\n  flex-direction: column;\r\n  background: radial-gradient(circle at top right, rgba(31, 41, 55, 0.95), rgba(11, 18, 32, 0.98) 60%);\r\n  color: var(--pq-manager-text);\r\n  border: 1px solid var(--pq-manager-border);\r\n  border-radius: 16px;\r\n  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);\r\n  overflow: hidden;\r\n}\r\n\r\n.pq-manager-shell {\r\n  display: flex;\r\n  flex-direction: column;\r\n  height: 100%;\r\n  min-height: 0;\r\n}\r\n\r\n.pq-manager-header {\r\n  display: flex;\r\n  align-items: flex-start;\r\n  justify-content: space-between;\r\n  gap: 16px;\r\n  padding: 16px 18px 12px;\r\n  border-bottom: 1px solid var(--pq-manager-border);\r\n  background: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.82));\r\n}\r\n\r\n.pq-manager-title {\r\n  font-size: 18px;\r\n  font-weight: 700;\r\n  line-height: 1.2;\r\n  margin: 0;\r\n}\r\n\r\n.pq-manager-subtitle {\r\n  margin-top: 4px;\r\n  color: var(--pq-manager-muted);\r\n  font-size: 13px;\r\n  line-height: 1.4;\r\n  max-width: 72ch;\r\n}\r\n\r\n.pq-manager-actions {\r\n  display: flex;\r\n  gap: 8px;\r\n  flex-shrink: 0;\r\n}\r\n\r\n.pq-manager-actions button {\r\n  appearance: none;\r\n  border: 1px solid var(--pq-manager-border);\r\n  background: rgba(31, 41, 55, 0.95);\r\n  color: var(--pq-manager-text);\r\n  border-radius: 999px;\r\n  padding: 8px 12px;\r\n  font: inherit;\r\n  cursor: pointer;\r\n}\r\n\r\n.pq-manager-actions button:hover {\r\n  border-color: var(--pq-manager-accent);\r\n}\r\n\r\n.pq-manager-body {\r\n  display: flex;\r\n  flex-direction: column;\r\n  min-height: 0;\r\n  padding: 16px 18px 18px;\r\n  gap: 12px;\r\n  overflow: hidden;\r\n}\r\n\r\n.pq-manager-grid {\r\n  display: grid;\r\n  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));\r\n  gap: 12px;\r\n  align-items: start;\r\n  flex: 1;\r\n  min-height: 0;\r\n  overflow: auto;\r\n  padding-right: 4px;\r\n}\r\n\r\n.chat-card {\r\n  background: linear-gradient(180deg, var(--pq-manager-panel), var(--pq-manager-card));\r\n  border: 1px solid var(--pq-manager-border);\r\n  border-radius: 12px;\r\n  overflow: hidden;\r\n  min-height: 140px;\r\n}\r\n\r\n.chat-title {\r\n  padding: 10px 12px;\r\n  border-bottom: 1px solid var(--pq-manager-border);\r\n  font-size: 12px;\r\n  letter-spacing: 0.2px;\r\n  text-transform: uppercase;\r\n  color: #d1d5db;\r\n  display: flex;\r\n  justify-content: space-between;\r\n  gap: 8px;\r\n}\r\n\r\n.chat-title .chat-controls {\r\n  display: inline-flex;\r\n  gap: 8px;\r\n  align-items: center;\r\n}\r\n\r\n.chat-delete {\r\n  appearance: none;\r\n  border: 1px solid transparent;\r\n  background: transparent;\r\n  color: var(--pq-manager-muted);\r\n  border-radius: 8px;\r\n  padding: 4px 8px;\r\n  font-size: 12px;\r\n  cursor: pointer;\r\n}\r\n\r\n.chat-delete:hover {\r\n  color: var(--pq-manager-accent);\r\n  border-color: rgba(96, 165, 250, 0.12);\r\n  background: rgba(96, 165, 250, 0.03);\r\n}\r\n\r\n.chat-list {\r\n  list-style: none;\r\n  margin: 0;\r\n  padding: 8px;\r\n  min-height: 90px;\r\n}\r\n\r\n.chat-item {\r\n  background: rgba(17, 24, 39, 0.7);\r\n  border: 1px solid #334155;\r\n  border-radius: 8px;\r\n  padding: 8px;\r\n  margin-bottom: 8px;\r\n  cursor: grab;\r\n  user-select: none;\r\n  font-size: 13px;\r\n  line-height: 1.35;\r\n  word-break: break-word;\r\n}\r\n\r\n.chat-item.dragging {\r\n  opacity: 0.5;\r\n}\r\n\r\n.chat-list.drag-over,\r\n.chat-item.drag-over {\r\n  outline: 2px dashed var(--pq-manager-accent);\r\n  outline-offset: 2px;\r\n}\r\n\r\n.empty {\r\n  color: var(--pq-manager-muted);\r\n  font-size: 12px;\r\n  padding: 8px;\r\n  border: 1px dashed var(--pq-manager-border);\r\n  border-radius: 8px;\r\n  text-align: center;\r\n}\r\n\r\n.pq-manager-footer {\r\n  color: var(--pq-manager-muted);\r\n  font-size: 12px;\r\n  border-top: 1px solid var(--pq-manager-border);\r\n  padding-top: 12px;\r\n}';
 
   // AI Queue/core/chat-manager.js
-  var GLOBAL_CHAT_KEY = '__global__';
+  var GLOBAL_CHAT_KEY2 = '__global__';
   var MANAGER_PANEL_ID = 'pq-chat-manager-panel';
   var MANAGER_GRID_ID = 'pq-chat-manager-grid';
   var MANAGER_BODY_ID = 'pq-chat-manager-body';
   var activeManagers = /* @__PURE__ */ new Map();
-  function toChatKey(chatCode) {
-    return typeof chatCode === 'string' && chatCode.trim() ? chatCode.trim() : GLOBAL_CHAT_KEY;
-  }
   function toChatCode2(chatKey) {
-    return chatKey === GLOBAL_CHAT_KEY ? null : chatKey;
+    return chatKey === GLOBAL_CHAT_KEY2 ? null : chatKey;
   }
   function chatLabel(chatKey) {
-    if (chatKey === GLOBAL_CHAT_KEY) {
+    if (chatKey === GLOBAL_CHAT_KEY2) {
       return 'Global (all chats)';
     }
     return chatKey;
@@ -1204,42 +1226,47 @@
   function cloneItem(item) {
     return { ...item };
   }
-  function groupItems(items) {
-    const grouped = { [GLOBAL_CHAT_KEY]: [] };
-    items.forEach((item) => {
-      const key = toChatKey(item.chatCode);
-      if (!grouped[key]) {
-        grouped[key] = [];
+  function cloneItems(items) {
+    return Array.isArray(items) ? items.map((item) => cloneItem(item)) : [];
+  }
+  function groupItems(chats) {
+    const grouped = { [GLOBAL_CHAT_KEY2]: [] };
+    Object.entries(chats || {}).forEach(([chatKey, bucket]) => {
+      if (!grouped[chatKey]) {
+        grouped[chatKey] = [];
       }
-      grouped[key].push(cloneItem(item));
+      grouped[chatKey].push(...cloneItems(bucket?.items));
     });
     return grouped;
   }
   function orderedKeys(groups) {
     const keys = Object.keys(groups).filter((key) => groups[key]?.length > 0);
     const nonGlobal = keys
-      .filter((key) => key !== GLOBAL_CHAT_KEY)
+      .filter((key) => key !== GLOBAL_CHAT_KEY2)
       .sort((a, b) => a.localeCompare(b));
-    if (groups[GLOBAL_CHAT_KEY]?.length > 0) {
-      return [GLOBAL_CHAT_KEY, ...nonGlobal];
+    if (groups[GLOBAL_CHAT_KEY2]?.length > 0) {
+      return [GLOBAL_CHAT_KEY2, ...nonGlobal];
     }
     return nonGlobal;
   }
-  function flattenGroups(groups) {
-    const flat = [];
+  function flattenGroups(groups, existingChats = {}) {
+    const nextChats = {};
     orderedKeys(groups).forEach((key) => {
-      groups[key].forEach((item) => {
-        const normalized = cloneItem(item);
-        const chatCode = toChatCode2(key);
-        if (chatCode) {
-          normalized.chatCode = chatCode;
-        } else {
-          delete normalized.chatCode;
-        }
-        flat.push(normalized);
-      });
+      nextChats[key] = {
+        items: cloneItems(groups[key]),
+        failedItems: cloneItems(existingChats[key]?.failedItems),
+      };
     });
-    return flat;
+    Object.entries(existingChats).forEach(([chatKey, bucket]) => {
+      if (nextChats[chatKey]) return;
+      if (Array.isArray(bucket?.failedItems) && bucket.failedItems.length > 0) {
+        nextChats[chatKey] = {
+          items: [],
+          failedItems: cloneItems(bucket.failedItems),
+        };
+      }
+    });
+    return nextChats;
   }
   function findItemIndex(groups, chatKey, itemId) {
     const list = groups[chatKey] || [];
@@ -1339,13 +1366,13 @@
     }
     movedItem.chatCode = toChatCode2(toChatKey2) || void 0;
     targetList.splice(normalizedIndex, 0, movedItem);
-    if (fromChatKey !== GLOBAL_CHAT_KEY && (state.groups[fromChatKey] || []).length === 0) {
+    if (fromChatKey !== GLOBAL_CHAT_KEY2 && (state.groups[fromChatKey] || []).length === 0) {
       delete state.groups[fromChatKey];
     }
     return true;
   }
   function persistState(storageKey, state) {
-    state.data.items = flattenGroups(state.groups);
+    state.data.chats = flattenGroups(state.groups, state.data.chats);
     writeScopedQueueData(storageKey, state.data);
   }
   function renderCards(grid, storageKey, state, rerender) {
@@ -1483,7 +1510,7 @@
     const data = readScopedQueueData(storageKey);
     const state = {
       data,
-      groups: groupItems(data.items),
+      groups: groupItems(data.chats),
       drag: null,
     };
     const doc = mountTarget?.ownerDocument || document;
@@ -1499,7 +1526,7 @@
       refreshButton.onclick = () => {
         const refreshedData = readScopedQueueData(storageKey);
         state.data = refreshedData;
-        state.groups = groupItems(refreshedData.items);
+        state.groups = groupItems(refreshedData.chats);
         state.drag = null;
         rerender();
       };
@@ -1518,7 +1545,7 @@
     if (!manager || !manager.panel || manager.panel.hidden) return false;
     const refreshedData = readScopedQueueData(storageKey);
     manager.state.data = refreshedData;
-    manager.state.groups = groupItems(refreshedData.items);
+    manager.state.groups = groupItems(refreshedData.chats);
     manager.state.drag = null;
     const grid = manager.panel.querySelector(`#${MANAGER_GRID_ID}`);
     renderCards(grid, storageKey, manager.state, manager.rerender);
@@ -1883,6 +1910,9 @@
       return {
         id: crypto.randomUUID(),
         prompt: text,
+        attempts: 0,
+        status: 'queued',
+        createdAt: Date.now(),
         ...(chatCode ? { chatCode } : {}),
       };
     },

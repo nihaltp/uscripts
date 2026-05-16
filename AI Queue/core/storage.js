@@ -1,9 +1,17 @@
 import { error, log } from './logging.js';
 
+const GLOBAL_CHAT_KEY = '__global__';
+const DEFAULT_ITEM_STATUS = 'queued';
+const DEFAULT_FAILED_STATUS = 'failed';
+
 function toChatCode(value) {
   if (typeof value !== 'string') return null;
   const normalized = value.trim();
   return normalized ? normalized : null;
+}
+
+function toChatKey(value) {
+  return toChatCode(value) || GLOBAL_CHAT_KEY;
 }
 
 function generateId() {
@@ -13,81 +21,105 @@ function generateId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function sanitizeItem(item) {
+function toCreatedAt(value) {
+  const timestamp = Number(value);
+  return Number.isFinite(timestamp) ? timestamp : Date.now();
+}
+
+function sanitizeItem(item, defaultStatus = DEFAULT_ITEM_STATUS) {
   if (!item || typeof item.prompt !== 'string') return null;
 
-  const normalized = {
+  return {
     id: typeof item.id === 'string' && item.id ? item.id : generateId(),
     prompt: item.prompt,
+    attempts: Number.isFinite(Number(item.attempts)) ? Number(item.attempts) : 0,
+    status: typeof item.status === 'string' && item.status.trim() ? item.status.trim() : defaultStatus,
+    createdAt: toCreatedAt(item.createdAt),
   };
+}
 
-  if (item.attempts !== undefined) {
-    const attempts = Number(item.attempts);
-    if (Number.isFinite(attempts)) {
-      normalized.attempts = attempts;
-    }
+function sanitizeItems(items, defaultStatus = DEFAULT_ITEM_STATUS) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => sanitizeItem(item, defaultStatus)).filter(Boolean);
+}
+
+function emptyChats() {
+  return {};
+}
+
+function sanitizeChatBuckets(chats) {
+  const normalized = emptyChats();
+
+  if (!chats || typeof chats !== 'object' || Array.isArray(chats)) {
+    return normalized;
   }
 
-  const chatCode = toChatCode(item.chatCode);
-  if (chatCode) {
-    normalized.chatCode = chatCode;
+  for (const [chatKey, bucket] of Object.entries(chats)) {
+    normalized[toChatKey(chatKey)] = {
+      items: sanitizeItems(bucket?.items, DEFAULT_ITEM_STATUS),
+      failedItems: sanitizeItems(bucket?.failedItems, DEFAULT_FAILED_STATUS),
+    };
   }
 
   return normalized;
 }
 
-function sanitizeItems(items) {
-  if (!Array.isArray(items)) return [];
-  return items.map((item) => sanitizeItem(item)).filter(Boolean);
+function addLegacyItem(chats, item, defaultStatus, bucketName) {
+  const normalizedItem = sanitizeItem(item, defaultStatus);
+  if (!normalizedItem) return;
+
+  const chatKey = toChatKey(item?.chatCode);
+  if (!chats[chatKey]) {
+    chats[chatKey] = { items: [], failedItems: [] };
+  }
+
+  chats[chatKey][bucketName].push(normalizedItem);
 }
 
 function buildLegacyData(parsed) {
-  return {
-    items: sanitizeItems(parsed?.queue),
-    failedItems: sanitizeItems(parsed?.failedQueue),
-  };
+  const chats = emptyChats();
+
+  if (Array.isArray(parsed?.items)) {
+    parsed.items.forEach((item) => addLegacyItem(chats, item, DEFAULT_ITEM_STATUS, 'items'));
+  } else if (Array.isArray(parsed?.queue)) {
+    parsed.queue.forEach((item) => addLegacyItem(chats, item, DEFAULT_ITEM_STATUS, 'items'));
+  }
+
+  if (Array.isArray(parsed?.failedItems)) {
+    parsed.failedItems.forEach((item) => addLegacyItem(chats, item, DEFAULT_FAILED_STATUS, 'failedItems'));
+  } else if (Array.isArray(parsed?.failedQueue)) {
+    parsed.failedQueue.forEach((item) => addLegacyItem(chats, item, DEFAULT_FAILED_STATUS, 'failedItems'));
+  }
+
+  return { chats };
 }
 
 function normalizeData(parsed) {
   if (!parsed || typeof parsed !== 'object') {
-    return { items: [], failedItems: [] };
+    return { chats: emptyChats() };
   }
 
-  // v2 shape
-  if (Array.isArray(parsed.items) || Array.isArray(parsed.failedItems)) {
+  if (parsed.chats && typeof parsed.chats === 'object' && !Array.isArray(parsed.chats)) {
     return {
-      items: sanitizeItems(parsed.items),
-      failedItems: sanitizeItems(parsed.failedItems),
+      chats: sanitizeChatBuckets(parsed.chats),
     };
   }
 
-  // Legacy shape (queue + failedQueue)
   return buildLegacyData(parsed);
-}
-
-function matchesCurrentChat(item, currentChatCode) {
-  const itemChatCode = toChatCode(item.chatCode);
-  if (!itemChatCode) {
-    return true;
-  }
-  if (!currentChatCode) {
-    return false;
-  }
-  return itemChatCode === currentChatCode;
 }
 
 export function readScopedQueueData(storageKey = 'pq-queue-state') {
   try {
     const stored = localStorage.getItem(storageKey);
     if (!stored) {
-      return { items: [], failedItems: [] };
+      return { chats: emptyChats() };
     }
 
     const parsed = JSON.parse(stored);
     return normalizeData(parsed);
   } catch (err) {
     error('Failed to read queue storage:', err);
-    return { items: [], failedItems: [] };
+    return { chats: emptyChats() };
   }
 }
 
@@ -107,29 +139,28 @@ export function saveQueue(
   currentChatCode = null
 ) {
   try {
-    const chatCode = toChatCode(currentChatCode);
+    const chatKey = toChatKey(currentChatCode);
     const data = readScopedQueueData(storageKey);
+    const existingBucket = data.chats[chatKey] || { items: [], failedItems: [] };
 
-    const keepOtherChatItems = (item) => !matchesCurrentChat(item, chatCode);
-
-    const visibleQueueItems = sanitizeItems(queue || []);
-    const nextItems = [...data.items.filter(keepOtherChatItems), ...visibleQueueItems];
-
-    let nextFailedItems = data.failedItems;
-    if (Array.isArray(failedQueue)) {
-      const visibleFailedItems = sanitizeItems(failedQueue || []);
-      nextFailedItems = [...data.failedItems.filter(keepOtherChatItems), ...visibleFailedItems];
-    }
+    const nextBucket = {
+      items: sanitizeItems(queue || [], DEFAULT_ITEM_STATUS),
+      failedItems: Array.isArray(failedQueue)
+        ? sanitizeItems(failedQueue || [], DEFAULT_FAILED_STATUS)
+        : sanitizeItems(existingBucket.failedItems, DEFAULT_FAILED_STATUS),
+    };
 
     writeScopedQueueData(storageKey, {
-      items: nextItems,
-      failedItems: nextFailedItems,
+      chats: {
+        ...data.chats,
+        [chatKey]: nextBucket,
+      },
     });
 
     log('queue saved to storage', {
       storageKey,
-      currentChatCode: chatCode,
-      visibleItems: visibleQueueItems.length,
+      currentChatCode: chatKey,
+      visibleItems: nextBucket.items.length,
     });
   } catch (err) {
     error('Failed to save queue:', err);
@@ -143,26 +174,20 @@ export function loadQueue(
   currentChatCode = null
 ) {
   try {
-    const chatCode = toChatCode(currentChatCode);
+    const chatKey = toChatKey(currentChatCode);
     const data = readScopedQueueData(storageKey);
+    const bucket = data.chats[chatKey] || { items: [], failedItems: [] };
 
-    const visibleQueueItems = data.items
-      .filter((item) => matchesCurrentChat(item, chatCode))
-      .map((item) => ({ ...item }));
-
-    queue.push(...visibleQueueItems);
+    queue.push(...bucket.items.map((item) => ({ ...item })));
 
     if (Array.isArray(failedQueue)) {
-      const visibleFailedItems = data.failedItems
-        .filter((item) => matchesCurrentChat(item, chatCode))
-        .map((item) => ({ ...item }));
-      failedQueue.push(...visibleFailedItems);
+      failedQueue.push(...bucket.failedItems.map((item) => ({ ...item })));
     }
 
     log('queue loaded from storage', {
       storageKey,
-      currentChatCode: chatCode,
-      visibleItems: visibleQueueItems.length,
+      currentChatCode: chatKey,
+      visibleItems: bucket.items.length,
     });
   } catch (err) {
     error('Failed to load queue:', err);
