@@ -1,4 +1,4 @@
-import { log } from './logging.js';
+import { error, log } from './logging.js';
 import { isActionButtonElement, isAttached, isVisible } from './utils.js';
 
 export function waitForCondition(
@@ -16,12 +16,12 @@ export function waitForCondition(
           return;
         }
       } catch (err) {
-        log('waitForCondition check error:', err);
+        error('waitForCondition check error:', err);
       }
 
       const elapsed = Date.now() - startedAt;
       if (elapsed > timeoutMs) {
-        reject(new Error(`Timeout waiting for ${description} (${elapsed}ms)`));
+        reject(error(`Timeout waiting for ${description} (${elapsed}ms)`));
         return;
       }
 

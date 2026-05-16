@@ -1,4 +1,4 @@
-import { log, throwError } from './logging.js';
+import { error, throwError } from './logging.js';
 import { isAttached } from './utils.js';
 import {
   getComposerEditor,
@@ -124,7 +124,7 @@ export async function sendPrompt(prompt) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   } catch (err) {
-    log('send button unavailable, falling back to Enter', err.message);
+    error('send button unavailable, falling back to Enter', err.message);
   }
 
   dispatchEnterKey(editor);

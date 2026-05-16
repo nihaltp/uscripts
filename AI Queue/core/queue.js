@@ -1,10 +1,10 @@
-import { error } from './logging.js';
+import { log } from './logging.js';
 
 export function deleteQueueItem(id, queue, renderQueue, saveQueue) {
   const index = queue.findIndex((item) => item.id === id);
 
   if (index === -1) {
-    error('Item to delete not found in queue:', id);
+    log('Item to delete not found in queue:', id);
     return;
   }
 
@@ -17,7 +17,7 @@ export function editQueueItem(id, queue, updateUI) {
   const item = queue.find((item) => item.id === id);
 
   if (!item) {
-    error('Item to edit not found in queue:', id);
+    log('Item to edit not found in queue:', id);
     return;
   }
 

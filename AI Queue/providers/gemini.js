@@ -6,7 +6,6 @@ import { saveQueue, loadQueue } from '../core/storage.js';
 import { updateToolbarButton, showPanel, ensureToolbarStyles } from '../core/ui.js';
 import { setupPanelControls } from '../core/panel-controls.js';
 import { setupPanelDrag } from '../core/drag.js';
-import { getComposerHost } from '../core/dom.js';
 import { log, error } from '../core/logging.js';
 import { setStatus } from '../core/queue.js';
 import { sendPrompt } from '../core/keyboard.js';

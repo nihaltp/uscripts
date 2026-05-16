@@ -10,7 +10,7 @@
 // @match        https://gemini.google.com/app
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.12
+// @version      3.0.13
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -424,7 +424,7 @@
   function deleteQueueItem(id, queue, renderQueue, saveQueue2) {
     const index = queue.findIndex((item) => item.id === id);
     if (index === -1) {
-      error('Item to delete not found in queue:', id);
+      log('Item to delete not found in queue:', id);
       return;
     }
     queue.splice(index, 1);
@@ -434,7 +434,7 @@
   function editQueueItem(id, queue, updateUI) {
     const item = queue.find((item2) => item2.id === id);
     if (!item) {
-      error('Item to edit not found in queue:', id);
+      log('Item to edit not found in queue:', id);
       return;
     }
     updateUI(id, item.prompt);
@@ -498,8 +498,8 @@
       try {
         e.dataTransfer.setData('text/plain', item.id);
         e.dataTransfer.effectAllowed = 'move';
-      } catch (error2) {
-        log('Drag start dataTransfer error:', error2);
+      } catch (err) {
+        error('Drag start dataTransfer error:', err);
       }
       li.style.opacity = '0.6';
     });
@@ -525,8 +525,8 @@
       e.preventDefault();
       try {
         e.dataTransfer.dropEffect = 'move';
-      } catch (error2) {
-        log('Drag over dataTransfer error:', error2);
+      } catch (err) {
+        error('Drag over dataTransfer error:', err);
       }
       li.style.borderTop = '2px solid #7dd3fc';
     });
@@ -698,13 +698,13 @@
     const handleAddClick = () => {
       const text = input.value.trim();
       if (!text) {
-        error('Empty prompt, not adding to queue');
+        log('Empty prompt, not adding to queue');
         return;
       }
       if (queueState.editingId !== null) {
         const item = queueState.queue.find((item2) => item2.id === queueState.editingId);
         if (!item) {
-          error('Editing item not found in queue:', queueState.editingId);
+          log('Editing item not found in queue:', queueState.editingId);
           queueState.queue.push(createItem2(text));
         } else {
           item.prompt = text;
@@ -835,11 +835,11 @@
             return;
           }
         } catch (err) {
-          log('waitForCondition check error:', err);
+          error('waitForCondition check error:', err);
         }
         const elapsed = Date.now() - startedAt;
         if (elapsed > timeoutMs) {
-          reject(new Error(`Timeout waiting for ${description} (${elapsed}ms)`));
+          reject(error(`Timeout waiting for ${description} (${elapsed}ms)`));
           return;
         }
         setTimeout(check, intervalMs);
@@ -1104,7 +1104,7 @@
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     } catch (err) {
-      log('send button unavailable, falling back to Enter', err.message);
+      error('send button unavailable, falling back to Enter', err.message);
     }
     dispatchEnterKey(editor);
     if (editor.form && typeof editor.form.requestSubmit === 'function') {

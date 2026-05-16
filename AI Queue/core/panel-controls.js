@@ -1,4 +1,4 @@
-import { error } from './logging.js';
+import { error, log } from './logging.js';
 import { setStatus } from './queue.js';
 import { updateToolbarButton, getPanel } from './ui.js';
 import { queueState } from './state.js';
@@ -21,7 +21,7 @@ export function setupPanelControls({ createItem, renderQueue, saveQueue, process
     const text = input.value.trim();
 
     if (!text) {
-      error('Empty prompt, not adding to queue');
+      log('Empty prompt, not adding to queue');
       return;
     }
 
@@ -29,7 +29,7 @@ export function setupPanelControls({ createItem, renderQueue, saveQueue, process
       const item = queueState.queue.find((item) => item.id === queueState.editingId);
 
       if (!item) {
-        error('Editing item not found in queue:', queueState.editingId);
+        log('Editing item not found in queue:', queueState.editingId);
         queueState.queue.push(createItem(text));
       } else {
         item.prompt = text;

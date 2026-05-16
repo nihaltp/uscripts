@@ -1,4 +1,4 @@
-import { log } from './logging.js';
+import { error } from './logging.js';
 import { moveQueueItem } from './queue.js';
 import { queueState } from './state.js';
 
@@ -51,8 +51,8 @@ export function createQueueItemElement(item, { renderQueue, saveQueue }) {
     try {
       e.dataTransfer.setData('text/plain', item.id);
       e.dataTransfer.effectAllowed = 'move';
-    } catch (error) {
-      log('Drag start dataTransfer error:', error);
+    } catch (err) {
+      error('Drag start dataTransfer error:', err);
     }
     li.style.opacity = '0.6';
   });
@@ -85,8 +85,8 @@ export function createQueueItemElement(item, { renderQueue, saveQueue }) {
     e.preventDefault();
     try {
       e.dataTransfer.dropEffect = 'move';
-    } catch (error) {
-      log('Drag over dataTransfer error:', error);
+    } catch (err) {
+      error('Drag over dataTransfer error:', err);
     }
     li.style.borderTop = '2px solid #7dd3fc';
   });
