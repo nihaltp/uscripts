@@ -40,7 +40,6 @@ export function waitForElement(getter, options = {}) {
 export function safeClick(element) {
   if (!isAttached(element) || !isVisible(element)) return false;
 
-  element.scrollIntoView({ block: 'center', inline: 'center' });
   element.focus?.({ preventScroll: true });
 
   if (typeof element.click === 'function') {

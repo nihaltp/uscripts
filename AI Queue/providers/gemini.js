@@ -9,7 +9,7 @@ import { setupPanelDrag } from '../core/drag.js';
 import { log, error, formatError } from '../core/logging.js';
 import { setStatus } from '../core/queue.js';
 import { sendPrompt } from '../core/keyboard.js';
-import { waitForIdle, waitForPromptProcessing } from '../core/generation.js';
+import { waitForIdle } from '../core/generation.js';
 import { bootstrapQueueApp } from '../core/bootstrap.js';
 import { openChatManagerWindow } from '../core/chat-manager.js';
 import { installSelectionPromptMenu } from '../core/selection-menu.js';
@@ -227,7 +227,6 @@ export async function processGeminiQueue() {
 
     try {
       await sendPrompt(prompt);
-      await waitForPromptProcessing();
       item.attempts = 0;
     } catch (err) {
       error('Failed to send prompt:', formatError(err));

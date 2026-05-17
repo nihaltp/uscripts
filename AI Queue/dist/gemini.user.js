@@ -10,7 +10,7 @@
 // @match        https://gemini.google.com/app
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.17
+// @version      3.0.18
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -975,7 +975,6 @@
   }
   function safeClick(element) {
     if (!isAttached(element) || !isVisible(element)) return false;
-    element.scrollIntoView({ block: 'center', inline: 'center' });
     element.focus?.({ preventScroll: true });
     if (typeof element.click === 'function') {
       element.click();
@@ -1129,7 +1128,179 @@
     ].some(isActionButtonVisible);
   }
 
+  // AI Queue/core/generation.js
+  var lastGenerationLabel = '';
+  function getGenerationState() {
+    const editor = getComposerEditor();
+    const sendButton = getSendButton({ includeDisabled: true });
+    const stopButton = findStopButton();
+    const hasPrompt = !!getEditorText(editor).trim();
+    const busyIndicators = hasBusyIndicators();
+    const generating = Boolean(
+      stopButton || busyIndicators || (sendButton && sendButton.disabled && hasPrompt)
+    );
+    const label = JSON.stringify({
+      generating,
+      hasPrompt,
+      busyIndicators,
+      sendDisabled: !!(sendButton && sendButton.disabled),
+      stopButton: !!stopButton,
+    });
+    if (label !== lastGenerationLabel) {
+      lastGenerationLabel = label;
+      log('generation state', {
+        generating,
+        hasPrompt,
+        busyIndicators,
+        sendDisabled: !!(sendButton && sendButton.disabled),
+        stopButton: !!stopButton,
+      });
+    }
+    return { generating, editor, sendButton, stopButton, busyIndicators, hasPrompt };
+  }
+  async function waitForIdle({ timeoutMs = 6e4, intervalMs = 200 } = {}) {
+    try {
+      await waitForCondition(
+        async () => {
+          const { generating } = getGenerationState();
+          return !generating;
+        },
+        {
+          timeoutMs,
+          intervalMs,
+          description: 'AI to become idle',
+        }
+      );
+      await sleep(300);
+    } catch (err) {
+      log('waitForIdle timed out:', formatError(err));
+      await sleep(300);
+    }
+  }
+  async function waitForGenerationStart({ timeoutMs = 8e3, intervalMs = 100 } = {}) {
+    return waitForCondition(() => getGenerationState().generating, {
+      timeoutMs,
+      intervalMs,
+      description: 'Generation to start',
+    });
+  }
+  async function waitForPromptProcessing() {
+    try {
+      await waitForGenerationStart();
+    } catch (err) {
+      log('Generation did not start:', formatError(err));
+    }
+    await waitForIdle();
+  }
+
   // AI Queue/core/keyboard.js
+  function isScrollableElement(element) {
+    if (!element || !(element instanceof HTMLElement)) return false;
+    const style = window.getComputedStyle(element);
+    if (!style) return false;
+    const overflowY = style.overflowY;
+    const overflowX = style.overflowX;
+    const canScrollY =
+      /(auto|scroll|overlay)/i.test(overflowY) && element.scrollHeight > element.clientHeight;
+    const canScrollX =
+      /(auto|scroll|overlay)/i.test(overflowX) && element.scrollWidth > element.clientWidth;
+    return canScrollY || canScrollX;
+  }
+  function getScrollTargets(element) {
+    const targets = [];
+    const seen = /* @__PURE__ */ new Set();
+    const addTarget = (target) => {
+      if (!target || seen.has(target)) return;
+      seen.add(target);
+      targets.push(target);
+    };
+    addTarget(window);
+    const scrollingElement = document.scrollingElement || document.documentElement;
+    if (scrollingElement) {
+      addTarget(scrollingElement);
+    }
+    if (document.body) {
+      addTarget(document.body);
+    }
+    let current = element?.parentElement || null;
+    while (current) {
+      if (isScrollableElement(current)) {
+        addTarget(current);
+      }
+      current = current.parentElement;
+    }
+    const root = document.body || document.documentElement;
+    if (root) {
+      for (const candidate of root.querySelectorAll('*')) {
+        if (isScrollableElement(candidate)) {
+          addTarget(candidate);
+        }
+      }
+    }
+    return targets;
+  }
+  function getScrollPosition(target) {
+    if (target === window) {
+      return { x: window.scrollX, y: window.scrollY };
+    }
+    return {
+      x: target.scrollLeft,
+      y: target.scrollTop,
+    };
+  }
+  function restoreScrollPosition(target, position) {
+    if (target === window) {
+      window.scrollTo(position.x, position.y);
+      return;
+    }
+    target.scrollLeft = position.x;
+    target.scrollTop = position.y;
+  }
+  async function withPreservedViewport(action, targets = []) {
+    const scrollTargets = targets.length > 0 ? targets : [window];
+    const scrollPositions = new Map(
+      scrollTargets.map((target) => [target, getScrollPosition(target)])
+    );
+    const originalAnchors = /* @__PURE__ */ new Map();
+    let restoring = false;
+    for (const target of scrollTargets) {
+      if (target instanceof HTMLElement) {
+        originalAnchors.set(target, target.style.overflowAnchor);
+        target.style.overflowAnchor = 'none';
+      }
+    }
+    const restoreScroll = () => {
+      if (restoring) return;
+      restoring = true;
+      for (const target of scrollTargets) {
+        const position = scrollPositions.get(target);
+        if (!position) continue;
+        const currentPosition = getScrollPosition(target);
+        if (currentPosition.x === position.x && currentPosition.y === position.y) continue;
+        restoreScrollPosition(target, position);
+      }
+      restoring = false;
+    };
+    const keepViewportStable = () => {
+      restoreScroll();
+    };
+    window.addEventListener('scroll', keepViewportStable, true);
+    window.addEventListener('resize', keepViewportStable);
+    const restoreTimer = window.setInterval(restoreScroll, 50);
+    try {
+      return await action();
+    } finally {
+      window.clearInterval(restoreTimer);
+      window.removeEventListener('scroll', keepViewportStable, true);
+      window.removeEventListener('resize', keepViewportStable);
+      for (const target of scrollTargets) {
+        if (target instanceof HTMLElement && originalAnchors.has(target)) {
+          target.style.overflowAnchor = originalAnchors.get(target);
+        }
+      }
+      restoreScroll();
+    }
+  }
   function dispatchEnterKey(target) {
     const eventInit = {
       bubbles: true,
@@ -1208,96 +1379,37 @@
       intervalMs: 200,
       description: 'Composer editor',
     });
-    setEditorValue(editor, prompt);
-    try {
-      await waitForCondition(
-        () => {
-          const btn = getSendButton();
-          return btn && !btn.disabled;
-        },
-        {
-          timeoutMs: 5e3,
-          intervalMs: 100,
-          description: 'send button to enable',
+    const scrollTargets = getScrollTargets(editor);
+    return withPreservedViewport(async () => {
+      setEditorValue(editor, prompt);
+      try {
+        await waitForCondition(
+          () => {
+            const btn = getSendButton();
+            return btn && !btn.disabled;
+          },
+          {
+            timeoutMs: 5e3,
+            intervalMs: 100,
+            description: 'send button to enable',
+          }
+        );
+        const sendButton = getSendButton();
+        if (sendButton) {
+          safeClick(sendButton);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          await waitForPromptProcessing();
+          return;
         }
-      );
-      const sendButton = getSendButton();
-      if (sendButton) {
-        safeClick(sendButton);
-        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (err) {
+        error('send button unavailable, falling back to Enter', formatError(err));
       }
-    } catch (err) {
-      error('send button unavailable, falling back to Enter', formatError(err));
-    }
-    dispatchEnterKey(editor);
-    if (editor.form && typeof editor.form.requestSubmit === 'function') {
-      editor.form.requestSubmit();
-    }
-  }
-
-  // AI Queue/core/generation.js
-  var lastGenerationLabel = '';
-  function getGenerationState() {
-    const editor = getComposerEditor();
-    const sendButton = getSendButton({ includeDisabled: true });
-    const stopButton = findStopButton();
-    const hasPrompt = !!getEditorText(editor).trim();
-    const busyIndicators = hasBusyIndicators();
-    const generating = Boolean(
-      stopButton || busyIndicators || (sendButton && sendButton.disabled && hasPrompt)
-    );
-    const label = JSON.stringify({
-      generating,
-      hasPrompt,
-      busyIndicators,
-      sendDisabled: !!(sendButton && sendButton.disabled),
-      stopButton: !!stopButton,
-    });
-    if (label !== lastGenerationLabel) {
-      lastGenerationLabel = label;
-      log('generation state', {
-        generating,
-        hasPrompt,
-        busyIndicators,
-        sendDisabled: !!(sendButton && sendButton.disabled),
-        stopButton: !!stopButton,
-      });
-    }
-    return { generating, editor, sendButton, stopButton, busyIndicators, hasPrompt };
-  }
-  async function waitForIdle({ timeoutMs = 6e4, intervalMs = 200 } = {}) {
-    try {
-      await waitForCondition(
-        async () => {
-          const { generating } = getGenerationState();
-          return !generating;
-        },
-        {
-          timeoutMs,
-          intervalMs,
-          description: 'AI to become idle',
-        }
-      );
-      await sleep(300);
-    } catch (err) {
-      log('waitForIdle timed out:', formatError(err));
-      await sleep(300);
-    }
-  }
-  async function waitForGenerationStart({ timeoutMs = 8e3, intervalMs = 100 } = {}) {
-    return waitForCondition(() => getGenerationState().generating, {
-      timeoutMs,
-      intervalMs,
-      description: 'Generation to start',
-    });
-  }
-  async function waitForPromptProcessing() {
-    try {
-      await waitForGenerationStart();
-    } catch (err) {
-      log('Generation did not start:', formatError(err));
-    }
-    await waitForIdle();
+      dispatchEnterKey(editor);
+      if (editor.form && typeof editor.form.requestSubmit === 'function') {
+        editor.form.requestSubmit();
+      }
+      await waitForPromptProcessing();
+    }, scrollTargets);
   }
 
   // AI Queue/styles/chat-manager.css
@@ -2004,7 +2116,6 @@
       setStatus(panel, `Sending: ${prompt.slice(0, 40)}...`);
       try {
         await sendPrompt(prompt);
-        await waitForPromptProcessing();
         item.attempts = 0;
       } catch (err) {
         error('Failed to send prompt:', formatError(err));
