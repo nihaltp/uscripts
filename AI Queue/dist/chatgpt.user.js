@@ -10,7 +10,7 @@
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.0.18
+// @version      3.0.19
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
@@ -1293,7 +1293,7 @@
       }
     }
     const restoreScroll = () => {
-      if (restoring) return;
+      if (restoring || userInteracting) return;
       restoring = true;
       for (const target of scrollTargets) {
         const position = scrollPositions.get(target);
@@ -1307,6 +1307,28 @@
     const keepViewportStable = () => {
       restoreScroll();
     };
+    let userInteracting = false;
+    let userInteractTimer = null;
+    const onUserInteraction = (ev) => {
+      userInteracting = true;
+      if (userInteractTimer) clearTimeout(userInteractTimer);
+      userInteractTimer = setTimeout(() => {
+        userInteracting = false;
+        userInteractTimer = null;
+        try {
+          for (const t of scrollTargets) {
+            scrollPositions.set(t, getScrollPosition(t));
+          }
+        } catch (err) {
+          error('Error updating scroll positions after user interaction:', formatError(err));
+        }
+      }, 300);
+    };
+    window.addEventListener('wheel', onUserInteraction, { passive: true, capture: true });
+    window.addEventListener('touchstart', onUserInteraction, { passive: true, capture: true });
+    window.addEventListener('touchmove', onUserInteraction, { passive: true, capture: true });
+    window.addEventListener('pointerdown', onUserInteraction, { passive: true, capture: true });
+    window.addEventListener('keydown', onUserInteraction, true);
     window.addEventListener('scroll', keepViewportStable, true);
     window.addEventListener('resize', keepViewportStable);
     const restoreTimer = window.setInterval(restoreScroll, 50);
@@ -1316,6 +1338,22 @@
       window.clearInterval(restoreTimer);
       window.removeEventListener('scroll', keepViewportStable, true);
       window.removeEventListener('resize', keepViewportStable);
+      window.removeEventListener('wheel', onUserInteraction, true);
+      window.removeEventListener('touchstart', onUserInteraction, true);
+      window.removeEventListener('touchmove', onUserInteraction, true);
+      window.removeEventListener('pointerdown', onUserInteraction, true);
+      window.removeEventListener('keydown', onUserInteraction, true);
+      if (userInteractTimer) {
+        clearTimeout(userInteractTimer);
+        try {
+          for (const t of scrollTargets) {
+            scrollPositions.set(t, getScrollPosition(t));
+          }
+        } catch (err) {
+          error('Error updating scroll positions during cleanup:', formatError(err));
+        }
+        userInteractTimer = null;
+      }
       restoreScrollApis();
       for (const target of scrollTargets) {
         if (target instanceof HTMLElement && originalAnchors.has(target)) {

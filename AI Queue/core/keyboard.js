@@ -127,7 +127,7 @@ export async function withPreservedViewport(action, targets = []) {
   }
 
   const restoreScroll = () => {
-    if (restoring) return;
+    if (restoring || userInteracting) return;
 
     restoring = true;
     for (const target of scrollTargets) {
@@ -146,6 +146,30 @@ export async function withPreservedViewport(action, targets = []) {
     restoreScroll();
   };
 
+  // Track short-lived user interactions so we don't fight user-initiated scrolls
+  let userInteracting = false;
+  let userInteractTimer = null;
+  const onUserInteraction = (ev) => {
+    userInteracting = true;
+    if (userInteractTimer) clearTimeout(userInteractTimer);
+    userInteractTimer = setTimeout(() => {
+      userInteracting = false;
+      userInteractTimer = null;
+      try {
+        for (const t of scrollTargets) {
+          scrollPositions.set(t, getScrollPosition(t));
+        }
+      } catch (err) {
+        error('Error updating scroll positions after user interaction:', formatError(err));
+      }
+    }, 300);
+  };
+
+  window.addEventListener('wheel', onUserInteraction, { passive: true, capture: true });
+  window.addEventListener('touchstart', onUserInteraction, { passive: true, capture: true });
+  window.addEventListener('touchmove', onUserInteraction, { passive: true, capture: true });
+  window.addEventListener('pointerdown', onUserInteraction, { passive: true, capture: true });
+  window.addEventListener('keydown', onUserInteraction, true);
   window.addEventListener('scroll', keepViewportStable, true);
   window.addEventListener('resize', keepViewportStable);
   const restoreTimer = window.setInterval(restoreScroll, 50);
@@ -156,6 +180,23 @@ export async function withPreservedViewport(action, targets = []) {
     window.clearInterval(restoreTimer);
     window.removeEventListener('scroll', keepViewportStable, true);
     window.removeEventListener('resize', keepViewportStable);
+    window.removeEventListener('wheel', onUserInteraction, true);
+    window.removeEventListener('touchstart', onUserInteraction, true);
+    window.removeEventListener('touchmove', onUserInteraction, true);
+    window.removeEventListener('pointerdown', onUserInteraction, true);
+    window.removeEventListener('keydown', onUserInteraction, true);
+    if (userInteractTimer) {
+      clearTimeout(userInteractTimer);
+      try {
+        for (const t of scrollTargets) {
+          scrollPositions.set(t, getScrollPosition(t));
+        }
+      } catch (err) {
+        error('Error updating scroll positions during cleanup:', formatError(err));
+      }
+      userInteractTimer = null;
+    }
+
     restoreScrollApis();
 
     for (const target of scrollTargets) {
