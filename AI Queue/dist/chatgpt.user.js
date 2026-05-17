@@ -10,7 +10,7 @@
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.0.17
+// @version      3.0.18
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
@@ -1256,6 +1256,28 @@
     target.scrollLeft = position.x;
     target.scrollTop = position.y;
   }
+  function createScrollApiSuppressor() {
+    const restorers = [];
+    const patch = (target, key, replacement) => {
+      if (!target || typeof target[key] !== 'function') return;
+      const original = target[key];
+      target[key] = replacement;
+      restorers.push(() => {
+        target[key] = original;
+      });
+    };
+    patch(Element.prototype, 'scrollIntoView', function () {});
+    patch(window, 'scrollTo', function () {});
+    patch(window, 'scrollBy', function () {});
+    patch(Element.prototype, 'scroll', function () {});
+    patch(Element.prototype, 'scrollTo', function () {});
+    patch(Element.prototype, 'scrollBy', function () {});
+    return () => {
+      for (let index = restorers.length - 1; index >= 0; index -= 1) {
+        restorers[index]();
+      }
+    };
+  }
   async function withPreservedViewport(action, targets = []) {
     const scrollTargets = targets.length > 0 ? targets : [window];
     const scrollPositions = new Map(
@@ -1263,6 +1285,7 @@
     );
     const originalAnchors = /* @__PURE__ */ new Map();
     let restoring = false;
+    const restoreScrollApis = createScrollApiSuppressor();
     for (const target of scrollTargets) {
       if (target instanceof HTMLElement) {
         originalAnchors.set(target, target.style.overflowAnchor);
@@ -1293,6 +1316,7 @@
       window.clearInterval(restoreTimer);
       window.removeEventListener('scroll', keepViewportStable, true);
       window.removeEventListener('resize', keepViewportStable);
+      restoreScrollApis();
       for (const target of scrollTargets) {
         if (target instanceof HTMLElement && originalAnchors.has(target)) {
           target.style.overflowAnchor = originalAnchors.get(target);

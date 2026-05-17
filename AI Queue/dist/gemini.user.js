@@ -10,7 +10,7 @@
 // @match        https://gemini.google.com/app
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.18
+// @version      3.0.19
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -1256,6 +1256,28 @@
     target.scrollLeft = position.x;
     target.scrollTop = position.y;
   }
+  function createScrollApiSuppressor() {
+    const restorers = [];
+    const patch = (target, key, replacement) => {
+      if (!target || typeof target[key] !== 'function') return;
+      const original = target[key];
+      target[key] = replacement;
+      restorers.push(() => {
+        target[key] = original;
+      });
+    };
+    patch(Element.prototype, 'scrollIntoView', function () {});
+    patch(window, 'scrollTo', function () {});
+    patch(window, 'scrollBy', function () {});
+    patch(Element.prototype, 'scroll', function () {});
+    patch(Element.prototype, 'scrollTo', function () {});
+    patch(Element.prototype, 'scrollBy', function () {});
+    return () => {
+      for (let index = restorers.length - 1; index >= 0; index -= 1) {
+        restorers[index]();
+      }
+    };
+  }
   async function withPreservedViewport(action, targets = []) {
     const scrollTargets = targets.length > 0 ? targets : [window];
     const scrollPositions = new Map(
@@ -1263,6 +1285,7 @@
     );
     const originalAnchors = /* @__PURE__ */ new Map();
     let restoring = false;
+    const restoreScrollApis = createScrollApiSuppressor();
     for (const target of scrollTargets) {
       if (target instanceof HTMLElement) {
         originalAnchors.set(target, target.style.overflowAnchor);
@@ -1293,6 +1316,7 @@
       window.clearInterval(restoreTimer);
       window.removeEventListener('scroll', keepViewportStable, true);
       window.removeEventListener('resize', keepViewportStable);
+      restoreScrollApis();
       for (const target of scrollTargets) {
         if (target instanceof HTMLElement && originalAnchors.has(target)) {
           target.style.overflowAnchor = originalAnchors.get(target);

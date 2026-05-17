@@ -8,10 +8,6 @@ const MANAGER_GRID_ID = 'pq-chat-manager-grid';
 const MANAGER_BODY_ID = 'pq-chat-manager-body';
 const activeManagers = new Map();
 
-function toChatKey(chatCode) {
-  return typeof chatCode === 'string' && chatCode.trim() ? chatCode.trim() : GLOBAL_CHAT_KEY;
-}
-
 function toChatCode(chatKey) {
   return chatKey === GLOBAL_CHAT_KEY ? null : chatKey;
 }
@@ -259,7 +255,7 @@ function renderCards(grid, storageKey, state, rerender) {
 
     deleteButton.addEventListener('click', () => {
       const chatName = chatLabel(chatKey);
-      // eslint-disable-next-line no-alert
+      
       if (!doc.defaultView?.confirm(`Delete all prompts in "${chatName}"? This cannot be undone.`)) return;
 
       // remove the group and persist

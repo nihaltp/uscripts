@@ -85,11 +85,39 @@ function restoreScrollPosition(target, position) {
   target.scrollTop = position.y;
 }
 
+function createScrollApiSuppressor() {
+  const restorers = [];
+
+  const patch = (target, key, replacement) => {
+    if (!target || typeof target[key] !== 'function') return;
+
+    const original = target[key];
+    target[key] = replacement;
+    restorers.push(() => {
+      target[key] = original;
+    });
+  };
+
+  patch(Element.prototype, 'scrollIntoView', function () {});
+  patch(window, 'scrollTo', function () {});
+  patch(window, 'scrollBy', function () {});
+  patch(Element.prototype, 'scroll', function () {});
+  patch(Element.prototype, 'scrollTo', function () {});
+  patch(Element.prototype, 'scrollBy', function () {});
+
+  return () => {
+    for (let index = restorers.length - 1; index >= 0; index -= 1) {
+      restorers[index]();
+    }
+  };
+}
+
 export async function withPreservedViewport(action, targets = []) {
   const scrollTargets = targets.length > 0 ? targets : [window];
   const scrollPositions = new Map(scrollTargets.map((target) => [target, getScrollPosition(target)]));
   const originalAnchors = new Map();
   let restoring = false;
+  const restoreScrollApis = createScrollApiSuppressor();
 
   for (const target of scrollTargets) {
     if (target instanceof HTMLElement) {
@@ -128,6 +156,7 @@ export async function withPreservedViewport(action, targets = []) {
     window.clearInterval(restoreTimer);
     window.removeEventListener('scroll', keepViewportStable, true);
     window.removeEventListener('resize', keepViewportStable);
+    restoreScrollApis();
 
     for (const target of scrollTargets) {
       if (target instanceof HTMLElement && originalAnchors.has(target)) {
