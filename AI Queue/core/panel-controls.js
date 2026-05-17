@@ -1,4 +1,4 @@
-import { error, log } from './logging.js';
+import { error, log, formatError } from './logging.js';
 import { setStatus } from './queue.js';
 import { updateToolbarButton, getPanel } from './ui.js';
 import { queueState } from './state.js';
@@ -85,7 +85,7 @@ export function setupPanelControls({ createItem, renderQueue, saveQueue, process
     try {
       await processQueue();
     } catch (err) {
-      error('Queue processor error:', err);
+      error('Queue processor error:', formatError(err));
     } finally {
       queueState.running = false;
       updateStartStopButtons();

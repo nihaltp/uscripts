@@ -1,4 +1,4 @@
-import { log } from './logging.js';
+import { log, formatError } from './logging.js';
 import {
   findStopButton,
   getComposerEditor,
@@ -64,7 +64,7 @@ export async function waitForIdle({ timeoutMs = 60000, intervalMs = 200 } = {}) 
 
     await sleep(300);
   } catch (err) {
-    log('waitForIdle timed out:', err.message);
+    log('waitForIdle timed out:', formatError(err));
     await sleep(300);
   }
 }
@@ -83,7 +83,7 @@ export async function waitForPromptProcessing() {
   try {
     await waitForGenerationStart();
   } catch (err) {
-    log('Generation did not start:', err.message);
+    log('Generation did not start:', formatError(err));
   }
 
   await waitForIdle();

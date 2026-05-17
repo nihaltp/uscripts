@@ -6,7 +6,7 @@ import { saveQueue, loadQueue } from '../core/storage.js';
 import { updateToolbarButton, showPanel, ensureToolbarStyles } from '../core/ui.js';
 import { setupPanelControls } from '../core/panel-controls.js';
 import { setupPanelDrag } from '../core/drag.js';
-import { log, error } from '../core/logging.js';
+import { log, error, formatError } from '../core/logging.js';
 import { setStatus } from '../core/queue.js';
 import { sendPrompt } from '../core/keyboard.js';
 import { waitForIdle, waitForPromptProcessing } from '../core/generation.js';
@@ -230,7 +230,7 @@ export async function processGeminiQueue() {
       await waitForPromptProcessing();
       item.attempts = 0;
     } catch (err) {
-      error('Failed to send prompt:', err.message);
+      error('Failed to send prompt:', formatError(err));
       item.status = 'failed';
       item.attempts = (item.attempts || 0) + 1;
 

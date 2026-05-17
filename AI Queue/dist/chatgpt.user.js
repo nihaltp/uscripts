@@ -10,7 +10,7 @@
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.0.15
+// @version      3.0.16
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
@@ -48,6 +48,22 @@
   }
   function error(...args) {
     console.error('[AI QUEUE]', ...args);
+  }
+  function formatError(err) {
+    if (err instanceof Error) {
+      return err.message;
+    }
+    if (typeof err === 'string') {
+      return err;
+    }
+    if (err && typeof err.message === 'string') {
+      return err.message;
+    }
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
   }
   function throwError(...args) {
     error(...args);
@@ -856,7 +872,7 @@
       try {
         await processQueue();
       } catch (err) {
-        error('Queue processor error:', err);
+        error('Queue processor error:', formatError(err));
       } finally {
         queueState.running = false;
         updateStartStopButtons();
@@ -945,7 +961,8 @@
         }
         const elapsed = Date.now() - startedAt;
         if (elapsed > timeoutMs) {
-          reject(error(`Timeout waiting for ${description} (${elapsed}ms)`));
+          error(`Timeout waiting for ${description} (${elapsed}ms)`);
+          reject(new Error(`Timeout waiting for ${description} (${elapsed}ms`));
           return;
         }
         setTimeout(check, intervalMs);
@@ -1210,7 +1227,7 @@
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     } catch (err) {
-      error('send button unavailable, falling back to Enter', err.message);
+      error('send button unavailable, falling back to Enter', formatError(err));
     }
     dispatchEnterKey(editor);
     if (editor.form && typeof editor.form.requestSubmit === 'function') {
@@ -1263,7 +1280,7 @@
       );
       await sleep(300);
     } catch (err) {
-      log('waitForIdle timed out:', err.message);
+      log('waitForIdle timed out:', formatError(err));
       await sleep(300);
     }
   }
@@ -1278,7 +1295,7 @@
     try {
       await waitForGenerationStart();
     } catch (err) {
-      log('Generation did not start:', err.message);
+      log('Generation did not start:', formatError(err));
     }
     await waitForIdle();
   }
@@ -1951,7 +1968,7 @@
         await sendPrompt(prompt);
         await waitForPromptProcessing();
       } catch (err) {
-        error('Failed to send prompt:', err.message);
+        error('Failed to send prompt:', formatError(err));
       }
       saveChatGPTQueue();
     }

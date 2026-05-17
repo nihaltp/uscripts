@@ -14,6 +14,26 @@ export function error(...args) {
   console.error('[AI QUEUE]', ...args);
 }
 
+export function formatError(err) {
+  if (err instanceof Error) {
+    return err.message;
+  }
+
+  if (typeof err === 'string') {
+    return err;
+  }
+
+  if (err && typeof err.message === 'string') {
+    return err.message;
+  }
+
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
+
 export function throwError(...args) {
   error(...args);
   throw new Error(args.join(' '));

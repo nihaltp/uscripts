@@ -21,7 +21,8 @@ export function waitForCondition(
 
       const elapsed = Date.now() - startedAt;
       if (elapsed > timeoutMs) {
-        reject(error(`Timeout waiting for ${description} (${elapsed}ms)`));
+        error(`Timeout waiting for ${description} (${elapsed}ms)`);
+        reject(new Error(`Timeout waiting for ${description} (${elapsed}ms`));
         return;
       }
 

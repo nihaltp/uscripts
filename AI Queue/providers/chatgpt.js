@@ -9,7 +9,7 @@ import { setupPanelDrag } from '../core/drag.js';
 import { setStatus } from '../core/queue.js';
 import { sendPrompt } from '../core/keyboard.js';
 import { waitForIdle, waitForPromptProcessing } from '../core/generation.js';
-import { error } from '../core/logging.js';
+import { error, formatError } from '../core/logging.js';
 import { bootstrapQueueApp } from '../core/bootstrap.js';
 import { openChatManagerWindow } from '../core/chat-manager.js';
 import { installSelectionPromptMenu } from '../core/selection-menu.js';
@@ -176,7 +176,7 @@ export async function processChatGPTQueue() {
       await sendPrompt(prompt);
       await waitForPromptProcessing();
     } catch (err) {
-      error('Failed to send prompt:', err.message);
+      error('Failed to send prompt:', formatError(err));
     }
 
     saveChatGPTQueue();
