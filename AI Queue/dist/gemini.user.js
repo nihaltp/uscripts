@@ -10,7 +10,7 @@
 // @match        https://gemini.google.com/app
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.21
+// @version      3.0.22
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -2210,6 +2210,7 @@
   }
   function saveGeminiQueue() {
     saveQueue(queueState.queue, queueState.failedQueue, STORAGE_KEY, getCurrentGeminiChatCode());
+    refreshChatManager(STORAGE_KEY);
   }
   function syncQueuedItemsToCurrentChatCode(chatCode) {
     if (!chatCode) return false;

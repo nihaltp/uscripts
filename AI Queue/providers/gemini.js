@@ -189,6 +189,7 @@ export function renderGeminiQueue() {
 
 export function saveGeminiQueue() {
   saveQueue(queueState.queue, queueState.failedQueue, STORAGE_KEY, getCurrentGeminiChatCode());
+  refreshChatManager(STORAGE_KEY);
 }
 
 function syncQueuedItemsToCurrentChatCode(chatCode) {
