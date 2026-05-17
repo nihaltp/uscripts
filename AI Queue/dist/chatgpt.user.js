@@ -10,7 +10,7 @@
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.0.20
+// @version      3.0.21
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
@@ -2048,7 +2048,6 @@
           hideSelectionMenu();
           return;
         }
-        event.preventDefault();
         showSelectionMenu(selectionText, event.clientX, event.clientY, onAddSelection);
       },
       true

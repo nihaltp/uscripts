@@ -99,7 +99,6 @@ export function installSelectionPromptMenu({ createItem, renderQueue, saveQueue,
         return;
       }
 
-      event.preventDefault();
       showSelectionMenu(selectionText, event.clientX, event.clientY, onAddSelection);
     },
     true

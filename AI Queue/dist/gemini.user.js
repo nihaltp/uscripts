@@ -10,7 +10,7 @@
 // @match        https://gemini.google.com/app
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.22
+// @version      3.0.23
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -2048,7 +2048,6 @@
           hideSelectionMenu();
           return;
         }
-        event.preventDefault();
         showSelectionMenu(selectionText, event.clientX, event.clientY, onAddSelection);
       },
       true
