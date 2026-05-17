@@ -229,23 +229,32 @@ export function startUrlWatcher(
   ensureToolbarButton,
   onUrlChange
 ) {
-  const handleUrlChange = (reason) => {
-    onUrlChange?.();
+  const handleUrlChange = (reason, previousUrl, currentUrl) => {
+    onUrlChange?.(previousUrl, currentUrl, reason);
     requestRepair(reason, createPanel, setupPanelEvents, setupPanelDrag, ensureToolbarButton);
   };
 
   patchHistoryMethod('pushState');
   patchHistoryMethod('replaceState');
 
-  window.addEventListener('popstate', () => handleUrlChange('popstate'));
-  window.addEventListener('hashchange', () => handleUrlChange('hashchange'));
+  window.addEventListener('popstate', () => {
+    const previousUrl = lastKnownUrl;
+    lastKnownUrl = location.href;
+    handleUrlChange('popstate', previousUrl, lastKnownUrl);
+  });
+  window.addEventListener('hashchange', () => {
+    const previousUrl = lastKnownUrl;
+    lastKnownUrl = location.href;
+    handleUrlChange('hashchange', previousUrl, lastKnownUrl);
+  });
 
   if (urlWatcher) clearInterval(urlWatcher);
 
   urlWatcher = setInterval(() => {
     if (location.href !== lastKnownUrl) {
+      const previousUrl = lastKnownUrl;
       lastKnownUrl = location.href;
-      handleUrlChange('url-change');
+      handleUrlChange('url-change', previousUrl, lastKnownUrl);
     }
   }, 1000);
 }

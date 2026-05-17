@@ -1,6 +1,7 @@
 import { log } from './logging.js';
 import { queueState, resetQueueState } from './state.js';
 import { startDomObserver, startUrlWatcher } from './ui.js';
+import { applyScopeToQueuedItems } from './storage.js';
 import { refreshChatManager } from './chat-manager.js';
 
 export function bootstrapQueueApp(provider) {
@@ -19,7 +20,28 @@ export function bootstrapQueueApp(provider) {
     }
   };
 
-  const refreshForCurrentUrl = () => {
+  const refreshForCurrentUrl = (previousUrl = location.href, currentUrl = location.href) => {
+    const getScope = provider.getCurrentScope;
+    const previousScope = typeof getScope === 'function' ? getScope(previousUrl) : null;
+    const currentScope = typeof getScope === 'function' ? getScope(currentUrl) : null;
+
+    if (queueState.running && queueState.awaitingChatScopeSync && !previousScope && currentScope) {
+      const updated = applyScopeToQueuedItems(queueState.queue, queueState.failedQueue, currentScope);
+
+      if (updated) {
+        provider.saveQueue?.();
+        provider.renderQueue?.();
+        provider.ensureToolbarButton?.();
+        if (storageKey) {
+          refreshChatManager(storageKey);
+        }
+      }
+
+      queueState.awaitingChatScopeSync = false;
+
+      return;
+    }
+
     if (queueState.running) {
       queueState.running = false;
     }

@@ -39,6 +39,40 @@ function resolveScopeKeys(currentScope = null) {
   return [...new Set([scope.groupId, scope.chatId].filter(Boolean))];
 }
 
+function hasItemScope(item) {
+  return !!(item?.chatId || item?.chatCode || item?.groupId);
+}
+
+export function applyScopeToQueuedItems(queue, failedQueue, currentScope = null) {
+  const scope = resolveScope(currentScope);
+  if (!scope.chatId && !scope.groupId) return false;
+
+  let updated = false;
+
+  const applyScope = (item) => {
+    if (!item || hasItemScope(item)) return;
+
+    if (scope.chatId) {
+      item.chatId = scope.chatId;
+      item.chatCode = scope.chatId;
+    }
+
+    if (scope.groupId) {
+      item.groupId = scope.groupId;
+    }
+
+    updated = true;
+  };
+
+  (queue || []).forEach(applyScope);
+
+  if (Array.isArray(failedQueue)) {
+    failedQueue.forEach(applyScope);
+  }
+
+  return updated;
+}
+
 function toChatKey(value) {
   return toChatCode(value) || GLOBAL_CHAT_KEY;
 }

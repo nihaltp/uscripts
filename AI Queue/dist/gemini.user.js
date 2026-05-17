@@ -10,7 +10,7 @@
 // @match        https://gemini.google.com/app
 // @match        https://gemini.google.com/app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.20
+// @version      3.0.21
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -25,6 +25,7 @@
     running: false,
     editingId: null,
     draggedId: null,
+    awaitingChatScopeSync: false,
   };
   function resetQueueState({ includeFailedQueue = false } = {}) {
     queueState.queue.length = 0;
@@ -34,6 +35,7 @@
     queueState.running = false;
     queueState.editingId = null;
     queueState.draggedId = null;
+    queueState.awaitingChatScopeSync = false;
   }
 
   // AI Queue/core/logging.js
@@ -292,19 +294,28 @@
     ensureToolbarButton,
     onUrlChange
   ) {
-    const handleUrlChange = (reason) => {
-      onUrlChange?.();
+    const handleUrlChange = (reason, previousUrl, currentUrl) => {
+      onUrlChange?.(previousUrl, currentUrl, reason);
       requestRepair(reason, createPanel, setupPanelEvents, setupPanelDrag2, ensureToolbarButton);
     };
     patchHistoryMethod('pushState');
     patchHistoryMethod('replaceState');
-    window.addEventListener('popstate', () => handleUrlChange('popstate'));
-    window.addEventListener('hashchange', () => handleUrlChange('hashchange'));
+    window.addEventListener('popstate', () => {
+      const previousUrl = lastKnownUrl;
+      lastKnownUrl = location.href;
+      handleUrlChange('popstate', previousUrl, lastKnownUrl);
+    });
+    window.addEventListener('hashchange', () => {
+      const previousUrl = lastKnownUrl;
+      lastKnownUrl = location.href;
+      handleUrlChange('hashchange', previousUrl, lastKnownUrl);
+    });
     if (urlWatcher) clearInterval(urlWatcher);
     urlWatcher = setInterval(() => {
       if (location.href !== lastKnownUrl) {
+        const previousUrl = lastKnownUrl;
         lastKnownUrl = location.href;
-        handleUrlChange('url-change');
+        handleUrlChange('url-change', previousUrl, lastKnownUrl);
       }
     }, 1e3);
   }
@@ -596,6 +607,30 @@
   function resolveScopeKeys(currentScope = null) {
     const scope = resolveScope(currentScope);
     return [...new Set([scope.groupId, scope.chatId].filter(Boolean))];
+  }
+  function hasItemScope(item) {
+    return !!(item?.chatId || item?.chatCode || item?.groupId);
+  }
+  function applyScopeToQueuedItems(queue, failedQueue, currentScope = null) {
+    const scope = resolveScope(currentScope);
+    if (!scope.chatId && !scope.groupId) return false;
+    let updated = false;
+    const applyScope = (item) => {
+      if (!item || hasItemScope(item)) return;
+      if (scope.chatId) {
+        item.chatId = scope.chatId;
+        item.chatCode = scope.chatId;
+      }
+      if (scope.groupId) {
+        item.groupId = scope.groupId;
+      }
+      updated = true;
+    };
+    (queue || []).forEach(applyScope);
+    if (Array.isArray(failedQueue)) {
+      failedQueue.forEach(applyScope);
+    }
+    return updated;
   }
   function toChatKey(value) {
     return toChatCode(value) || GLOBAL_CHAT_KEY;
@@ -1836,7 +1871,32 @@
         refreshChatManager(storageKey);
       }
     };
-    const refreshForCurrentUrl = () => {
+    const refreshForCurrentUrl = (previousUrl = location.href, currentUrl = location.href) => {
+      const getScope = provider.getCurrentScope;
+      const previousScope = typeof getScope === 'function' ? getScope(previousUrl) : null;
+      const currentScope = typeof getScope === 'function' ? getScope(currentUrl) : null;
+      if (
+        queueState.running &&
+        queueState.awaitingChatScopeSync &&
+        !previousScope &&
+        currentScope
+      ) {
+        const updated = applyScopeToQueuedItems(
+          queueState.queue,
+          queueState.failedQueue,
+          currentScope
+        );
+        if (updated) {
+          provider.saveQueue?.();
+          provider.renderQueue?.();
+          provider.ensureToolbarButton?.();
+          if (storageKey) {
+            refreshChatManager(storageKey);
+          }
+        }
+        queueState.awaitingChatScopeSync = false;
+        return;
+      }
       if (queueState.running) {
         queueState.running = false;
       }
@@ -2151,6 +2211,14 @@
   function saveGeminiQueue() {
     saveQueue(queueState.queue, queueState.failedQueue, STORAGE_KEY, getCurrentGeminiChatCode());
   }
+  function syncQueuedItemsToCurrentChatCode(chatCode) {
+    if (!chatCode) return false;
+    const updated = applyScopeToQueuedItems(queueState.queue, queueState.failedQueue, chatCode);
+    if (!updated) return false;
+    saveGeminiQueue();
+    refreshChatManager(STORAGE_KEY);
+    return true;
+  }
   function loadGeminiQueue() {
     loadQueue(queueState.queue, queueState.failedQueue, STORAGE_KEY, getCurrentGeminiChatCode());
   }
@@ -2169,6 +2237,8 @@
         continue;
       }
       const prompt = item.prompt;
+      const beforeChatCode = getCurrentGeminiChatCode();
+      queueState.awaitingChatScopeSync = !beforeChatCode;
       updateToolbarButton(
         document.querySelector('#pq-toolbar-button'),
         queueState.queue,
@@ -2178,8 +2248,16 @@
       setStatus(panel, `Sending: ${prompt.slice(0, 40)}...`);
       try {
         await sendPrompt(prompt);
+        const afterChatCode = getCurrentGeminiChatCode();
+        if (!beforeChatCode && afterChatCode) {
+          syncQueuedItemsToCurrentChatCode(afterChatCode);
+        }
+        if (afterChatCode) {
+          queueState.awaitingChatScopeSync = false;
+        }
         item.attempts = 0;
       } catch (err) {
+        queueState.awaitingChatScopeSync = false;
         error('Failed to send prompt:', formatError(err));
         item.status = 'failed';
         item.attempts = (item.attempts || 0) + 1;
@@ -2189,6 +2267,9 @@
         } else {
           queueState.failedQueue.push(item);
         }
+      }
+      if (beforeChatCode) {
+        queueState.awaitingChatScopeSync = false;
       }
       saveGeminiQueue();
     }
@@ -2238,6 +2319,7 @@
   var geminiProvider = {
     storageKey: STORAGE_KEY,
     includeFailedQueue: true,
+    getCurrentScope: getCurrentGeminiChatCode,
     createItem(text) {
       const chatCode = getCurrentGeminiChatCode();
       return {

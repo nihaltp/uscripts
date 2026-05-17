@@ -2,7 +2,7 @@ import { queueState } from '../core/state.js';
 import { createBasePanel } from '../core/panel.js';
 import { createQueueItemElement } from '../core/queue-ui.js';
 import { deleteQueueItem, editQueueItem } from '../core/queue.js';
-import { saveQueue, loadQueue } from '../core/storage.js';
+import { applyScopeToQueuedItems, saveQueue, loadQueue } from '../core/storage.js';
 import { updateToolbarButton, showPanel, ensureToolbarStyles } from '../core/ui.js';
 import { setupPanelControls } from '../core/panel-controls.js';
 import { setupPanelDrag } from '../core/drag.js';
@@ -11,7 +11,7 @@ import { sendPrompt } from '../core/keyboard.js';
 import { waitForIdle } from '../core/generation.js';
 import { error, formatError } from '../core/logging.js';
 import { bootstrapQueueApp } from '../core/bootstrap.js';
-import { openChatManagerWindow } from '../core/chat-manager.js';
+import { openChatManagerWindow, refreshChatManager } from '../core/chat-manager.js';
 import { installSelectionPromptMenu } from '../core/selection-menu.js';
 
 const STORAGE_KEY = 'pq-chatgpt-queue';
@@ -143,6 +143,17 @@ export function saveChatGPTQueue() {
   saveQueue(queueState.queue, null, STORAGE_KEY, getCurrentChatGPTScope());
 }
 
+function syncQueuedItemsToCurrentChatScope(scope) {
+  if (!scope) return false;
+
+  const updated = applyScopeToQueuedItems(queueState.queue, null, scope);
+  if (!updated) return false;
+
+  saveChatGPTQueue();
+  refreshChatManager(STORAGE_KEY);
+  return true;
+}
+
 export function loadChatGPTQueue() {
   loadQueue(queueState.queue, null, STORAGE_KEY, getCurrentChatGPTScope());
 }
@@ -162,6 +173,9 @@ export async function processChatGPTQueue() {
 
     const item = queueState.queue.shift();
     const prompt = item.prompt;
+    const beforeScope = getCurrentChatGPTScope();
+
+    queueState.awaitingChatScopeSync = !beforeScope;
 
     updateToolbarButton(
       document.querySelector('#pq-toolbar-button'),
@@ -174,8 +188,22 @@ export async function processChatGPTQueue() {
 
     try {
       await sendPrompt(prompt);
+      const afterScope = getCurrentChatGPTScope();
+
+      if (!beforeScope && afterScope) {
+        syncQueuedItemsToCurrentChatScope(afterScope);
+      }
+
+      if (afterScope) {
+        queueState.awaitingChatScopeSync = false;
+      }
     } catch (err) {
+      queueState.awaitingChatScopeSync = false;
       error('Failed to send prompt:', formatError(err));
+    }
+
+    if (beforeScope) {
+      queueState.awaitingChatScopeSync = false;
     }
 
     saveChatGPTQueue();
@@ -231,6 +259,7 @@ export function ensureChatGPTToolbarButton() {
 export const chatgptProvider = {
   storageKey: STORAGE_KEY,
   includeFailedQueue: false,
+  getCurrentScope: getCurrentChatGPTScope,
   createItem(text) {
     const scope = getCurrentChatGPTScope();
     return {

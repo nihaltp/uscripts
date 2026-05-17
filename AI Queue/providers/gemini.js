@@ -2,7 +2,7 @@ import { queueState } from '../core/state.js';
 import { createBasePanel } from '../core/panel.js';
 import { createQueueItemElement } from '../core/queue-ui.js';
 import { deleteQueueItem, editQueueItem } from '../core/queue.js';
-import { saveQueue, loadQueue } from '../core/storage.js';
+import { applyScopeToQueuedItems, saveQueue, loadQueue } from '../core/storage.js';
 import { updateToolbarButton, showPanel, ensureToolbarStyles } from '../core/ui.js';
 import { setupPanelControls } from '../core/panel-controls.js';
 import { setupPanelDrag } from '../core/drag.js';
@@ -11,7 +11,7 @@ import { setStatus } from '../core/queue.js';
 import { sendPrompt } from '../core/keyboard.js';
 import { waitForIdle } from '../core/generation.js';
 import { bootstrapQueueApp } from '../core/bootstrap.js';
-import { openChatManagerWindow } from '../core/chat-manager.js';
+import { openChatManagerWindow, refreshChatManager } from '../core/chat-manager.js';
 import { installSelectionPromptMenu } from '../core/selection-menu.js';
 
 const STORAGE_KEY = 'pq-gemini-queue';
@@ -191,6 +191,17 @@ export function saveGeminiQueue() {
   saveQueue(queueState.queue, queueState.failedQueue, STORAGE_KEY, getCurrentGeminiChatCode());
 }
 
+function syncQueuedItemsToCurrentChatCode(chatCode) {
+  if (!chatCode) return false;
+
+  const updated = applyScopeToQueuedItems(queueState.queue, queueState.failedQueue, chatCode);
+  if (!updated) return false;
+
+  saveGeminiQueue();
+  refreshChatManager(STORAGE_KEY);
+  return true;
+}
+
 export function loadGeminiQueue() {
   loadQueue(queueState.queue, queueState.failedQueue, STORAGE_KEY, getCurrentGeminiChatCode());
 }
@@ -215,6 +226,9 @@ export async function processGeminiQueue() {
     }
 
     const prompt = item.prompt;
+    const beforeChatCode = getCurrentGeminiChatCode();
+
+    queueState.awaitingChatScopeSync = !beforeChatCode;
 
     updateToolbarButton(
       document.querySelector('#pq-toolbar-button'),
@@ -227,8 +241,17 @@ export async function processGeminiQueue() {
 
     try {
       await sendPrompt(prompt);
+      const afterChatCode = getCurrentGeminiChatCode();
+
+      if (!beforeChatCode && afterChatCode) {
+        syncQueuedItemsToCurrentChatCode(afterChatCode);
+      }
+      if (afterChatCode) {
+        queueState.awaitingChatScopeSync = false;
+      }
       item.attempts = 0;
     } catch (err) {
+      queueState.awaitingChatScopeSync = false;
       error('Failed to send prompt:', formatError(err));
       item.status = 'failed';
       item.attempts = (item.attempts || 0) + 1;
@@ -239,6 +262,10 @@ export async function processGeminiQueue() {
       } else {
         queueState.failedQueue.push(item);
       }
+    }
+
+    if (beforeChatCode) {
+      queueState.awaitingChatScopeSync = false;
     }
 
     saveGeminiQueue();
@@ -296,6 +323,7 @@ export function ensureGeminiToolbarButton() {
 export const geminiProvider = {
   storageKey: STORAGE_KEY,
   includeFailedQueue: true,
+  getCurrentScope: getCurrentGeminiChatCode,
   createItem(text) {
     const chatCode = getCurrentGeminiChatCode();
     return {

@@ -10,7 +10,7 @@
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.0.19
+// @version      3.0.20
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
@@ -25,6 +25,7 @@
     running: false,
     editingId: null,
     draggedId: null,
+    awaitingChatScopeSync: false,
   };
   function resetQueueState({ includeFailedQueue = false } = {}) {
     queueState.queue.length = 0;
@@ -34,6 +35,7 @@
     queueState.running = false;
     queueState.editingId = null;
     queueState.draggedId = null;
+    queueState.awaitingChatScopeSync = false;
   }
 
   // AI Queue/core/logging.js
@@ -292,19 +294,28 @@
     ensureToolbarButton,
     onUrlChange
   ) {
-    const handleUrlChange = (reason) => {
-      onUrlChange?.();
+    const handleUrlChange = (reason, previousUrl, currentUrl) => {
+      onUrlChange?.(previousUrl, currentUrl, reason);
       requestRepair(reason, createPanel, setupPanelEvents, setupPanelDrag2, ensureToolbarButton);
     };
     patchHistoryMethod('pushState');
     patchHistoryMethod('replaceState');
-    window.addEventListener('popstate', () => handleUrlChange('popstate'));
-    window.addEventListener('hashchange', () => handleUrlChange('hashchange'));
+    window.addEventListener('popstate', () => {
+      const previousUrl = lastKnownUrl;
+      lastKnownUrl = location.href;
+      handleUrlChange('popstate', previousUrl, lastKnownUrl);
+    });
+    window.addEventListener('hashchange', () => {
+      const previousUrl = lastKnownUrl;
+      lastKnownUrl = location.href;
+      handleUrlChange('hashchange', previousUrl, lastKnownUrl);
+    });
     if (urlWatcher) clearInterval(urlWatcher);
     urlWatcher = setInterval(() => {
       if (location.href !== lastKnownUrl) {
+        const previousUrl = lastKnownUrl;
         lastKnownUrl = location.href;
-        handleUrlChange('url-change');
+        handleUrlChange('url-change', previousUrl, lastKnownUrl);
       }
     }, 1e3);
   }
@@ -596,6 +607,30 @@
   function resolveScopeKeys(currentScope = null) {
     const scope = resolveScope(currentScope);
     return [...new Set([scope.groupId, scope.chatId].filter(Boolean))];
+  }
+  function hasItemScope(item) {
+    return !!(item?.chatId || item?.chatCode || item?.groupId);
+  }
+  function applyScopeToQueuedItems(queue, failedQueue, currentScope = null) {
+    const scope = resolveScope(currentScope);
+    if (!scope.chatId && !scope.groupId) return false;
+    let updated = false;
+    const applyScope = (item) => {
+      if (!item || hasItemScope(item)) return;
+      if (scope.chatId) {
+        item.chatId = scope.chatId;
+        item.chatCode = scope.chatId;
+      }
+      if (scope.groupId) {
+        item.groupId = scope.groupId;
+      }
+      updated = true;
+    };
+    (queue || []).forEach(applyScope);
+    if (Array.isArray(failedQueue)) {
+      failedQueue.forEach(applyScope);
+    }
+    return updated;
   }
   function toChatKey(value) {
     return toChatCode(value) || GLOBAL_CHAT_KEY;
@@ -1836,7 +1871,32 @@
         refreshChatManager(storageKey);
       }
     };
-    const refreshForCurrentUrl = () => {
+    const refreshForCurrentUrl = (previousUrl = location.href, currentUrl = location.href) => {
+      const getScope = provider.getCurrentScope;
+      const previousScope = typeof getScope === 'function' ? getScope(previousUrl) : null;
+      const currentScope = typeof getScope === 'function' ? getScope(currentUrl) : null;
+      if (
+        queueState.running &&
+        queueState.awaitingChatScopeSync &&
+        !previousScope &&
+        currentScope
+      ) {
+        const updated = applyScopeToQueuedItems(
+          queueState.queue,
+          queueState.failedQueue,
+          currentScope
+        );
+        if (updated) {
+          provider.saveQueue?.();
+          provider.renderQueue?.();
+          provider.ensureToolbarButton?.();
+          if (storageKey) {
+            refreshChatManager(storageKey);
+          }
+        }
+        queueState.awaitingChatScopeSync = false;
+        return;
+      }
       if (queueState.running) {
         queueState.running = false;
       }
@@ -2113,6 +2173,14 @@
   function saveChatGPTQueue() {
     saveQueue(queueState.queue, null, STORAGE_KEY, getCurrentChatGPTScope());
   }
+  function syncQueuedItemsToCurrentChatScope(scope) {
+    if (!scope) return false;
+    const updated = applyScopeToQueuedItems(queueState.queue, null, scope);
+    if (!updated) return false;
+    saveChatGPTQueue();
+    refreshChatManager(STORAGE_KEY);
+    return true;
+  }
   function loadChatGPTQueue() {
     loadQueue(queueState.queue, null, STORAGE_KEY, getCurrentChatGPTScope());
   }
@@ -2131,6 +2199,8 @@
       await waitForIdle();
       const item = queueState.queue.shift();
       const prompt = item.prompt;
+      const beforeScope = getCurrentChatGPTScope();
+      queueState.awaitingChatScopeSync = !beforeScope;
       updateToolbarButton(
         document.querySelector('#pq-toolbar-button'),
         queueState.queue,
@@ -2140,8 +2210,19 @@
       setStatus(panel, `Sending: ${prompt.slice(0, 40)}...`);
       try {
         await sendPrompt(prompt);
+        const afterScope = getCurrentChatGPTScope();
+        if (!beforeScope && afterScope) {
+          syncQueuedItemsToCurrentChatScope(afterScope);
+        }
+        if (afterScope) {
+          queueState.awaitingChatScopeSync = false;
+        }
       } catch (err) {
+        queueState.awaitingChatScopeSync = false;
         error('Failed to send prompt:', formatError(err));
+      }
+      if (beforeScope) {
+        queueState.awaitingChatScopeSync = false;
       }
       saveChatGPTQueue();
     }
@@ -2189,6 +2270,7 @@
   var chatgptProvider = {
     storageKey: STORAGE_KEY,
     includeFailedQueue: false,
+    getCurrentScope: getCurrentChatGPTScope,
     createItem(text) {
       const scope = getCurrentChatGPTScope();
       return {

@@ -4,6 +4,7 @@ export const queueState = {
   running: false,
   editingId: null,
   draggedId: null,
+  awaitingChatScopeSync: false,
 };
 
 export function resetQueueState({ includeFailedQueue = false } = {}) {
@@ -15,4 +16,5 @@ export function resetQueueState({ includeFailedQueue = false } = {}) {
   queueState.running = false;
   queueState.editingId = null;
   queueState.draggedId = null;
+  queueState.awaitingChatScopeSync = false;
 }
