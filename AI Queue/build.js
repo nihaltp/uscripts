@@ -14,6 +14,7 @@ const builds = [
     name: 'ChatGPT Prompt Queue',
     description: 'A userscript to manage a queue of prompts for ChatGPT.',
     matches: ['https://chatgpt.com/*', 'https://chat.openai.com/*'],
+    excludes: ['https://chatgpt.com/auth/*'],
     icon: 'https://chatgpt.com/favicon.ico',
     grants: ['none'],
     runAt: 'document-idle',
@@ -25,6 +26,7 @@ const builds = [
     name: 'Gemini Prompt Queue',
     description: 'A userscript to manage a queue of prompts for Gemini.',
     matches: ['https://gemini.google.com/app', 'https://gemini.google.com/app/*'],
+    excludes: ['https://gemini.google.com/signin/*'],
     icon: 'https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com',
     grants: ['none'],
     runAt: 'document-idle',
@@ -36,6 +38,7 @@ const builds = [
 async function buildAll() {
   for (const app of builds) {
     const matchLines = app.matches.map((m) => `// @match        ${m}`).join('\n');
+    const excludeLines = app.excludes.map((e) => `// @exclude      ${e}`).join('\n');
     const grantLines = app.grants.map((g) => `// @grant        ${g}`).join('\n');
 
     const banner = `// ==UserScript==
@@ -48,6 +51,7 @@ async function buildAll() {
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT
 ${matchLines}
+${excludeLines}
 // @icon         ${app.icon}
 // @version      ${versions[app.id]}
 ${grantLines}
