@@ -13,7 +13,7 @@ const builds = [
     id: 'chatgpt',
     name: 'ChatGPT Prompt Queue',
     description: 'A userscript to manage a queue of prompts for ChatGPT.',
-    matches: ['https://chatgpt.com/*', 'https://chat.openai.com/*'],
+    matches: ['https://chatgpt.com/*'],
     excludes: ['https://chatgpt.com/auth/*'],
     icon: 'https://chatgpt.com/favicon.ico',
     grants: ['none'],
