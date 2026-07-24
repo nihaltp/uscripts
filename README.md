@@ -27,3 +27,7 @@
 ## Gemini
 
 [Gemini Prompt Queue](https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js) - A script to manage multiple Gemini prompts in a queue, allowing you to switch between them and keep track of their status.
+
+## Google Forms
+
+[Google Forms Auto Fill](https://raw.githubusercontent.com/nihaltp/uscripts/main/google_forms/dist/google-forms-saver.user.js) - A script to automatically fill Google Forms with saved data, making it easier to complete forms quickly.
