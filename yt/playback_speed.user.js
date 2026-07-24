@@ -3,7 +3,7 @@
 // @description  Remembers and reapplies playback speed on YouTube
 // @author       nihaltp
 // @namespace    https://github.com/nihaltp/uscripts
-// @supportURL   https://github.com/nihaltp/uscripts/issues
+// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=yt_playback_speed.yml
 // @homepageURL  https://github.com/nihaltp/uscripts
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT

@@ -60,7 +60,7 @@ async function buildAll() {
 // @description  ${app.description}
 // @author       nihaltp
 // @namespace    https://github.com/nihaltp/uscripts
-// @supportURL   https://github.com/nihaltp/uscripts/issues/new?title=%5BBUG%5D%20${encodeURIComponent(app.name)}%20${encodeURIComponent(app.outfile)}&body=File%3A%20AI%20Queue%2F${encodeURIComponent(app.outfile)}%0A%0ADescribe%20issue%20here...
+// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=${app.name.toLowerCase().replace(/ /g, '_')}.yml
 // @homepageURL  https://github.com/nihaltp/uscripts
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT

@@ -1,0 +1,19 @@
+name: YouTube Playback Speed Bug Report
+description: Report an issue for the YouTube Playback Speed userscript
+title: "[YouTube] [Playback Speed] "
+labels: ["bug"]
+body:
+  - type: input
+    id: script_version
+    attributes:
+      label: Script Version
+      description: What version of the script are you using?
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the issue here...
+    validations:
+      required: true

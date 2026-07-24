@@ -3,7 +3,7 @@
 // @description  Auto-click modal Continue after Next is clicked
 // @author       nihaltp
 // @namespace    https://github.com/nihaltp/uscripts
-// @supportURL   https://github.com/nihaltp/uscripts/issues
+// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=w3schools_auto_continue.yml
 // @homepageURL  https://github.com/nihaltp/uscripts
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT

@@ -1,0 +1,26 @@
+name: 10fastfingers Bug Report
+description: Report an issue for a 10fastfingers userscript
+title: "[10fastfingers] "
+labels: ["bug"]
+body:
+  - type: input
+    id: script_name
+    attributes:
+      label: Script Name
+      description: Which script is this about?
+    validations:
+      required: false
+  - type: input
+    id: script_version
+    attributes:
+      label: Script Version
+      description: What version of the script are you using?
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the issue here...
+    validations:
+      required: true

@@ -3,7 +3,7 @@
 // @description  Hide AI-generated images on Pixabay.
 // @author       nihaltp
 // @namespace    https://github.com/nihaltp/uscripts
-// @supportURL   https://github.com/nihaltp/uscripts/issues/new?title=%5BBUG%5D%2010fastfingers%2Fenter_retest&body=File%3A%2010fastfingers%2Fenter_retest.user.js%0A%0ADescribe%20issue%20here...
+// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=10fastfingers_enter_retest.yml
 // @homepageURL  https://github.com/nihaltp/uscripts
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT

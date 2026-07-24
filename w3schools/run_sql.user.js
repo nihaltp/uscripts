@@ -3,7 +3,7 @@
 // @description  Automatically clicks the "Run SQL »" button on W3Schools SQL tutorial pages when the page loads
 // @author       nihaltp
 // @namespace    https://github.com/nihaltp/uscripts
-// @supportURL   https://github.com/nihaltp/uscripts/issues
+// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=w3schools_run_sql.yml
 // @homepageURL  https://github.com/nihaltp/uscripts
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT

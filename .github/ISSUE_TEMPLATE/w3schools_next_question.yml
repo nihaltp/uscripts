@@ -1,0 +1,19 @@
+name: W3Schools Next Question Bug Report
+description: Report an issue for the W3Schools Next Question userscript
+title: "[W3Schools] [Next Question] "
+labels: ["bug"]
+body:
+  - type: input
+    id: script_version
+    attributes:
+      label: Script Version
+      description: What version of the script are you using?
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the issue here...
+    validations:
+      required: true
