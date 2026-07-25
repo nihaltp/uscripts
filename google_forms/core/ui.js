@@ -318,6 +318,13 @@ function buildSaveRow(formId, name, save, statusContainer) {
     },
   });
 
+  // ── Edit button ──────────────────────────────────────────
+  const editBtn = el('button', {
+    className: 'gf-saver-btn-secondary',
+    textContent: 'Edit',
+    onClick: () => openEditModal(formId, name, save, statusContainer),
+  });
+
   // ── Delete button ────────────────────────────────────────
   const deleteBtn = el('button', {
     className: 'gf-saver-btn-danger',
@@ -333,7 +340,7 @@ function buildSaveRow(formId, name, save, statusContainer) {
     'div',
     { className: 'gf-saver-save-item' },
     el('div', { className: 'gf-saver-save-info' }, nameEl, el('div', { className: 'gf-saver-save-meta', textContent: meta })),
-    el('div', { className: 'gf-saver-save-actions' }, loadBtn, renameBtn, deleteBtn),
+    el('div', { className: 'gf-saver-save-actions' }, loadBtn, editBtn, renameBtn, deleteBtn),
   );
 }
 
@@ -357,6 +364,154 @@ async function handleLoad(formId, saveName, save, statusContainer) {
     // Show conflict resolution modal
     openConflictModal(saveName, savedFields, conflicts);
   }
+}
+
+// ── Edit modal ────────────────────────────────────────────────────────────────
+
+function openEditModal(formId, saveName, save, statusContainer) {
+  removeBackdrop();
+
+  const savedFields = save.fields || [];
+  const fieldInputs = [];
+
+  // ── Header ──────────────────────────────────────────────
+  const header = el(
+    'div',
+    { className: 'gf-saver-modal-header' },
+    el('span', { className: 'gf-saver-modal-icon', textContent: '✏️' }),
+    el(
+      'div',
+      { style: 'flex:1' },
+      el('p', { className: 'gf-saver-modal-title', textContent: `Edit "${saveName}"` }),
+      el('p', {
+        className: 'gf-saver-modal-subtitle',
+        textContent: `${savedFields.length} field${savedFields.length !== 1 ? 's' : ''} — edit saved values`,
+      }),
+    ),
+    el('button', { className: 'gf-saver-close-btn', textContent: '×', onClick: () => openMainModal(formId) }),
+  );
+
+  // ── Edit table ──────────────────────────────────────────
+  const thead = el(
+    'thead',
+    {},
+    el(
+      'tr',
+      {},
+      el('th', { textContent: 'Field' }),
+      el('th', { textContent: 'Saved Value' }),
+    ),
+  );
+
+  const tbody = el('tbody', {});
+  for (const field of savedFields) {
+    let inputEl;
+
+    if (field.options && field.options.length > 0) {
+      if (field.type === 'checkbox') {
+        inputEl = el('select', {
+          className: 'gf-saver-edit-input gf-saver-edit-select',
+          multiple: true,
+          // Show up to 4 items before scrolling
+          size: Math.min(field.options.length, 4)
+        });
+        for (const opt of field.options) {
+          const optionEl = el('option', { value: opt, textContent: opt });
+          if (field.values.includes(opt)) {
+            optionEl.selected = true;
+          }
+          inputEl.appendChild(optionEl);
+        }
+      } else {
+        inputEl = el('select', {
+          className: 'gf-saver-edit-input gf-saver-edit-select'
+        });
+        inputEl.appendChild(el('option', { value: '', textContent: '-- Select --' }));
+        for (const opt of field.options) {
+          const optionEl = el('option', { value: opt, textContent: opt });
+          if (field.values.includes(opt)) {
+            optionEl.selected = true;
+          }
+          inputEl.appendChild(optionEl);
+        }
+      }
+    } else {
+      inputEl = el('input', {
+        className: 'gf-saver-edit-input',
+        type: 'text',
+        value: field.values.join(', '),
+      });
+    }
+
+    const getValue = () => {
+      if (inputEl.tagName === 'SELECT') {
+        if (inputEl.multiple) {
+          return [...inputEl.selectedOptions].map(o => o.value);
+        } else {
+          return inputEl.value ? [inputEl.value] : [];
+        }
+      }
+      return inputEl.value.split(',').map(v => v.trim()).filter(v => v !== '');
+    };
+
+    fieldInputs.push({ field, getValue });
+
+    tbody.appendChild(
+      el(
+        'tr',
+        {},
+        el('td', { className: 'gf-saver-conflict-field', textContent: field.label }),
+        el('td', { className: 'gf-saver-conflict-new' }, inputEl),
+      ),
+    );
+  }
+
+  const table = el('table', { className: 'gf-saver-conflict-table' }, thead, tbody);
+
+  const body = el(
+    'div',
+    { className: 'gf-saver-modal-body' },
+    el('p', { style: 'font-size:12px;color:rgba(255,255,255,0.5);margin:0 0 6px', textContent: 'Multiple values should be comma-separated.' }),
+    table,
+  );
+
+  // ── Footer ──────────────────────────────────────────────
+  const saveBtn = el('button', {
+    className: 'gf-saver-btn-primary',
+    textContent: 'Save Changes',
+    onClick: async () => {
+      const updatedFields = fieldInputs.map(({ field, getValue }) => ({
+        ...field,
+        values: getValue(),
+      }));
+      removeBackdrop();
+      try {
+        await writeSave(formId, saveName, updatedFields);
+        createStatusToast(`✓ Updated "${saveName}"`);
+        setTimeout(() => openMainModal(formId), 200);
+      } catch (err) {
+        error('editSave error:', err);
+        createStatusToast('✗ Failed to update save');
+      }
+    },
+  });
+
+  const cancelBtn = el('button', {
+    className: 'gf-saver-btn-secondary',
+    textContent: 'Cancel',
+    onClick: () => openMainModal(formId),
+  });
+
+  const footer = el('div', { className: 'gf-saver-conflict-footer' }, cancelBtn, saveBtn);
+
+  const modal = el('div', { className: 'gf-saver-modal' }, header, body, footer);
+  const backdrop = el('div', { id: `${DOM_ID_PREFIX}backdrop` }, modal);
+
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) openMainModal(formId);
+  });
+
+  document.body.appendChild(backdrop);
 }
 
 // ── Conflict / overwrite modal ────────────────────────────────────────────────

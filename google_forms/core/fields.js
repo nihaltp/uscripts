@@ -124,6 +124,12 @@ const linearScaleHandler = {
     return checked ? [getOptionLabel(checked)] : [];
   },
 
+  readOptions(container) {
+    const group = container.querySelector('[role="radiogroup"]');
+    if (!group) return null;
+    return [...group.querySelectorAll('[role="radio"]')].map(r => getOptionLabel(r).trim());
+  },
+
   async write(container, values) {
     if (!values[0]) return;
     const radios = [...container.querySelectorAll('[role="radio"]')];
@@ -278,6 +284,10 @@ const checkboxHandler = {
     );
   },
 
+  readOptions(container) {
+    return [...container.querySelectorAll('[role="checkbox"]')].map(cb => getOptionLabel(cb).trim());
+  },
+
   async write(container, values) {
     const checkboxes = [...container.querySelectorAll('[role="checkbox"]')];
     for (const cb of checkboxes) {
@@ -319,6 +329,25 @@ const dropdownHandler = {
     const text = listbox.textContent.trim();
     // Filter out the default placeholder text
     return text && text.toLowerCase() !== 'choose' ? [text] : [];
+  },
+
+  readOptions(container) {
+    const select = container.querySelector('select');
+    if (select) {
+      return [...select.options]
+        .map(o => o.text.trim())
+        .filter(t => t.toLowerCase() !== 'choose' && t !== '');
+    }
+
+    const listbox = container.querySelector('[role="listbox"]');
+    if (!listbox) return null;
+    const options = [...listbox.querySelectorAll('[role="option"]')];
+    if (options.length > 0) {
+      return options
+        .map(o => getOptionLabel(o).trim())
+        .filter(t => t.toLowerCase() !== 'choose' && t !== '');
+    }
+    return null;
   },
 
   async write(container, values) {
@@ -369,6 +398,10 @@ const radioHandler = {
   read(container) {
     const checked = container.querySelector('[role="radio"][aria-checked="true"]');
     return checked ? [getOptionLabel(checked)] : [];
+  },
+
+  readOptions(container) {
+    return [...container.querySelectorAll('[role="radio"]')].map(r => getOptionLabel(r).trim());
   },
 
   async write(container, values) {
@@ -523,10 +556,11 @@ export function captureVisible() {
     if (!handler) continue;
 
     const values = handler.read(container);
+    const options = handler.readOptions ? handler.readOptions(container) : null;
     const key = hashKey(label, handler.type);
 
-    results.push({ key, label, type: handler.type, values });
-    log('captured', { key, label, type: handler.type, values });
+    results.push({ key, label, type: handler.type, values, options });
+    log('captured', { key, label, type: handler.type, values, options });
   }
 
   return results;

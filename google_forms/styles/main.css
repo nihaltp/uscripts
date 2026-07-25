@@ -202,6 +202,30 @@
   color: rgba(255,255,255,0.3);
 }
 
+.gf-saver-edit-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: #e0e0f0;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.gf-saver-edit-input:focus {
+  border-color: #1a73e8;
+  background: rgba(26, 115, 232, 0.08);
+}
+
+.gf-saver-edit-select option {
+  color: #202124;
+  background: #ffffff;
+}
+
 /* ── Buttons ────────────────────────────────────────────────────────── */
 
 .gf-saver-btn-primary {
