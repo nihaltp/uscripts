@@ -1,7 +1,7 @@
 // entry.js — userscript entry point
 import { waitForForm } from './core/init.js';
 import { getFormId } from './core/storage.js';
-import { createFloatingButton } from './core/ui.js';
+import { createFloatingButton, autoLoadIfSingleSave } from './core/ui.js';
 import { log, error } from './core/logging.js';
 
 // ── SPA navigation watcher ────────────────────────────────────────────────────
@@ -27,6 +27,7 @@ function init() {
   waitForForm(() => {
     log('form ready — injecting/refreshing UI');
     createFloatingButton(formId);
+    autoLoadIfSingleSave(formId);
   });
 }
 

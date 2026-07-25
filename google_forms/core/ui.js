@@ -788,3 +788,19 @@ function createStatusToast(message) {
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3500);
 }
+
+export async function autoLoadIfSingleSave(formId) {
+  try {
+    const saves = await readAllSaves(formId);
+    const names = Object.keys(saves);
+    if (names.length === 1) {
+      const name = names[0];
+      const save = saves[name];
+      log(`[GF-Saver] Auto-loading single save: ${name}`);
+      const dummyContainer = document.createElement('div');
+      await handleLoad(formId, name, save, dummyContainer);
+    }
+  } catch (err) {
+    error('[GF-Saver] autoLoadIfSingleSave error:', err);
+  }
+}
