@@ -6,11 +6,13 @@ on:
       - 'google_forms/**'
       - 'package.json'
       - 'package-lock.json'
+      - '.github/workflows/google-forms.yml'
   pull_request:
     paths:
       - 'google_forms/**'
       - 'package.json'
       - 'package-lock.json'
+      - '.github/workflows/google-forms.yml'
   workflow_dispatch:
 
 jobs:

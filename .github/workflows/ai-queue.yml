@@ -6,11 +6,13 @@ on:
       - 'AI_Queue/**'
       - 'package.json'
       - 'package-lock.json'
+      - '.github/workflows/ai-queue.yml'
   pull_request:
     paths:
       - 'AI_Queue/**'
       - 'package.json'
       - 'package-lock.json'
+      - '.github/workflows/ai-queue.yml'
   workflow_dispatch:
 
 jobs:
