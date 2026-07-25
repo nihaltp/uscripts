@@ -10,7 +10,7 @@
 // @include      https://docs.google.com/forms/d/e/*
 // @include      https://docs.google.com/forms/u/0/d/e/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=docs.google.com
-// @version      1.0.1
+// @version      1.1.0
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
@@ -423,6 +423,30 @@
   color: rgba(255,255,255,0.3);
 }
 
+.gf-saver-edit-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: #e0e0f0;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.gf-saver-edit-input:focus {
+  border-color: #1a73e8;
+  background: rgba(26, 115, 232, 0.08);
+}
+
+.gf-saver-edit-select option {
+  color: #202124;
+  background: #ffffff;
+}
+
 /* \u2500\u2500 Buttons \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
 
 .gf-saver-btn-primary {
@@ -807,9 +831,10 @@
       const handler = detectHandler(container);
       if (!handler) continue;
       const values = handler.read(container);
+      const options = handler.readOptions ? handler.readOptions(container) : null;
       const key = hashKey(label, handler.type);
-      results.push({ key, label, type: handler.type, values });
-      log('captured', { key, label, type: handler.type, values });
+      results.push({ key, label, type: handler.type, values, options });
+      log('captured', { key, label, type: handler.type, values, options });
     }
     return results;
   }
@@ -864,6 +889,55 @@
       await current.handler.write(current.container, saved.values);
     }
   }
+  function detectUpdateConflicts(savedFields, currentFields) {
+    const savedMap = {};
+    for (const s of savedFields) savedMap[s.key] = s;
+    const conflicts = [];
+    for (const current of currentFields) {
+      const saved = savedMap[current.key];
+      if (saved) {
+        const hasSavedValue = saved.values.length > 0 && saved.values.some((v) => v.trim() !== '');
+        const hasCurrentValue =
+          current.values.length > 0 && current.values.some((v) => v.trim() !== '');
+        if (
+          hasSavedValue &&
+          hasCurrentValue &&
+          JSON.stringify(current.values) !== JSON.stringify(saved.values)
+        ) {
+          conflicts.push({
+            key: current.key,
+            label: current.label,
+            currentValues: current.values,
+            savedValues: saved.values,
+          });
+        }
+      }
+    }
+    return conflicts;
+  }
+  function mergeFields(savedFields, currentFields, overwriteMap) {
+    const merged = [...savedFields];
+    const savedMap = {};
+    merged.forEach((f, i) => (savedMap[f.key] = i));
+    for (const current of currentFields) {
+      const savedIdx = savedMap[current.key];
+      if (savedIdx !== void 0) {
+        const decision = overwriteMap[current.key];
+        if (decision === true) {
+          merged[savedIdx] = { ...merged[savedIdx], values: current.values };
+        } else if (decision === void 0) {
+          const hasCurrentValue =
+            current.values.length > 0 && current.values.some((v) => v.trim() !== '');
+          if (hasCurrentValue) {
+            merged[savedIdx] = { ...merged[savedIdx], values: current.values };
+          }
+        }
+      } else {
+        merged.push(current);
+      }
+    }
+    return merged;
+  }
   var WIDGET_SELECTOR,
     linearScaleHandler,
     dateHandler,
@@ -892,6 +966,11 @@
         read(container) {
           const checked = container.querySelector('[role="radio"][aria-checked="true"]');
           return checked ? [getOptionLabel(checked)] : [];
+        },
+        readOptions(container) {
+          const group = container.querySelector('[role="radiogroup"]');
+          if (!group) return null;
+          return [...group.querySelectorAll('[role="radio"]')].map((r) => getOptionLabel(r).trim());
         },
         async write(container, values) {
           if (!values[0]) return;
@@ -1010,6 +1089,11 @@
             getOptionLabel
           );
         },
+        readOptions(container) {
+          return [...container.querySelectorAll('[role="checkbox"]')].map((cb) =>
+            getOptionLabel(cb).trim()
+          );
+        },
         async write(container, values) {
           const checkboxes = [...container.querySelectorAll('[role="checkbox"]')];
           for (const cb of checkboxes) {
@@ -1042,6 +1126,23 @@
           if (selected) return [selected.textContent.trim()];
           const text = listbox.textContent.trim();
           return text && text.toLowerCase() !== 'choose' ? [text] : [];
+        },
+        readOptions(container) {
+          const select = container.querySelector('select');
+          if (select) {
+            return [...select.options]
+              .map((o) => o.text.trim())
+              .filter((t) => t.toLowerCase() !== 'choose' && t !== '');
+          }
+          const listbox = container.querySelector('[role="listbox"]');
+          if (!listbox) return null;
+          const options = [...listbox.querySelectorAll('[role="option"]')];
+          if (options.length > 0) {
+            return options
+              .map((o) => getOptionLabel(o).trim())
+              .filter((t) => t.toLowerCase() !== 'choose' && t !== '');
+          }
+          return null;
         },
         async write(container, values) {
           if (!values[0]) return;
@@ -1080,6 +1181,11 @@
         read(container) {
           const checked = container.querySelector('[role="radio"][aria-checked="true"]');
           return checked ? [getOptionLabel(checked)] : [];
+        },
+        readOptions(container) {
+          return [...container.querySelectorAll('[role="radio"]')].map((r) =>
+            getOptionLabel(r).trim()
+          );
         },
         async write(container, values) {
           if (!values[0]) return;
@@ -1266,6 +1372,12 @@
             showStatus(statusContainer, '\u26A0\uFE0F No fields found on this page.', 'error');
             return;
           }
+          if (saveNames.includes(name)) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+            handleSaveToExisting(formId, name, saves[name], statusContainer);
+            return;
+          }
           await writeSave(formId, name, fields);
           nameInput.value = '';
           showStatus(
@@ -1278,8 +1390,10 @@
           error('writeSave error:', err);
           showStatus(statusContainer, '\u2717 Failed to save. Check console.', 'error');
         } finally {
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Save';
+          if (!saveNames.includes(name)) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+          }
         }
       },
     });
@@ -1369,6 +1483,16 @@
         renameInput.select();
       },
     });
+    const editBtn = el('button', {
+      className: 'gf-saver-btn-secondary',
+      textContent: 'Edit',
+      onClick: () => openEditModal(formId, name, save, statusContainer),
+    });
+    const updateBtn = el('button', {
+      className: 'gf-saver-btn-primary',
+      textContent: 'Update',
+      onClick: () => handleSaveToExisting(formId, name, save, statusContainer),
+    });
     const deleteBtn = el('button', {
       className: 'gf-saver-btn-danger',
       textContent: 'Delete',
@@ -1387,7 +1511,15 @@
         nameEl,
         el('div', { className: 'gf-saver-save-meta', textContent: meta })
       ),
-      el('div', { className: 'gf-saver-save-actions' }, loadBtn, renameBtn, deleteBtn)
+      el(
+        'div',
+        { className: 'gf-saver-save-actions' },
+        loadBtn,
+        updateBtn,
+        editBtn,
+        renameBtn,
+        deleteBtn
+      )
     );
   }
   async function handleLoad(formId, saveName, save, statusContainer) {
@@ -1402,11 +1534,182 @@
       await applyFields(savedFields, {});
       createStatusToast(`\u2713 Loaded "${saveName}" \u2014 ${savedFields.length} fields applied`);
     } else {
-      openConflictModal(saveName, savedFields, conflicts);
+      openConflictModal(formId, saveName, savedFields, conflicts, 'load', statusContainer);
     }
   }
-  function openConflictModal(saveName, savedFields, conflicts) {
+  async function handleSaveToExisting(formId, saveName, save, statusContainer) {
+    const savedFields = save.fields || [];
+    const currentFields = captureVisible();
+    if (currentFields.length === 0) {
+      showStatus(statusContainer, '\u26A0\uFE0F No fields found on this page.', 'error');
+      return;
+    }
+    const conflicts = detectUpdateConflicts(savedFields, currentFields);
+    if (conflicts.length === 0) {
+      const mergedFields = mergeFields(savedFields, currentFields, {});
+      removeBackdrop();
+      try {
+        await writeSave(formId, saveName, mergedFields);
+        createStatusToast(`\u2713 Updated "${saveName}"`);
+        setTimeout(() => openMainModal(formId), 200);
+      } catch (err) {
+        error('updateSave error:', err);
+        showStatus(statusContainer, '\u2717 Failed to update. Check console.', 'error');
+      }
+    } else {
+      openConflictModal(
+        formId,
+        saveName,
+        savedFields,
+        conflicts,
+        'save',
+        statusContainer,
+        currentFields
+      );
+    }
+  }
+  function openEditModal(formId, saveName, save, statusContainer) {
     removeBackdrop();
+    const savedFields = save.fields || [];
+    const fieldInputs = [];
+    const header = el(
+      'div',
+      { className: 'gf-saver-modal-header' },
+      el('span', { className: 'gf-saver-modal-icon', textContent: '\u270F\uFE0F' }),
+      el(
+        'div',
+        { style: 'flex:1' },
+        el('p', { className: 'gf-saver-modal-title', textContent: `Edit "${saveName}"` }),
+        el('p', {
+          className: 'gf-saver-modal-subtitle',
+          textContent: `${savedFields.length} field${savedFields.length !== 1 ? 's' : ''} \u2014 edit saved values`,
+        })
+      ),
+      el('button', {
+        className: 'gf-saver-close-btn',
+        textContent: '\xD7',
+        onClick: () => openMainModal(formId),
+      })
+    );
+    const thead = el(
+      'thead',
+      {},
+      el('tr', {}, el('th', { textContent: 'Field' }), el('th', { textContent: 'Saved Value' }))
+    );
+    const tbody = el('tbody', {});
+    for (const field of savedFields) {
+      let inputEl;
+      if (field.options && field.options.length > 0) {
+        if (field.type === 'checkbox') {
+          inputEl = el('select', {
+            className: 'gf-saver-edit-input gf-saver-edit-select',
+            multiple: true,
+            // Show up to 4 items before scrolling
+            size: Math.min(field.options.length, 4),
+          });
+          for (const opt of field.options) {
+            const optionEl = el('option', { value: opt, textContent: opt });
+            if (field.values.includes(opt)) {
+              optionEl.selected = true;
+            }
+            inputEl.appendChild(optionEl);
+          }
+        } else {
+          inputEl = el('select', {
+            className: 'gf-saver-edit-input gf-saver-edit-select',
+          });
+          inputEl.appendChild(el('option', { value: '', textContent: '-- Select --' }));
+          for (const opt of field.options) {
+            const optionEl = el('option', { value: opt, textContent: opt });
+            if (field.values.includes(opt)) {
+              optionEl.selected = true;
+            }
+            inputEl.appendChild(optionEl);
+          }
+        }
+      } else {
+        inputEl = el('input', {
+          className: 'gf-saver-edit-input',
+          type: 'text',
+          value: field.values.join(', '),
+        });
+      }
+      const getValue = () => {
+        if (inputEl.tagName === 'SELECT') {
+          if (inputEl.multiple) {
+            return [...inputEl.selectedOptions].map((o) => o.value);
+          } else {
+            return inputEl.value ? [inputEl.value] : [];
+          }
+        }
+        return inputEl.value
+          .split(',')
+          .map((v) => v.trim())
+          .filter((v) => v !== '');
+      };
+      fieldInputs.push({ field, getValue });
+      tbody.appendChild(
+        el(
+          'tr',
+          {},
+          el('td', { className: 'gf-saver-conflict-field', textContent: field.label }),
+          el('td', { className: 'gf-saver-conflict-new' }, inputEl)
+        )
+      );
+    }
+    const table = el('table', { className: 'gf-saver-conflict-table' }, thead, tbody);
+    const body = el(
+      'div',
+      { className: 'gf-saver-modal-body' },
+      el('p', {
+        style: 'font-size:12px;color:rgba(255,255,255,0.5);margin:0 0 6px',
+        textContent: 'Multiple values should be comma-separated.',
+      }),
+      table
+    );
+    const saveBtn = el('button', {
+      className: 'gf-saver-btn-primary',
+      textContent: 'Save Changes',
+      onClick: async () => {
+        const updatedFields = fieldInputs.map(({ field, getValue }) => ({
+          ...field,
+          values: getValue(),
+        }));
+        removeBackdrop();
+        try {
+          await writeSave(formId, saveName, updatedFields);
+          createStatusToast(`\u2713 Updated "${saveName}"`);
+          setTimeout(() => openMainModal(formId), 200);
+        } catch (err) {
+          error('editSave error:', err);
+          createStatusToast('\u2717 Failed to update save');
+        }
+      },
+    });
+    const cancelBtn = el('button', {
+      className: 'gf-saver-btn-secondary',
+      textContent: 'Cancel',
+      onClick: () => openMainModal(formId),
+    });
+    const footer = el('div', { className: 'gf-saver-conflict-footer' }, cancelBtn, saveBtn);
+    const modal = el('div', { className: 'gf-saver-modal' }, header, body, footer);
+    const backdrop = el('div', { id: `${DOM_ID_PREFIX}backdrop` }, modal);
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) openMainModal(formId);
+    });
+    document.body.appendChild(backdrop);
+  }
+  function openConflictModal(
+    formId,
+    saveName,
+    savedFields,
+    conflicts,
+    mode = 'load',
+    statusContainer = null,
+    currentFields = null
+  ) {
+    removeBackdrop();
+    const isLoad = mode === 'load';
     const checkboxes = {};
     const header = el(
       'div',
@@ -1417,7 +1720,9 @@
         { style: 'flex:1' },
         el('p', {
           className: 'gf-saver-modal-title',
-          textContent: 'Some fields already have values',
+          textContent: isLoad
+            ? 'Some fields already have values'
+            : 'Some fields have different saved values',
         }),
         el('p', {
           className: 'gf-saver-modal-subtitle',
@@ -1437,8 +1742,8 @@
         'tr',
         {},
         el('th', { textContent: 'Field' }),
-        el('th', { textContent: 'Current' }),
-        el('th', { textContent: 'Saved' }),
+        el('th', { textContent: isLoad ? 'Current' : 'Current Form' }),
+        el('th', { textContent: isLoad ? 'Saved' : 'In Save' }),
         el('th', { textContent: '\u2713' })
       )
     );
@@ -1470,7 +1775,9 @@
       { className: 'gf-saver-modal-body' },
       el('p', {
         style: 'font-size:12px;color:rgba(255,255,255,0.5);margin:0 0 6px',
-        textContent: 'Checked fields will be overwritten with the saved value.',
+        textContent: isLoad
+          ? 'Checked fields will be overwritten with the saved value.'
+          : 'Checked fields in the save will be overwritten with the current form value.',
       }),
       table
     );
@@ -1483,8 +1790,20 @@
           overwriteMap[key] = cb.checked;
         }
         removeBackdrop();
-        await applyFields(savedFields, overwriteMap);
-        createStatusToast(`\u2713 Loaded "${saveName}"`);
+        if (isLoad) {
+          await applyFields(savedFields, overwriteMap);
+          createStatusToast(`\u2713 Loaded "${saveName}"`);
+        } else {
+          const mergedFields = mergeFields(savedFields, currentFields, overwriteMap);
+          try {
+            await writeSave(formId, saveName, mergedFields);
+            createStatusToast(`\u2713 Updated "${saveName}"`);
+            setTimeout(() => openMainModal(formId), 200);
+          } catch (err) {
+            error('updateSave error:', err);
+            createStatusToast('\u2717 Failed to update save');
+          }
+        }
       },
     });
     const skipBtn = el('button', {
@@ -1496,14 +1815,32 @@
           overwriteMap[key] = false;
         }
         removeBackdrop();
-        await applyFields(savedFields, overwriteMap);
-        createStatusToast(`\u2713 Loaded "${saveName}" (conflicts skipped)`);
+        if (isLoad) {
+          await applyFields(savedFields, overwriteMap);
+          createStatusToast(`\u2713 Loaded "${saveName}" (conflicts skipped)`);
+        } else {
+          const mergedFields = mergeFields(savedFields, currentFields, overwriteMap);
+          try {
+            await writeSave(formId, saveName, mergedFields);
+            createStatusToast(`\u2713 Updated "${saveName}" (conflicts skipped)`);
+            setTimeout(() => openMainModal(formId), 200);
+          } catch (err) {
+            error('updateSave error:', err);
+            createStatusToast('\u2717 Failed to update save');
+          }
+        }
       },
     });
     const cancelBtn = el('button', {
       className: 'gf-saver-btn-secondary',
       textContent: 'Cancel',
-      onClick: removeBackdrop,
+      onClick: () => {
+        if (!isLoad) {
+          openMainModal(formId);
+        } else {
+          removeBackdrop();
+        }
+      },
     });
     const footer = el(
       'div',
@@ -1515,7 +1852,10 @@
     const modal = el('div', { className: 'gf-saver-modal' }, header, body, footer);
     const backdrop = el('div', { id: `${DOM_ID_PREFIX}backdrop` }, modal);
     backdrop.addEventListener('click', (e) => {
-      if (e.target === backdrop) removeBackdrop();
+      if (e.target === backdrop) {
+        if (!isLoad) openMainModal(formId);
+        else removeBackdrop();
+      }
     });
     document.body.appendChild(backdrop);
   }
@@ -1545,6 +1885,21 @@
     });
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
+  }
+  async function autoLoadIfSingleSave(formId) {
+    try {
+      const saves = await readAllSaves(formId);
+      const names = Object.keys(saves);
+      if (names.length === 1) {
+        const name = names[0];
+        const save = saves[name];
+        log(`[GF-Saver] Auto-loading single save: ${name}`);
+        const dummyContainer = document.createElement('div');
+        await handleLoad(formId, name, save, dummyContainer);
+      }
+    } catch (err) {
+      error('[GF-Saver] autoLoadIfSingleSave error:', err);
+    }
   }
   var currentFormId;
   var init_ui = __esm({
@@ -1579,6 +1934,7 @@
         waitForForm(() => {
           log('form ready \u2014 injecting/refreshing UI');
           createFloatingButton(formId);
+          autoLoadIfSingleSave(formId);
         });
       }
       (function patchHistory() {
