@@ -1872,7 +1872,7 @@
   // AI_Queue/core/bootstrap.js
   function bootstrapQueueApp(provider) {
     globalThis.aiQueue = queueState;
-    log('AI Queue running', true);
+    log('AI_Queue running', true);
     const storageKey = provider.storageKey;
     const syncFromStorage = () => {
       resetQueueState({ includeFailedQueue: !!provider.includeFailedQueue });
