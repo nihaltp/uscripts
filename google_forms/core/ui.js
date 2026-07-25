@@ -197,6 +197,14 @@ async function openMainModal(formId) {
           showStatus(statusContainer, '⚠️ No fields found on this page.', 'error');
           return;
         }
+
+        if (saveNames.includes(name)) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save';
+          handleSaveToExisting(formId, name, saves[name], statusContainer);
+          return;
+        }
+
         await writeSave(formId, name, fields);
         nameInput.value = '';
         showStatus(statusContainer, `✓ Saved "${name}" (${fields.length} fields)`, 'success');
@@ -206,8 +214,10 @@ async function openMainModal(formId) {
         error('writeSave error:', err);
         showStatus(statusContainer, '✗ Failed to save. Check console.', 'error');
       } finally {
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save'; // safe — no HTML
+        if (!saveNames.includes(name)) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save'; // safe — no HTML
+        }
       }
     },
   });
@@ -325,6 +335,13 @@ function buildSaveRow(formId, name, save, statusContainer) {
     onClick: () => openEditModal(formId, name, save, statusContainer),
   });
 
+  // ── Update button ────────────────────────────────────────
+  const updateBtn = el('button', {
+    className: 'gf-saver-btn-primary',
+    textContent: 'Update',
+    onClick: () => handleSaveToExisting(formId, name, save, statusContainer),
+  });
+
   // ── Delete button ────────────────────────────────────────
   const deleteBtn = el('button', {
     className: 'gf-saver-btn-danger',
@@ -340,7 +357,7 @@ function buildSaveRow(formId, name, save, statusContainer) {
     'div',
     { className: 'gf-saver-save-item' },
     el('div', { className: 'gf-saver-save-info' }, nameEl, el('div', { className: 'gf-saver-save-meta', textContent: meta })),
-    el('div', { className: 'gf-saver-save-actions' }, loadBtn, editBtn, renameBtn, deleteBtn),
+    el('div', { className: 'gf-saver-save-actions' }, loadBtn, updateBtn, editBtn, renameBtn, deleteBtn),
   );
 }
 
@@ -362,8 +379,85 @@ async function handleLoad(formId, saveName, save, statusContainer) {
     createStatusToast(`✓ Loaded "${saveName}" — ${savedFields.length} fields applied`);
   } else {
     // Show conflict resolution modal
-    openConflictModal(saveName, savedFields, conflicts);
+    openConflictModal(formId, saveName, savedFields, conflicts, 'load', statusContainer);
   }
+}
+
+// ── Update handler ────────────────────────────────────────────────────────────
+
+async function handleSaveToExisting(formId, saveName, save, statusContainer) {
+  const savedFields = save.fields || [];
+  const currentFields = captureVisible();
+  
+  if (currentFields.length === 0) {
+    showStatus(statusContainer, '⚠️ No fields found on this page.', 'error');
+    return;
+  }
+
+  // Detect conflicts: current fields vs saved fields
+  const savedMap = {};
+  for (const s of savedFields) savedMap[s.key] = s;
+
+  const conflicts = [];
+  for (const current of currentFields) {
+    const saved = savedMap[current.key];
+    if (saved) {
+      const hasSavedValue = saved.values.length > 0 && saved.values.some(v => v.trim() !== '');
+      const hasCurrentValue = current.values.length > 0 && current.values.some(v => v.trim() !== '');
+      if (hasSavedValue && hasCurrentValue && JSON.stringify(current.values) !== JSON.stringify(saved.values)) {
+        conflicts.push({
+          key: current.key,
+          label: current.label,
+          currentValues: current.values,
+          savedValues: saved.values,
+        });
+      }
+    }
+  }
+
+  if (conflicts.length === 0) {
+    // Merge without conflicts
+    const mergedFields = mergeFields(savedFields, currentFields, {});
+    removeBackdrop();
+    try {
+      await writeSave(formId, saveName, mergedFields);
+      createStatusToast(`✓ Updated "${saveName}"`);
+      setTimeout(() => openMainModal(formId), 200);
+    } catch (err) {
+      error('updateSave error:', err);
+      showStatus(statusContainer, '✗ Failed to update. Check console.', 'error');
+    }
+  } else {
+    openConflictModal(formId, saveName, savedFields, conflicts, 'save', statusContainer, currentFields);
+  }
+}
+
+function mergeFields(savedFields, currentFields, overwriteMap) {
+  const merged = [...savedFields];
+  const savedMap = {};
+  merged.forEach((f, i) => savedMap[f.key] = i);
+
+  for (const current of currentFields) {
+    const savedIdx = savedMap[current.key];
+    if (savedIdx !== undefined) {
+      // Exists in save
+      const decision = overwriteMap[current.key];
+      // If decision is true (overwrite) or undefined (no conflict, so just update/keep), we take current if it has value
+      if (decision === true) {
+        merged[savedIdx] = { ...merged[savedIdx], values: current.values };
+      } else if (decision === undefined) {
+        // If there was no conflict, just use current if it has a value, otherwise keep saved
+        const hasCurrentValue = current.values.length > 0 && current.values.some(v => v.trim() !== '');
+        if (hasCurrentValue) {
+           merged[savedIdx] = { ...merged[savedIdx], values: current.values };
+        }
+      }
+    } else {
+      // New field, add to save
+      merged.push(current);
+    }
+  }
+  return merged;
 }
 
 // ── Edit modal ────────────────────────────────────────────────────────────────
@@ -516,9 +610,10 @@ function openEditModal(formId, saveName, save, statusContainer) {
 
 // ── Conflict / overwrite modal ────────────────────────────────────────────────
 
-function openConflictModal(saveName, savedFields, conflicts) {
+function openConflictModal(formId, saveName, savedFields, conflicts, mode = 'load', statusContainer = null, currentFields = null) {
   removeBackdrop();
 
+  const isLoad = mode === 'load';
   const checkboxes = {}; // key → checkbox element
 
   // ── Header ──────────────────────────────────────────────
@@ -529,7 +624,7 @@ function openConflictModal(saveName, savedFields, conflicts) {
     el(
       'div',
       { style: 'flex:1' },
-      el('p', { className: 'gf-saver-modal-title', textContent: 'Some fields already have values' }),
+      el('p', { className: 'gf-saver-modal-title', textContent: isLoad ? 'Some fields already have values' : 'Some fields have different saved values' }),
       el('p', {
         className: 'gf-saver-modal-subtitle',
         textContent: `${conflicts.length} conflict${conflicts.length !== 1 ? 's' : ''} — choose what to overwrite`,
@@ -546,8 +641,8 @@ function openConflictModal(saveName, savedFields, conflicts) {
       'tr',
       {},
       el('th', { textContent: 'Field' }),
-      el('th', { textContent: 'Current' }),
-      el('th', { textContent: 'Saved' }),
+      el('th', { textContent: isLoad ? 'Current' : 'Current Form' }),
+      el('th', { textContent: isLoad ? 'Saved' : 'In Save' }),
       el('th', { textContent: '✓' }),
     ),
   );
@@ -575,7 +670,7 @@ function openConflictModal(saveName, savedFields, conflicts) {
   const body = el(
     'div',
     { className: 'gf-saver-modal-body' },
-    el('p', { style: 'font-size:12px;color:rgba(255,255,255,0.5);margin:0 0 6px', textContent: 'Checked fields will be overwritten with the saved value.' }),
+    el('p', { style: 'font-size:12px;color:rgba(255,255,255,0.5);margin:0 0 6px', textContent: isLoad ? 'Checked fields will be overwritten with the saved value.' : 'Checked fields in the save will be overwritten with the current form value.' }),
     table,
   );
 
@@ -584,14 +679,26 @@ function openConflictModal(saveName, savedFields, conflicts) {
     className: 'gf-saver-btn-primary',
     textContent: 'Apply selected',
     onClick: async () => {
-      // Build overwrite map: true for checked conflicts, false for unchecked
       const overwriteMap = {};
       for (const [key, cb] of Object.entries(checkboxes)) {
         overwriteMap[key] = cb.checked;
       }
       removeBackdrop();
-      await applyFields(savedFields, overwriteMap);
-      createStatusToast(`✓ Loaded "${saveName}"`);
+      
+      if (isLoad) {
+        await applyFields(savedFields, overwriteMap);
+        createStatusToast(`✓ Loaded "${saveName}"`);
+      } else {
+        const mergedFields = mergeFields(savedFields, currentFields, overwriteMap);
+        try {
+          await writeSave(formId, saveName, mergedFields);
+          createStatusToast(`✓ Updated "${saveName}"`);
+          setTimeout(() => openMainModal(formId), 200);
+        } catch (err) {
+          error('updateSave error:', err);
+          createStatusToast('✗ Failed to update save');
+        }
+      }
     },
   });
 
@@ -599,21 +706,39 @@ function openConflictModal(saveName, savedFields, conflicts) {
     className: 'gf-saver-btn-secondary',
     textContent: 'Skip conflicts',
     onClick: async () => {
-      // Skip ALL conflicting fields, only apply clean ones
       const overwriteMap = {};
       for (const key of Object.keys(checkboxes)) {
         overwriteMap[key] = false;
       }
       removeBackdrop();
-      await applyFields(savedFields, overwriteMap);
-      createStatusToast(`✓ Loaded "${saveName}" (conflicts skipped)`);
+      
+      if (isLoad) {
+        await applyFields(savedFields, overwriteMap);
+        createStatusToast(`✓ Loaded "${saveName}" (conflicts skipped)`);
+      } else {
+        const mergedFields = mergeFields(savedFields, currentFields, overwriteMap);
+        try {
+          await writeSave(formId, saveName, mergedFields);
+          createStatusToast(`✓ Updated "${saveName}" (conflicts skipped)`);
+          setTimeout(() => openMainModal(formId), 200);
+        } catch (err) {
+          error('updateSave error:', err);
+          createStatusToast('✗ Failed to update save');
+        }
+      }
     },
   });
 
   const cancelBtn = el('button', {
     className: 'gf-saver-btn-secondary',
     textContent: 'Cancel',
-    onClick: removeBackdrop,
+    onClick: () => {
+       if (!isLoad) {
+          openMainModal(formId); // go back to main modal if we were saving
+       } else {
+          removeBackdrop();
+       }
+    }
   });
 
   const footer = el('div', { className: 'gf-saver-conflict-footer' }, cancelBtn, skipBtn, applyBtn);
@@ -622,7 +747,10 @@ function openConflictModal(saveName, savedFields, conflicts) {
   const backdrop = el('div', { id: `${DOM_ID_PREFIX}backdrop` }, modal);
 
   backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop) removeBackdrop();
+    if (e.target === backdrop) {
+       if (!isLoad) openMainModal(formId);
+       else removeBackdrop();
+    }
   });
 
   document.body.appendChild(backdrop);
