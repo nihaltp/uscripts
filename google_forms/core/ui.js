@@ -1,7 +1,7 @@
 // core/ui.js
 import styles from '../styles/main.css';
 import { readAllSaves, writeSave, renameSave, deleteSave } from './storage.js';
-import { captureVisible, detectConflicts, applyFields } from './fields.js';
+import { captureVisible, detectConflicts, detectUpdateConflicts, applyFields, mergeFields } from './fields.js';
 import { log, error } from './logging.js';
 import { DOM_ID_PREFIX } from './constants.js';
 
@@ -394,26 +394,7 @@ async function handleSaveToExisting(formId, saveName, save, statusContainer) {
     return;
   }
 
-  // Detect conflicts: current fields vs saved fields
-  const savedMap = {};
-  for (const s of savedFields) savedMap[s.key] = s;
-
-  const conflicts = [];
-  for (const current of currentFields) {
-    const saved = savedMap[current.key];
-    if (saved) {
-      const hasSavedValue = saved.values.length > 0 && saved.values.some(v => v.trim() !== '');
-      const hasCurrentValue = current.values.length > 0 && current.values.some(v => v.trim() !== '');
-      if (hasSavedValue && hasCurrentValue && JSON.stringify(current.values) !== JSON.stringify(saved.values)) {
-        conflicts.push({
-          key: current.key,
-          label: current.label,
-          currentValues: current.values,
-          savedValues: saved.values,
-        });
-      }
-    }
-  }
+  const conflicts = detectUpdateConflicts(savedFields, currentFields);
 
   if (conflicts.length === 0) {
     // Merge without conflicts
@@ -430,34 +411,6 @@ async function handleSaveToExisting(formId, saveName, save, statusContainer) {
   } else {
     openConflictModal(formId, saveName, savedFields, conflicts, 'save', statusContainer, currentFields);
   }
-}
-
-function mergeFields(savedFields, currentFields, overwriteMap) {
-  const merged = [...savedFields];
-  const savedMap = {};
-  merged.forEach((f, i) => savedMap[f.key] = i);
-
-  for (const current of currentFields) {
-    const savedIdx = savedMap[current.key];
-    if (savedIdx !== undefined) {
-      // Exists in save
-      const decision = overwriteMap[current.key];
-      // If decision is true (overwrite) or undefined (no conflict, so just update/keep), we take current if it has value
-      if (decision === true) {
-        merged[savedIdx] = { ...merged[savedIdx], values: current.values };
-      } else if (decision === undefined) {
-        // If there was no conflict, just use current if it has a value, otherwise keep saved
-        const hasCurrentValue = current.values.length > 0 && current.values.some(v => v.trim() !== '');
-        if (hasCurrentValue) {
-           merged[savedIdx] = { ...merged[savedIdx], values: current.values };
-        }
-      }
-    } else {
-      // New field, add to save
-      merged.push(current);
-    }
-  }
-  return merged;
 }
 
 // ── Edit modal ────────────────────────────────────────────────────────────────

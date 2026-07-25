@@ -652,3 +652,65 @@ export async function applyFields(savedFields, overwriteMap = {}) {
     await current.handler.write(current.container, saved.values);
   }
 }
+
+/**
+ * Returns fields that have different values between saved and current, where both have values.
+ *
+ * @param {FieldData[]} savedFields
+ * @param {FieldData[]} currentFields
+ * @returns {ConflictInfo[]}
+ */
+export function detectUpdateConflicts(savedFields, currentFields) {
+  const savedMap = {};
+  for (const s of savedFields) savedMap[s.key] = s;
+
+  const conflicts = [];
+  for (const current of currentFields) {
+    const saved = savedMap[current.key];
+    if (saved) {
+      const hasSavedValue = saved.values.length > 0 && saved.values.some(v => v.trim() !== '');
+      const hasCurrentValue = current.values.length > 0 && current.values.some(v => v.trim() !== '');
+      if (hasSavedValue && hasCurrentValue && JSON.stringify(current.values) !== JSON.stringify(saved.values)) {
+        conflicts.push({
+          key: current.key,
+          label: current.label,
+          currentValues: current.values,
+          savedValues: saved.values,
+        });
+      }
+    }
+  }
+  return conflicts;
+}
+
+/**
+ * Merges current fields into saved fields based on an overwrite map.
+ * 
+ * @param {FieldData[]} savedFields
+ * @param {FieldData[]} currentFields
+ * @param {Record<string, boolean>} overwriteMap
+ * @returns {FieldData[]}
+ */
+export function mergeFields(savedFields, currentFields, overwriteMap) {
+  const merged = [...savedFields];
+  const savedMap = {};
+  merged.forEach((f, i) => savedMap[f.key] = i);
+
+  for (const current of currentFields) {
+    const savedIdx = savedMap[current.key];
+    if (savedIdx !== undefined) {
+      const decision = overwriteMap[current.key];
+      if (decision === true) {
+        merged[savedIdx] = { ...merged[savedIdx], values: current.values };
+      } else if (decision === undefined) {
+        const hasCurrentValue = current.values.length > 0 && current.values.some(v => v.trim() !== '');
+        if (hasCurrentValue) {
+           merged[savedIdx] = { ...merged[savedIdx], values: current.values };
+        }
+      }
+    } else {
+      merged.push(current);
+    }
+  }
+  return merged;
+}
