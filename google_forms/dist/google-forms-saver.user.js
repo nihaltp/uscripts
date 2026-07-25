@@ -10,7 +10,7 @@
 // @include      https://docs.google.com/forms/d/e/*
 // @include      https://docs.google.com/forms/u/0/d/e/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=docs.google.com
-// @version      1.0.0
+// @version      1.0.1
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
@@ -708,11 +708,9 @@
     el2.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
   }
   function simulateClick(el2) {
-    el2.dispatchEvent(
-      new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window })
-    );
-    el2.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-    el2.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    el2.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    el2.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    el2.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   }
   function setNativeValue(el2, value) {
     const proto =
