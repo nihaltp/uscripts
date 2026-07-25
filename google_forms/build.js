@@ -1,5 +1,5 @@
 // build.js — Google Forms Saver build script
-// Mirrors the structure of AI Queue/build.js
+// Mirrors the structure of AI_Queue/build.js
 const esbuild = require('esbuild');
 const fs = require('fs/promises');
 const path = require('path');

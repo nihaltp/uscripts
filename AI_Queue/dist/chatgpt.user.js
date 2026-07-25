@@ -30,7 +30,7 @@
 // ==/UserScript==
 
 (() => {
-  // AI Queue/core/state.js
+  // AI_Queue/core/state.js
   var queueState = {
     queue: [],
     failedQueue: [],
@@ -50,7 +50,7 @@
     queueState.awaitingChatScopeSync = false;
   }
 
-  // AI Queue/core/logging.js
+  // AI_Queue/core/logging.js
   window.aiQueueDebug = false;
   function isDebugEnabled() {
     return Boolean(globalThis.aiQueueDebug);
@@ -84,7 +84,7 @@
     throw new Error(args.join(' '));
   }
 
-  // AI Queue/core/utils.js
+  // AI_Queue/core/utils.js
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -122,11 +122,11 @@
     );
   }
 
-  // AI Queue/styles/ui.css
+  // AI_Queue/styles/ui.css
   var ui_default =
     '@keyframes pq-pulse {\n  0% {\n    transform: scale(1);\n    opacity: 1;\n  }\n\n  50% {\n    transform: scale(1.06);\n    opacity: 0.75;\n  }\n\n  100% {\n    transform: scale(1);\n    opacity: 1;\n  }\n}';
 
-  // AI Queue/core/ui.js
+  // AI_Queue/core/ui.js
   var repairTimer = null;
   var lastRepairAt = 0;
   var repairing = false;
@@ -332,7 +332,7 @@
     }, 1e3);
   }
 
-  // AI Queue/core/panel.js
+  // AI_Queue/core/panel.js
   function createBasePanel(titleText, includeFailedList = false) {
     log('createBasePanel called');
     let panel = document.querySelector('#pq-panel');
@@ -461,7 +461,7 @@
     return panel;
   }
 
-  // AI Queue/core/queue.js
+  // AI_Queue/core/queue.js
   function deleteQueueItem(id, queue, renderQueue, saveQueue2) {
     const index = queue.findIndex((item) => item.id === id);
     if (index === -1) {
@@ -497,7 +497,7 @@
     }
   }
 
-  // AI Queue/core/queue-ui.js
+  // AI_Queue/core/queue-ui.js
   function createQueueItemElement(item, { renderQueue, saveQueue: saveQueue2 }) {
     const li = document.createElement('li');
     li.style.marginBottom = '10px';
@@ -587,7 +587,7 @@
     return { li, text, editBtn, deleteBtn };
   }
 
-  // AI Queue/core/storage.js
+  // AI_Queue/core/storage.js
   var GLOBAL_CHAT_KEY = '__global__';
   var DEFAULT_ITEM_STATUS = 'queued';
   var DEFAULT_FAILED_STATUS = 'failed';
@@ -847,7 +847,7 @@
     }
   }
 
-  // AI Queue/core/panel-controls.js
+  // AI_Queue/core/panel-controls.js
   var boundPanels = /* @__PURE__ */ new WeakSet();
   function setupPanelControls({
     createItem,
@@ -930,7 +930,7 @@
     updateStartStopButtons();
   }
 
-  // AI Queue/core/drag.js
+  // AI_Queue/core/drag.js
   var dragBoundPanel = null;
   var listenersBound = false;
   var dragging = false;
@@ -989,7 +989,7 @@
     });
   }
 
-  // AI Queue/core/dom.js
+  // AI_Queue/core/dom.js
   function waitForCondition(
     predicate,
     { timeoutMs = 1e4, intervalMs = 100, description = 'condition' } = {}
@@ -1175,7 +1175,7 @@
     ].some(isActionButtonVisible);
   }
 
-  // AI Queue/core/generation.js
+  // AI_Queue/core/generation.js
   var lastGenerationLabel = '';
   function getGenerationState() {
     const editor = getComposerEditor();
@@ -1240,7 +1240,7 @@
     await waitForIdle();
   }
 
-  // AI Queue/core/keyboard.js
+  // AI_Queue/core/keyboard.js
   function isScrollableElement(element) {
     if (!element || !(element instanceof HTMLElement)) return false;
     const style = window.getComputedStyle(element);
@@ -1521,11 +1521,11 @@
     }, scrollTargets);
   }
 
-  // AI Queue/styles/chat-manager.css
+  // AI_Queue/styles/chat-manager.css
   var chat_manager_default =
     ':root {\n  color-scheme: dark;\n  --pq-manager-bg: #0b1220;\n  --pq-manager-panel: rgba(17, 24, 39, 0.96);\n  --pq-manager-card: rgba(31, 41, 55, 0.96);\n  --pq-manager-text: #f3f4f6;\n  --pq-manager-muted: #9ca3af;\n  --pq-manager-border: #374151;\n  --pq-manager-accent: #60a5fa;\n  --pq-manager-accent-strong: #22c55e;\n}\n\n#pq-chat-manager-panel {\n  position: fixed;\n  top: 6vh;\n  left: 50%;\n  transform: translateX(-50%);\n  width: min(1100px, calc(100vw - 32px));\n  height: min(760px, calc(100vh - 32px));\n  z-index: 2147483647;\n  display: flex;\n  flex-direction: column;\n  background: radial-gradient(circle at top right, rgba(31, 41, 55, 0.95), rgba(11, 18, 32, 0.98) 60%);\n  color: var(--pq-manager-text);\n  border: 1px solid var(--pq-manager-border);\n  border-radius: 16px;\n  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);\n  overflow: hidden;\n}\n\n.pq-manager-shell {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  min-height: 0;\n}\n\n.pq-manager-header {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 16px;\n  padding: 16px 18px 12px;\n  border-bottom: 1px solid var(--pq-manager-border);\n  background: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.82));\n}\n\n.pq-manager-title {\n  font-size: 18px;\n  font-weight: 700;\n  line-height: 1.2;\n  margin: 0;\n}\n\n.pq-manager-subtitle {\n  margin-top: 4px;\n  color: var(--pq-manager-muted);\n  font-size: 13px;\n  line-height: 1.4;\n  max-width: 72ch;\n}\n\n.pq-manager-actions {\n  display: flex;\n  gap: 8px;\n  flex-shrink: 0;\n}\n\n.pq-manager-actions button {\n  appearance: none;\n  border: 1px solid var(--pq-manager-border);\n  background: rgba(31, 41, 55, 0.95);\n  color: var(--pq-manager-text);\n  border-radius: 999px;\n  padding: 8px 12px;\n  font: inherit;\n  cursor: pointer;\n}\n\n.pq-manager-actions button:hover {\n  border-color: var(--pq-manager-accent);\n}\n\n.pq-manager-body {\n  display: flex;\n  flex-direction: column;\n  min-height: 0;\n  padding: 16px 18px 18px;\n  gap: 12px;\n  overflow: hidden;\n}\n\n.pq-manager-grid {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));\n  gap: 12px;\n  align-items: start;\n  flex: 1;\n  min-height: 0;\n  overflow: auto;\n  padding-right: 4px;\n}\n\n.chat-card {\n  background: linear-gradient(180deg, var(--pq-manager-panel), var(--pq-manager-card));\n  border: 1px solid var(--pq-manager-border);\n  border-radius: 12px;\n  overflow: hidden;\n  min-height: 140px;\n}\n\n.chat-title {\n  padding: 10px 12px;\n  border-bottom: 1px solid var(--pq-manager-border);\n  font-size: 12px;\n  letter-spacing: 0.2px;\n  text-transform: uppercase;\n  color: #d1d5db;\n  display: flex;\n  justify-content: space-between;\n  gap: 8px;\n}\n\n.chat-title .chat-controls {\n  display: inline-flex;\n  gap: 8px;\n  align-items: center;\n}\n\n.chat-delete {\n  appearance: none;\n  border: 1px solid transparent;\n  background: transparent;\n  color: var(--pq-manager-muted);\n  border-radius: 8px;\n  padding: 4px 8px;\n  font-size: 12px;\n  cursor: pointer;\n}\n\n.chat-delete:hover {\n  color: var(--pq-manager-accent);\n  border-color: rgba(96, 165, 250, 0.12);\n  background: rgba(96, 165, 250, 0.03);\n}\n\n.chat-list {\n  list-style: none;\n  margin: 0;\n  padding: 8px;\n  min-height: 90px;\n}\n\n.chat-item {\n  background: rgba(17, 24, 39, 0.7);\n  border: 1px solid #334155;\n  border-radius: 8px;\n  padding: 8px;\n  margin-bottom: 8px;\n  cursor: grab;\n  user-select: none;\n  font-size: 13px;\n  line-height: 1.35;\n  word-break: break-word;\n}\n\n.chat-item.dragging {\n  opacity: 0.5;\n}\n\n.chat-list.drag-over,\n.chat-item.drag-over {\n  outline: 2px dashed var(--pq-manager-accent);\n  outline-offset: 2px;\n}\n\n.empty {\n  color: var(--pq-manager-muted);\n  font-size: 12px;\n  padding: 8px;\n  border: 1px dashed var(--pq-manager-border);\n  border-radius: 8px;\n  text-align: center;\n}\n\n.pq-manager-footer {\n  color: var(--pq-manager-muted);\n  font-size: 12px;\n  border-top: 1px solid var(--pq-manager-border);\n  padding-top: 12px;\n}';
 
-  // AI Queue/core/chat-manager.js
+  // AI_Queue/core/chat-manager.js
   var GLOBAL_CHAT_KEY2 = '__global__';
   var MANAGER_PANEL_ID = 'pq-chat-manager-panel';
   var MANAGER_GRID_ID = 'pq-chat-manager-grid';
@@ -1869,7 +1869,7 @@
     return true;
   }
 
-  // AI Queue/core/bootstrap.js
+  // AI_Queue/core/bootstrap.js
   function bootstrapQueueApp(provider) {
     globalThis.aiQueue = queueState;
     log('AI Queue running', true);
@@ -1963,11 +1963,11 @@
     );
   }
 
-  // AI Queue/styles/selection-menu.css
+  // AI_Queue/styles/selection-menu.css
   var selection_menu_default =
     '#pq-selection-menu {\n  position: fixed;\n  z-index: 2147483647;\n  display: none;\n  min-width: 180px;\n  padding: 6px;\n  border: 1px solid #444;\n  border-radius: 12px;\n  background: #202123;\n  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);\n}\n\n#pq-selection-menu button {\n  appearance: none;\n  display: block;\n  width: 100%;\n  padding: 8px 12px;\n  border: 1px solid #555;\n  border-radius: 10px;\n  background: #2a2a2a;\n  color: #fff;\n  cursor: pointer;\n  font: inherit;\n  text-align: left;\n}\n\n#pq-selection-menu button:hover {\n  background: #343434;\n}';
 
-  // AI Queue/core/selection-menu.js
+  // AI_Queue/core/selection-menu.js
   var SELECTION_MENU_ID = 'pq-selection-menu';
   var installed = false;
   function getSelectedPageText() {
@@ -2075,7 +2075,7 @@
     window.addEventListener('resize', hideSelectionMenu);
   }
 
-  // AI Queue/providers/chatgpt.js
+  // AI_Queue/providers/chatgpt.js
   var STORAGE_KEY = 'pq-chatgpt-queue';
   var DOMAINS = ['chatgpt.com', 'chat.openai.com'];
   function normalizeCode(value) {

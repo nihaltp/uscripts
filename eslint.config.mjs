@@ -22,7 +22,7 @@ export default [
         ]
     },
     {
-        files: ["AI Queue/build.js"],
+        files: ["AI_Queue/build.js"],
         languageOptions: {
             ecmaVersion: 2022,
             sourceType: "commonjs",

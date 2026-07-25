@@ -1,6 +1,6 @@
-# AI Queue
+# AI_Queue
 
-This folder contains the source for the AI Queue userscripts.
+This folder contains the source for the AI_Queue userscripts.
 
 ## Scripts
 

@@ -5,7 +5,7 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "build-aiqueue": "node \"AI Queue/build.js\"",
+    "build-aiqueue": "node \"AI_Queue/build.js\"",
     "build-google-forms": "node google_forms/build.js",
     "format": "prettier . --write",
     "check-format": "prettier . --check",

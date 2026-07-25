@@ -6,7 +6,7 @@ import { refreshChatManager } from './chat-manager.js';
 
 export function bootstrapQueueApp(provider) {
   globalThis.aiQueue = queueState;
-  log('AI Queue running', true);
+  log('AI_Queue running', true);
 
   const storageKey = provider.storageKey;
 

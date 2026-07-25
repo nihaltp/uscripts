@@ -1,6 +1,6 @@
-name: AI Queue Bug Report
-description: Report an issue for a AI Queue userscript
-title: "[AI Queue] "
+name: AI_Queue Bug Report
+description: Report an issue for a AI_Queue userscript
+title: "[AI_Queue] "
 labels: ["bug"]
 body:
   - type: input

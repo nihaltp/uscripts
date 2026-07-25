@@ -1,6 +1,6 @@
 name: ChatGPT Prompt Queue Bug Report
 description: Report an issue for the ChatGPT Prompt Queue userscript
-title: "[AI Queue] [ChatGPT Prompt Queue] "
+title: "[AI_Queue] [ChatGPT Prompt Queue] "
 labels: ["bug"]
 body:
   - type: input
