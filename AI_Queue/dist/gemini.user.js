@@ -13,8 +13,8 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
 // @version      3.0.25
 // @grant        none
-// @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
-// @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
+// @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/gemini.user.js
+// @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/gemini.user.js
 // @run-at       document-idle
 // ==/UserScript==
 

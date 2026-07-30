@@ -24,8 +24,8 @@
 // @icon         https://chatgpt.com/favicon.ico
 // @version      3.0.24
 // @grant        none
-// @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
-// @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js
+// @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js
+// @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js
 // @run-at       document-idle
 // ==/UserScript==
 
