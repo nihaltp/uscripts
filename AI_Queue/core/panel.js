@@ -43,12 +43,41 @@ export function createBasePanel(titleText, includeFailedList = false) {
     const titleLabel = document.createElement('span');
     titleLabel.textContent = titleText;
 
+    const rightControls = document.createElement('div');
+    rightControls.style.display = 'flex';
+    rightControls.style.gap = '8px';
+
+    const infoBtn = document.createElement('button');
+    infoBtn.id = 'pq-info';
+    infoBtn.type = 'button';
+    infoBtn.textContent = 'i';
+    infoBtn.title = 'Help';
+    Object.assign(infoBtn.style, {
+      width: '24px',
+      height: '24px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: '50%',
+      border: '1px solid #555',
+      background: '#2a2a2a',
+      color: '#fff',
+      cursor: 'pointer',
+      fontFamily: 'serif',
+      fontStyle: 'italic',
+      fontWeight: 'bold',
+      fontSize: '14px',
+      padding: '0',
+    });
+    infoBtn.addEventListener('click', () => {
+      alert("How to use AI Queue:\n\n1. Type your prompt in the text area.\n2. Click 'Add To Queue'.\n3. Add as many prompts as you like.\n4. Click 'Start Queue' to process them automatically.\n\nThe script will wait for the AI to finish each response before sending the next one.");
+    });
+
     const closeBtn = document.createElement('button');
     closeBtn.id = 'pq-close';
     closeBtn.type = 'button';
     closeBtn.textContent = 'Close';
     Object.assign(closeBtn.style, {
-      flexShrink: '0',
       padding: '4px 10px',
       borderRadius: '9999px',
       border: '1px solid #555',
@@ -59,8 +88,11 @@ export function createBasePanel(titleText, includeFailedList = false) {
 
     closeBtn.addEventListener('click', () => hidePanel(panel));
 
+    rightControls.appendChild(infoBtn);
+    rightControls.appendChild(closeBtn);
+
     title.appendChild(titleLabel);
-    title.appendChild(closeBtn);
+    title.appendChild(rightControls);
 
     const textarea = document.createElement('textarea');
     textarea.id = 'pq-input';
