@@ -69,8 +69,8 @@ ${excludeLines}
 // @icon         ${app.icon}
 // @version      ${versions[app.id]}
 ${grantLines}
-// @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/${app.outfile}
-// @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/${app.outfile}
+// @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/${app.outfile}
+// @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/${app.outfile}
 // @run-at       ${app.runAt}
 // ==/UserScript==
 `;
