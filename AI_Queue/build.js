@@ -99,7 +99,7 @@ ${grantLines}
     });
     await fs.writeFile(outputPath, formatted);
 
-    console.log(`Built ${app.outfile}`);
+    console.log(`Built ${rootDir}/${app.outfile}`);
   }
 }
 
