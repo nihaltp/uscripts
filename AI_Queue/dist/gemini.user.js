@@ -11,7 +11,7 @@
 // @match        https://gemini.google.com/app/*
 // @exclude      https://gemini.google.com/signin/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.0.24
+// @version      3.0.25
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js
@@ -358,12 +358,41 @@
       title.style.marginBottom = '10px';
       const titleLabel = document.createElement('span');
       titleLabel.textContent = titleText;
+      const rightControls = document.createElement('div');
+      rightControls.style.display = 'flex';
+      rightControls.style.gap = '8px';
+      const infoBtn = document.createElement('button');
+      infoBtn.id = 'pq-info';
+      infoBtn.type = 'button';
+      infoBtn.textContent = 'i';
+      infoBtn.title = 'Help';
+      Object.assign(infoBtn.style, {
+        width: '24px',
+        height: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '50%',
+        border: '1px solid #555',
+        background: '#2a2a2a',
+        color: '#fff',
+        cursor: 'pointer',
+        fontFamily: 'serif',
+        fontStyle: 'italic',
+        fontWeight: 'bold',
+        fontSize: '14px',
+        padding: '0',
+      });
+      infoBtn.addEventListener('click', () => {
+        alert(
+          "How to use AI Queue:\n\n1. Type your prompt in the text area.\n2. Click 'Add To Queue'.\n3. Add as many prompts as you like.\n4. Click 'Start Queue' to process them automatically.\n\nThe script will wait for the AI to finish each response before sending the next one."
+        );
+      });
       const closeBtn = document.createElement('button');
       closeBtn.id = 'pq-close';
       closeBtn.type = 'button';
       closeBtn.textContent = 'Close';
       Object.assign(closeBtn.style, {
-        flexShrink: '0',
         padding: '4px 10px',
         borderRadius: '9999px',
         border: '1px solid #555',
@@ -372,8 +401,10 @@
         cursor: 'pointer',
       });
       closeBtn.addEventListener('click', () => hidePanel(panel));
+      rightControls.appendChild(infoBtn);
+      rightControls.appendChild(closeBtn);
       title.appendChild(titleLabel);
-      title.appendChild(closeBtn);
+      title.appendChild(rightControls);
       const textarea = document.createElement('textarea');
       textarea.id = 'pq-input';
       textarea.placeholder = 'Enter prompt...';
@@ -388,20 +419,27 @@
         padding: '8px',
         boxSizing: 'border-box',
       });
+      const btnStyle = {
+        marginTop: '10px',
+        width: '100%',
+        padding: '8px',
+        borderRadius: '6px',
+        border: '1px solid #555',
+        background: '#2a2a2a',
+        color: '#fff',
+        cursor: 'pointer',
+      };
       const addBtn = document.createElement('button');
       addBtn.id = 'pq-add';
-      addBtn.style.marginTop = '10px';
-      addBtn.style.width = '100%';
+      Object.assign(addBtn.style, btnStyle);
       addBtn.textContent = 'Add To Queue';
       const manageChatsBtn = document.createElement('button');
       manageChatsBtn.id = 'pq-manage-chats';
-      manageChatsBtn.style.marginTop = '10px';
-      manageChatsBtn.style.width = '100%';
+      Object.assign(manageChatsBtn.style, btnStyle);
       manageChatsBtn.textContent = 'Manage Chat Prompts';
       const startBtn = document.createElement('button');
       startBtn.id = 'pq-start';
-      startBtn.style.marginTop = '10px';
-      startBtn.style.width = '100%';
+      Object.assign(startBtn.style, btnStyle);
       startBtn.textContent = 'Start Queue';
       const status = document.createElement('div');
       status.id = 'pq-status';
@@ -500,18 +538,23 @@
     text.style.flex = '1';
     text.style.wordBreak = 'break-word';
     text.style.fontSize = '14px';
+    const iconBtnStyle = {
+      cursor: 'pointer',
+      display: 'none',
+      background: '#2a2a2a',
+      border: '1px solid #555',
+      borderRadius: '4px',
+      padding: '2px 6px',
+      fontSize: '12px',
+    };
     const editBtn = document.createElement('button');
     editBtn.textContent = '\u{1F589}';
     editBtn.title = 'Edit';
-    editBtn.style.cursor = 'pointer';
-    editBtn.style.color = '#7dd3fc';
-    editBtn.style.display = 'none';
+    Object.assign(editBtn.style, iconBtnStyle, { color: '#7dd3fc' });
     const deleteBtn = document.createElement('button');
     deleteBtn.textContent = '\u2715';
     deleteBtn.title = 'Delete';
-    deleteBtn.style.cursor = 'pointer';
-    deleteBtn.style.color = '#ff6b6b';
-    deleteBtn.style.display = 'none';
+    Object.assign(deleteBtn.style, iconBtnStyle, { color: '#ff6b6b' });
     row.appendChild(text);
     row.appendChild(editBtn);
     row.appendChild(deleteBtn);
@@ -1985,6 +2028,16 @@
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = 'Add to Prompt Queue';
+    Object.assign(button.style, {
+      padding: '8px 12px',
+      border: '1px solid #555',
+      background: '#2a2a2a',
+      color: '#fff',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      width: '100%',
+      textAlign: 'left',
+    });
     button.addEventListener('click', () => {
       const prompt = menu.dataset.prompt || '';
       if (prompt) {
