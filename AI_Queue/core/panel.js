@@ -77,22 +77,30 @@ export function createBasePanel(titleText, includeFailedList = false) {
       boxSizing: 'border-box',
     });
 
+    const btnStyle = {
+      marginTop: '10px',
+      width: '100%',
+      padding: '8px',
+      borderRadius: '6px',
+      border: '1px solid #555',
+      background: '#2a2a2a',
+      color: '#fff',
+      cursor: 'pointer',
+    };
+
     const addBtn = document.createElement('button');
     addBtn.id = 'pq-add';
-    addBtn.style.marginTop = '10px';
-    addBtn.style.width = '100%';
+    Object.assign(addBtn.style, btnStyle);
     addBtn.textContent = 'Add To Queue';
 
     const manageChatsBtn = document.createElement('button');
     manageChatsBtn.id = 'pq-manage-chats';
-    manageChatsBtn.style.marginTop = '10px';
-    manageChatsBtn.style.width = '100%';
+    Object.assign(manageChatsBtn.style, btnStyle);
     manageChatsBtn.textContent = 'Manage Chat Prompts';
 
     const startBtn = document.createElement('button');
     startBtn.id = 'pq-start';
-    startBtn.style.marginTop = '10px';
-    startBtn.style.width = '100%';
+    Object.assign(startBtn.style, btnStyle);
     startBtn.textContent = 'Start Queue';
 
     const status = document.createElement('div');

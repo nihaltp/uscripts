@@ -19,19 +19,25 @@ export function createQueueItemElement(item, { renderQueue, saveQueue }) {
   text.style.wordBreak = 'break-word';
   text.style.fontSize = '14px';
 
+  const iconBtnStyle = {
+    cursor: 'pointer',
+    display: 'none',
+    background: '#2a2a2a',
+    border: '1px solid #555',
+    borderRadius: '4px',
+    padding: '2px 6px',
+    fontSize: '12px'
+  };
+
   const editBtn = document.createElement('button');
   editBtn.textContent = '🖉';
   editBtn.title = 'Edit';
-  editBtn.style.cursor = 'pointer';
-  editBtn.style.color = '#7dd3fc';
-  editBtn.style.display = 'none';
+  Object.assign(editBtn.style, iconBtnStyle, { color: '#7dd3fc' });
 
   const deleteBtn = document.createElement('button');
   deleteBtn.textContent = '✕';
   deleteBtn.title = 'Delete';
-  deleteBtn.style.cursor = 'pointer';
-  deleteBtn.style.color = '#ff6b6b';
-  deleteBtn.style.display = 'none';
+  Object.assign(deleteBtn.style, iconBtnStyle, { color: '#ff6b6b' });
 
   row.appendChild(text);
   row.appendChild(editBtn);
