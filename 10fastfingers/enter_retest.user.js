@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         10FastFingers Retest on Enter
-// @description  Hide AI-generated images on Pixabay.
+// @description  Click Enter to press the retest button.
 // @author       nihaltp
 // @namespace    https://github.com/nihaltp/uscripts
 // @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=10fastfingers_enter_retest.yml
