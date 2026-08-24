@@ -119,6 +119,7 @@ export function observeInputBoundary(button) {
 
     try {
       const dom = await import('./dom.js');
+      const state = await import('./state.js');
       const editor = dom.getComposerEditor();
       if (!editor) {
         button.style.bottom = '24px';
@@ -126,6 +127,19 @@ export function observeInputBoundary(button) {
       }
       
       const host = editor.closest('form, [role="form"]') || editor.parentElement;
+      
+      if (state.queueState.running) {
+        if (host.style.opacity !== '0.001') {
+          host.dataset.pqOriginalOpacity = host.style.opacity;
+          host.dataset.pqOriginalPointerEvents = host.style.pointerEvents;
+          host.style.opacity = '0.001';
+          host.style.pointerEvents = 'none';
+        }
+      } else if (host.style.opacity === '0.001') {
+        host.style.opacity = host.dataset.pqOriginalOpacity || '';
+        host.style.pointerEvents = host.dataset.pqOriginalPointerEvents || '';
+      }
+
       const target = host || editor;
       
       const rect = target.getBoundingClientRect();
