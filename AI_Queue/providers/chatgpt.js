@@ -3,7 +3,7 @@ import { createBasePanel } from '../core/panel.js';
 import { createQueueItemElement } from '../core/queue-ui.js';
 import { deleteQueueItem, editQueueItem } from '../core/queue.js';
 import { applyScopeToQueuedItems, saveQueue, loadQueue } from '../core/storage.js';
-import { updateToolbarButton, showPanel, ensureToolbarStyles } from '../core/ui.js';
+import { updateToolbarButton, showPanel, ensureToolbarStyles, observeInputBoundary } from '../core/ui.js';
 import { setupPanelControls } from '../core/panel-controls.js';
 import { setupPanelDrag } from '../core/drag.js';
 import { setStatus } from '../core/queue.js';
@@ -254,6 +254,8 @@ export function ensureChatGPTToolbarButton() {
   if (button.parentElement !== document.body) {
     document.body.appendChild(button);
   }
+  
+  observeInputBoundary(button);
 }
 
 export const chatgptProvider = {

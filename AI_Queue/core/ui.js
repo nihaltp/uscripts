@@ -111,6 +111,40 @@ export function updateToolbarButton(toolbarButton, queue, running) {
   toolbarButton.style.opacity = running ? '1' : count > 0 ? '1' : '0.8';
 }
 
+export function observeInputBoundary(button) {
+  if (!button || button.__pq_boundary_interval) return;
+
+  button.__pq_boundary_interval = setInterval(async () => {
+    if (!button.parentElement) return;
+
+    try {
+      const dom = await import('./dom.js');
+      const editor = dom.getComposerEditor();
+      if (!editor) {
+        button.style.bottom = '24px';
+        return;
+      }
+      
+      const host = editor.closest('form, [role="form"]') || editor.parentElement;
+      const target = host || editor;
+      
+      const rect = target.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      
+      // If the input box is in the bottom half of the screen
+      if (rect.top > windowHeight / 2) {
+        const distanceToTop = windowHeight - rect.top;
+        const newBottom = Math.max(24, distanceToTop + 16);
+        button.style.bottom = `${newBottom}px`;
+      } else {
+        button.style.bottom = '24px';
+      }
+    } catch (err) {
+      // ignore
+    }
+  }, 200);
+}
+
 export function repairUi(
   reason = 'repair',
   createPanel,

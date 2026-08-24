@@ -102,7 +102,6 @@ export function getComposerEditor() {
 
   if (isEditableCandidate(activeElement)) {
     if (isActionButtonElement(activeElement)) return null;
-    log('editor found', activeElement);
     return activeElement;
   }
 
@@ -114,11 +113,9 @@ export function getComposerEditor() {
     .filter(isEditableCandidate)
     .sort((left, right) => scoreEditor(right) - scoreEditor(left));
 
-  candidates.forEach((candidate) => log('editor candidate', candidate.tagName, candidate));
 
   const editor = candidates[0] || null;
   if (editor && editor.matches('button, [role="button"]')) return null;
-  if (editor) log('editor found', editor);
 
   return editor;
 }
