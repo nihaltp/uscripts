@@ -122,7 +122,9 @@ export function observeInputBoundary(button) {
       const state = await import('./state.js');
       const editor = dom.getComposerEditor();
       if (!editor) {
-        button.style.bottom = '24px';
+        if (!state.queueState.running) {
+          button.style.bottom = '24px';
+        }
         return;
       }
       
@@ -140,18 +142,19 @@ export function observeInputBoundary(button) {
         host.style.pointerEvents = host.dataset.pqOriginalPointerEvents || '';
       }
 
-      const target = host || editor;
-      
-      const rect = target.getBoundingClientRect();
-      const windowHeight = window.innerHeight;
-      
-      // If the input box is in the bottom half of the screen
-      if (rect.top > windowHeight / 2) {
-        const distanceToTop = windowHeight - rect.top;
-        const newBottom = Math.max(24, distanceToTop + 16);
-        button.style.bottom = `${newBottom}px`;
-      } else {
-        button.style.bottom = '24px';
+      if (!state.queueState.running) {
+        const target = host || editor;
+        const rect = target.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+        
+        // If the input box is in the bottom half of the screen
+        if (rect.top > windowHeight / 2) {
+          const distanceToTop = windowHeight - rect.top;
+          const newBottom = Math.max(24, distanceToTop + 16);
+          button.style.bottom = `${newBottom}px`;
+        } else {
+          button.style.bottom = '24px';
+        }
       }
     } catch (err) {
       // ignore
