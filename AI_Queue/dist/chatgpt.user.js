@@ -22,7 +22,7 @@
 // @exclude      https://chatgpt.com/account-link/*
 // @exclude      https://chatgpt.com/gpts/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.0.24
+// @version      3.0.25
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js
@@ -30,15 +30,27 @@
 // ==/UserScript==
 
 (() => {
-  // AI_Queue/core/state.js
-  var queueState = {
-    queue: [],
-    failedQueue: [],
-    running: false,
-    editingId: null,
-    draggedId: null,
-    awaitingChatScopeSync: false,
+  var __defProp = Object.defineProperty;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __esm = (fn, res, err) =>
+    function __init() {
+      if (err) throw err[0];
+      try {
+        return (fn && (res = (0, fn[__getOwnPropNames(fn)[0]])((fn = 0))), res);
+      } catch (e) {
+        throw ((err = [e]), e);
+      }
+    };
+  var __export = (target, all) => {
+    for (var name in all) __defProp(target, name, { get: all[name], enumerable: true });
   };
+
+  // AI_Queue/core/state.js
+  var state_exports = {};
+  __export(state_exports, {
+    queueState: () => queueState,
+    resetQueueState: () => resetQueueState,
+  });
   function resetQueueState({ includeFailedQueue = false } = {}) {
     queueState.queue.length = 0;
     if (includeFailedQueue) {
@@ -49,9 +61,21 @@
     queueState.draggedId = null;
     queueState.awaitingChatScopeSync = false;
   }
+  var queueState;
+  var init_state = __esm({
+    'AI_Queue/core/state.js'() {
+      queueState = {
+        queue: [],
+        failedQueue: [],
+        running: false,
+        editingId: null,
+        draggedId: null,
+        awaitingChatScopeSync: false,
+      };
+    },
+  });
 
   // AI_Queue/core/logging.js
-  window.aiQueueDebug = false;
   function isDebugEnabled() {
     return Boolean(globalThis.aiQueueDebug);
   }
@@ -83,6 +107,11 @@
     error(...args);
     throw new Error(args.join(' '));
   }
+  var init_logging = __esm({
+    'AI_Queue/core/logging.js'() {
+      window.aiQueueDebug = false;
+    },
+  });
 
   // AI_Queue/core/utils.js
   function sleep(ms) {
@@ -121,6 +150,221 @@
       (target.closest?.('#pq-panel') || target.closest?.('.pq-toolbar') || target.id === 'pq-panel')
     );
   }
+  var init_utils = __esm({
+    'AI_Queue/core/utils.js'() {},
+  });
+
+  // AI_Queue/core/dom.js
+  var dom_exports = {};
+  __export(dom_exports, {
+    findStopButton: () => findStopButton,
+    getButtonLabel: () => getButtonLabel,
+    getComposerEditor: () => getComposerEditor,
+    getComposerHost: () => getComposerHost,
+    getEditorText: () => getEditorText,
+    getSendButton: () => getSendButton,
+    hasBusyIndicators: () => hasBusyIndicators,
+    isActionButtonVisible: () => isActionButtonVisible,
+    isEditableCandidate: () => isEditableCandidate,
+    safeClick: () => safeClick,
+    scoreEditor: () => scoreEditor,
+    waitForCondition: () => waitForCondition,
+    waitForElement: () => waitForElement,
+  });
+  function waitForCondition(
+    predicate,
+    { timeoutMs = 1e4, intervalMs = 100, description = 'condition' } = {}
+  ) {
+    const startedAt = Date.now();
+    return new Promise((resolve, reject) => {
+      const check = async () => {
+        try {
+          const result = await Promise.resolve(predicate());
+          if (result) {
+            resolve(result);
+            return;
+          }
+        } catch (err) {
+          error('waitForCondition check error:', err);
+        }
+        const elapsed = Date.now() - startedAt;
+        if (elapsed > timeoutMs) {
+          error(`Timeout waiting for ${description} (${elapsed}ms)`);
+          reject(new Error(`Timeout waiting for ${description} (${elapsed}ms`));
+          return;
+        }
+        setTimeout(check, intervalMs);
+      };
+      check();
+    });
+  }
+  function waitForElement(getter, options = {}) {
+    return waitForCondition(() => getter(), options);
+  }
+  function safeClick(element) {
+    if (!isAttached(element) || !isVisible(element)) return false;
+    element.focus?.({ preventScroll: true });
+    if (typeof element.click === 'function') {
+      element.click();
+      return true;
+    }
+    element.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window })
+    );
+    element.dispatchEvent(
+      new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window })
+    );
+    element.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, view: window })
+    );
+    return true;
+  }
+  function getEditorText(editor) {
+    if (!editor) return '';
+    if ('value' in editor) return String(editor.value || '');
+    return String(editor.textContent || '');
+  }
+  function isEditableCandidate(element) {
+    if (!element) return false;
+    if (!(element instanceof HTMLElement)) return false;
+    if (!isAttached(element)) return false;
+    if (!isVisible(element)) return false;
+    const isTextarea = element instanceof HTMLTextAreaElement;
+    const isContentEditable =
+      element.isContentEditable || element.getAttribute('contenteditable') === 'true';
+    if (!isTextarea && !isContentEditable) return false;
+    if (element.matches('button, [role="button"], input[type="button"], input[type="submit"]'))
+      return false;
+    if (element.disabled || element.getAttribute('aria-disabled') === 'true') return false;
+    if (element.closest('#pq-panel')) return false;
+    return true;
+  }
+  function scoreEditor(editor) {
+    const rect = editor.getBoundingClientRect();
+    let score = rect.top;
+    if (editor === document.activeElement) score += 1e3;
+    if (editor.matches('textarea')) score += 100;
+    if (editor.matches('[contenteditable="true"]')) score += 80;
+    if ((editor.getAttribute('role') || '').toLowerCase() === 'textbox') score += 60;
+    if (editor.closest('form')) score += 30;
+    if (editor.closest('[role="form"]')) score += 20;
+    if (rect.bottom > window.innerHeight * 0.5) score += 50;
+    return score;
+  }
+  function getComposerEditor() {
+    const activeElement = document.activeElement;
+    if (isEditableCandidate(activeElement)) {
+      if (isActionButtonElement(activeElement)) return null;
+      return activeElement;
+    }
+    const candidates = [
+      ...document.querySelectorAll(
+        'textarea:not(#pq-input), [contenteditable="true"][role="textbox"], [contenteditable="true"]'
+      ),
+    ]
+      .filter(isEditableCandidate)
+      .sort((left, right) => scoreEditor(right) - scoreEditor(left));
+    const editor = candidates[0] || null;
+    if (editor && editor.matches('button, [role="button"]')) return null;
+    return editor;
+  }
+  function getComposerHost(editor = getComposerEditor()) {
+    if (!editor) return null;
+    const host =
+      editor.closest(
+        'form, [role="form"], [aria-label*="prompt" i], [aria-label*="composer" i], [aria-label*="message" i], [data-testid*="prompt" i], [data-testid*="composer" i]'
+      ) ||
+      editor.parentElement ||
+      null;
+    if (!host || host === editor || editor.contains(host) || host.contains?.(editor)) return null;
+    if (
+      host.isContentEditable ||
+      host.matches?.(
+        '[contenteditable="true"], textarea, input, button, [role="button"], input[type="button"], input[type="submit"]'
+      )
+    )
+      return null;
+    return host;
+  }
+  function getButtonLabel(button) {
+    return [button.getAttribute('aria-label'), button.getAttribute('title'), button.textContent]
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function isActionButtonVisible(button) {
+    return isAttached(button) && isVisible(button);
+  }
+  function getSendButton({ includeDisabled = false } = {}) {
+    const host = getComposerHost();
+    const selectors = [
+      'button[data-testid="send-button"]',
+      '[role="button"][data-testid="send-button"]',
+      'button[aria-label*="Send" i]',
+      'button[title*="Send" i]',
+      '[role="button"][aria-label*="Send" i]',
+      '[role="button"][title*="Send" i]',
+    ];
+    const candidates = [];
+    for (const selector of selectors) {
+      candidates.push(...document.querySelectorAll(selector));
+    }
+    if (host) {
+      candidates.push(...host.querySelectorAll('button, [role="button"]'));
+    }
+    const button =
+      candidates.find((candidate) => {
+        if (!candidate || !(candidate instanceof HTMLElement)) return false;
+        if (!isActionButtonVisible(candidate)) return false;
+        const label = getButtonLabel(candidate);
+        const exactSend = candidate.matches('[data-testid="send-button"]');
+        const looksLikeSend = /\bsend\b/i.test(label) || /\bsubmit\b/i.test(label);
+        if (!exactSend && !looksLikeSend) return false;
+        if (!includeDisabled && candidate.disabled) return false;
+        return true;
+      }) || null;
+    if (button) log('send button found', button);
+    return button;
+  }
+  function findStopButton() {
+    const selectors = [
+      'button[data-testid="stop-button"]',
+      '[role="button"][data-testid="stop-button"]',
+      'button[aria-label*="Stop" i]',
+      'button[title*="Stop" i]',
+      '[role="button"][aria-label*="Stop" i]',
+      '[role="button"][title*="Stop" i]',
+    ];
+    for (const selector of selectors) {
+      const button = [...document.querySelectorAll(selector)].find(isActionButtonVisible) || null;
+      if (button) {
+        log('stop button found', button);
+        return button;
+      }
+    }
+    return null;
+  }
+  function hasBusyIndicators() {
+    return [
+      ...document.querySelectorAll(
+        '[aria-busy="true"], [data-loading="true"], [role="progressbar"]'
+      ),
+    ].some(isActionButtonVisible);
+  }
+  var init_dom = __esm({
+    'AI_Queue/core/dom.js'() {
+      init_logging();
+      init_utils();
+    },
+  });
+
+  // AI_Queue/providers/chatgpt.js
+  init_state();
+
+  // AI_Queue/core/ui.js
+  init_logging();
+  init_utils();
 
   // AI_Queue/styles/ui.css
   var ui_default =
@@ -203,6 +447,47 @@
     toolbarButton.textContent = count > 0 ? `Queue (${count})` : 'Queue';
     toolbarButton.style.animation = running ? 'pq-pulse 1.2s infinite' : '';
     toolbarButton.style.opacity = running ? '1' : count > 0 ? '1' : '0.8';
+  }
+  function observeInputBoundary(button) {
+    if (!button || button.__pq_boundary_interval) return;
+    button.__pq_boundary_interval = setInterval(async () => {
+      if (!button.parentElement) return;
+      try {
+        const dom = await Promise.resolve().then(() => (init_dom(), dom_exports));
+        const state = await Promise.resolve().then(() => (init_state(), state_exports));
+        const editor = dom.getComposerEditor();
+        if (!editor) {
+          if (!state.queueState.running) {
+            button.style.bottom = '24px';
+          }
+          return;
+        }
+        const host = editor.closest('form, [role="form"]') || editor.parentElement;
+        if (state.queueState.running) {
+          if (host.style.opacity !== '0.001') {
+            host.dataset.pqOriginalOpacity = host.style.opacity;
+            host.dataset.pqOriginalPointerEvents = host.style.pointerEvents;
+            host.style.opacity = '0.001';
+            host.style.pointerEvents = 'none';
+          }
+        } else if (host.style.opacity === '0.001') {
+          host.style.opacity = host.dataset.pqOriginalOpacity || '';
+          host.style.pointerEvents = host.dataset.pqOriginalPointerEvents || '';
+        }
+        if (!state.queueState.running) {
+          const target = host || editor;
+          const rect = target.getBoundingClientRect();
+          const windowHeight = window.innerHeight;
+          if (rect.top > windowHeight / 2) {
+            const distanceToTop = windowHeight - rect.top;
+            const newBottom = Math.max(24, distanceToTop + 16);
+            button.style.bottom = `${newBottom}px`;
+          } else {
+            button.style.bottom = '24px';
+          }
+        }
+      } catch (err) {}
+    }, 200);
   }
   function repairUi(
     reason = 'repair',
@@ -333,6 +618,7 @@
   }
 
   // AI_Queue/core/panel.js
+  init_logging();
   function createBasePanel(titleText, includeFailedList = false) {
     log('createBasePanel called');
     let panel = document.querySelector('#pq-panel');
@@ -346,6 +632,8 @@
         bottom: 'auto',
         right: 'auto',
         width: '320px',
+        maxWidth: 'calc(100vw - 48px)',
+        boxSizing: 'border-box',
         minHeight: '200px',
         maxHeight: '70vh',
         overflowY: 'auto',
@@ -499,7 +787,11 @@
     return panel;
   }
 
+  // AI_Queue/core/queue-ui.js
+  init_logging();
+
   // AI_Queue/core/queue.js
+  init_logging();
   function deleteQueueItem(id, queue, renderQueue, saveQueue2) {
     const index = queue.findIndex((item) => item.id === id);
     if (index === -1) {
@@ -536,6 +828,7 @@
   }
 
   // AI_Queue/core/queue-ui.js
+  init_state();
   function createQueueItemElement(item, { renderQueue, saveQueue: saveQueue2 }) {
     const li = document.createElement('li');
     li.style.marginBottom = '10px';
@@ -631,6 +924,7 @@
   }
 
   // AI_Queue/core/storage.js
+  init_logging();
   var GLOBAL_CHAT_KEY = '__global__';
   var DEFAULT_ITEM_STATUS = 'queued';
   var DEFAULT_FAILED_STATUS = 'failed';
@@ -891,6 +1185,8 @@
   }
 
   // AI_Queue/core/panel-controls.js
+  init_logging();
+  init_state();
   var boundPanels = /* @__PURE__ */ new WeakSet();
   function setupPanelControls({
     createItem,
@@ -974,6 +1270,7 @@
   }
 
   // AI_Queue/core/drag.js
+  init_logging();
   var dragBoundPanel = null;
   var listenersBound = false;
   var dragging = false;
@@ -1032,193 +1329,15 @@
     });
   }
 
-  // AI_Queue/core/dom.js
-  function waitForCondition(
-    predicate,
-    { timeoutMs = 1e4, intervalMs = 100, description = 'condition' } = {}
-  ) {
-    const startedAt = Date.now();
-    return new Promise((resolve, reject) => {
-      const check = async () => {
-        try {
-          const result = await Promise.resolve(predicate());
-          if (result) {
-            resolve(result);
-            return;
-          }
-        } catch (err) {
-          error('waitForCondition check error:', err);
-        }
-        const elapsed = Date.now() - startedAt;
-        if (elapsed > timeoutMs) {
-          error(`Timeout waiting for ${description} (${elapsed}ms)`);
-          reject(new Error(`Timeout waiting for ${description} (${elapsed}ms`));
-          return;
-        }
-        setTimeout(check, intervalMs);
-      };
-      check();
-    });
-  }
-  function waitForElement(getter, options = {}) {
-    return waitForCondition(() => getter(), options);
-  }
-  function safeClick(element) {
-    if (!isAttached(element) || !isVisible(element)) return false;
-    element.focus?.({ preventScroll: true });
-    if (typeof element.click === 'function') {
-      element.click();
-      return true;
-    }
-    element.dispatchEvent(
-      new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window })
-    );
-    element.dispatchEvent(
-      new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window })
-    );
-    element.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true, view: window })
-    );
-    return true;
-  }
-  function getEditorText(editor) {
-    if (!editor) return '';
-    if ('value' in editor) return String(editor.value || '');
-    return String(editor.textContent || '');
-  }
-  function isEditableCandidate(element) {
-    if (!element) return false;
-    if (!(element instanceof HTMLElement)) return false;
-    if (!isAttached(element)) return false;
-    if (!isVisible(element)) return false;
-    const isTextarea = element instanceof HTMLTextAreaElement;
-    const isContentEditable =
-      element.isContentEditable || element.getAttribute('contenteditable') === 'true';
-    if (!isTextarea && !isContentEditable) return false;
-    if (element.matches('button, [role="button"], input[type="button"], input[type="submit"]'))
-      return false;
-    if (element.disabled || element.getAttribute('aria-disabled') === 'true') return false;
-    if (element.closest('#pq-panel')) return false;
-    return true;
-  }
-  function scoreEditor(editor) {
-    const rect = editor.getBoundingClientRect();
-    let score = rect.top;
-    if (editor === document.activeElement) score += 1e3;
-    if (editor.matches('textarea')) score += 100;
-    if (editor.matches('[contenteditable="true"]')) score += 80;
-    if ((editor.getAttribute('role') || '').toLowerCase() === 'textbox') score += 60;
-    if (editor.closest('form')) score += 30;
-    if (editor.closest('[role="form"]')) score += 20;
-    if (rect.bottom > window.innerHeight * 0.5) score += 50;
-    return score;
-  }
-  function getComposerEditor() {
-    const activeElement = document.activeElement;
-    if (isEditableCandidate(activeElement)) {
-      if (isActionButtonElement(activeElement)) return null;
-      log('editor found', activeElement);
-      return activeElement;
-    }
-    const candidates = [
-      ...document.querySelectorAll(
-        'textarea:not(#pq-input), [contenteditable="true"][role="textbox"], [contenteditable="true"]'
-      ),
-    ]
-      .filter(isEditableCandidate)
-      .sort((left, right) => scoreEditor(right) - scoreEditor(left));
-    candidates.forEach((candidate) => log('editor candidate', candidate.tagName, candidate));
-    const editor = candidates[0] || null;
-    if (editor && editor.matches('button, [role="button"]')) return null;
-    if (editor) log('editor found', editor);
-    return editor;
-  }
-  function getComposerHost(editor = getComposerEditor()) {
-    if (!editor) return null;
-    const host =
-      editor.closest(
-        'form, [role="form"], [aria-label*="prompt" i], [aria-label*="composer" i], [aria-label*="message" i], [data-testid*="prompt" i], [data-testid*="composer" i]'
-      ) ||
-      editor.parentElement ||
-      null;
-    if (!host || host === editor || editor.contains(host) || host.contains?.(editor)) return null;
-    if (
-      host.isContentEditable ||
-      host.matches?.(
-        '[contenteditable="true"], textarea, input, button, [role="button"], input[type="button"], input[type="submit"]'
-      )
-    )
-      return null;
-    return host;
-  }
-  function getButtonLabel(button) {
-    return [button.getAttribute('aria-label'), button.getAttribute('title'), button.textContent]
-      .filter(Boolean)
-      .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-  function isActionButtonVisible(button) {
-    return isAttached(button) && isVisible(button);
-  }
-  function getSendButton({ includeDisabled = false } = {}) {
-    const host = getComposerHost();
-    const selectors = [
-      'button[data-testid="send-button"]',
-      '[role="button"][data-testid="send-button"]',
-      'button[aria-label*="Send" i]',
-      'button[title*="Send" i]',
-      '[role="button"][aria-label*="Send" i]',
-      '[role="button"][title*="Send" i]',
-    ];
-    const candidates = [];
-    for (const selector of selectors) {
-      candidates.push(...document.querySelectorAll(selector));
-    }
-    if (host) {
-      candidates.push(...host.querySelectorAll('button, [role="button"]'));
-    }
-    const button =
-      candidates.find((candidate) => {
-        if (!candidate || !(candidate instanceof HTMLElement)) return false;
-        if (!isActionButtonVisible(candidate)) return false;
-        const label = getButtonLabel(candidate);
-        const exactSend = candidate.matches('[data-testid="send-button"]');
-        const looksLikeSend = /\bsend\b/i.test(label) || /\bsubmit\b/i.test(label);
-        if (!exactSend && !looksLikeSend) return false;
-        if (!includeDisabled && candidate.disabled) return false;
-        return true;
-      }) || null;
-    if (button) log('send button found', button);
-    return button;
-  }
-  function findStopButton() {
-    const selectors = [
-      'button[data-testid="stop-button"]',
-      '[role="button"][data-testid="stop-button"]',
-      'button[aria-label*="Stop" i]',
-      'button[title*="Stop" i]',
-      '[role="button"][aria-label*="Stop" i]',
-      '[role="button"][title*="Stop" i]',
-    ];
-    for (const selector of selectors) {
-      const button = [...document.querySelectorAll(selector)].find(isActionButtonVisible) || null;
-      if (button) {
-        log('stop button found', button);
-        return button;
-      }
-    }
-    return null;
-  }
-  function hasBusyIndicators() {
-    return [
-      ...document.querySelectorAll(
-        '[aria-busy="true"], [data-loading="true"], [role="progressbar"]'
-      ),
-    ].some(isActionButtonVisible);
-  }
+  // AI_Queue/core/keyboard.js
+  init_logging();
+  init_utils();
+  init_dom();
 
   // AI_Queue/core/generation.js
+  init_logging();
+  init_dom();
+  init_utils();
   var lastGenerationLabel = '';
   function getGenerationState() {
     const editor = getComposerEditor();
@@ -1563,6 +1682,16 @@
       await waitForPromptProcessing();
     }, scrollTargets);
   }
+
+  // AI_Queue/providers/chatgpt.js
+  init_logging();
+
+  // AI_Queue/core/bootstrap.js
+  init_logging();
+  init_state();
+
+  // AI_Queue/core/chat-manager.js
+  init_logging();
 
   // AI_Queue/styles/chat-manager.css
   var chat_manager_default =
@@ -2006,6 +2135,9 @@
     );
   }
 
+  // AI_Queue/core/selection-menu.js
+  init_state();
+
   // AI_Queue/styles/selection-menu.css
   var selection_menu_default =
     '#pq-selection-menu {\n  position: fixed;\n  z-index: 2147483647;\n  display: none;\n  min-width: 180px;\n  padding: 6px;\n  border: 1px solid #444;\n  border-radius: 12px;\n  background: #202123;\n  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);\n}\n\n#pq-selection-menu button {\n  appearance: none;\n  display: block;\n  width: 100%;\n  padding: 8px 12px;\n  border: 1px solid #555;\n  border-radius: 10px;\n  background: #2a2a2a;\n  color: #fff;\n  cursor: pointer;\n  font: inherit;\n  text-align: left;\n}\n\n#pq-selection-menu button:hover {\n  background: #343434;\n}';
@@ -2330,6 +2462,7 @@
     if (button.parentElement !== document.body) {
       document.body.appendChild(button);
     }
+    observeInputBoundary(button);
   }
   var chatgptProvider = {
     storageKey: STORAGE_KEY,
