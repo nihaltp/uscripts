@@ -17,6 +17,8 @@ export function createBasePanel(titleText, includeFailedList = false) {
       bottom: 'auto',
       right: 'auto',
       width: '320px',
+      maxWidth: 'calc(100vw - 48px)',
+      boxSizing: 'border-box',
       minHeight: '200px',
       maxHeight: '70vh',
       overflowY: 'auto',
