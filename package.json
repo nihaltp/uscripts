@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/nihaltp/uscripts#readme",
   "dependencies": {
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.28.2"
   },
   "devDependencies": {
     "eslint": "^10.8.1",
