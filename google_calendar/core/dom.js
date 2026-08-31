@@ -1,6 +1,20 @@
 import { log } from './logging.js';
 import { config } from './config.js';
 
+let lastFingerprint = '';
+
+// Build a fingerprint from structural properties only (datekeys + event IDs),
+// ignoring styles that change on click/hover/selection.
+function buildFingerprint(chips, columns) {
+  const colKeys = Array.from(columns).map(c => c.getAttribute('data-datekey')).join(',');
+  const chipIds = Array.from(chips)
+    .filter(c => !c.classList.contains('gcal-multiday-clone'))
+    .map(c => c.getAttribute('data-eventid') || c.getAttribute('aria-label') || '')
+    .sort()
+    .join(';');
+  return `${colKeys}::${chipIds}`;
+}
+
 function getHourHeight() {
   const col = document.querySelector('div[role="gridcell"][data-datekey]');
   if (col && col.clientHeight) {
@@ -66,7 +80,16 @@ export function processCalendar() {
 
   const gridColumns = document.querySelectorAll('div[role="gridcell"][data-datekey]');
   if (gridColumns.length === 0) return;
-  
+
+  // Only rebuild clones when the calendar actually changed (navigation, event add/remove).
+  // Skip rebuilds caused by clicks, popovers, hover effects, etc.
+  const fingerprint = buildFingerprint(allDayChips, gridColumns);
+  if (fingerprint === lastFingerprint && document.querySelector('.gcal-multiday-clone')) {
+    log('Skipping rebuild — no structural change detected.');
+    return;
+  }
+  lastFingerprint = fingerprint;
+
   // Find an existing hourly event to dynamically steal its CSS classes
   // This ensures our clones perfectly match Google Calendar's native hourly event styling
   // Pre-calculate a global baseline of common classes across the entire week 
