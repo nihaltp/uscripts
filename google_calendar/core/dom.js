@@ -72,6 +72,64 @@ function extractTimes(chip) {
   };
 }
 
+// Find the best vertical offset (in px, clone-local) so the text label
+// doesn't sit behind an overlapping hourly event.
+// Returns a px offset from the clone's top edge.
+function findBestTextOffset(col, cloneTop, cloneHeight, textHeight) {
+  const cloneBottom = cloneTop + cloneHeight;
+  const existingEvents = col.querySelectorAll('[data-eventchip]:not(.gcal-multiday-clone)');
+  const blockers = [];
+
+  existingEvents.forEach(evt => {
+    const evtTop = parseFloat(evt.style.top) || 0;
+    const evtHeight = parseFloat(evt.style.height) || 0;
+    const evtBottom = evtTop + evtHeight;
+
+    // Only care about events overlapping the clone's region
+    if (evtTop < cloneBottom && evtBottom > cloneTop) {
+      blockers.push({
+        top: Math.max(evtTop - cloneTop, 0),
+        bottom: Math.min(evtBottom - cloneTop, cloneHeight)
+      });
+    }
+  });
+
+  if (blockers.length === 0) return 0; // No overlap, keep text at top
+
+  // Sort and merge overlapping blockers
+  blockers.sort((a, b) => a.top - b.top);
+  const merged = [];
+  for (const b of blockers) {
+    if (merged.length > 0 && b.top <= merged[merged.length - 1].bottom) {
+      merged[merged.length - 1].bottom = Math.max(merged[merged.length - 1].bottom, b.bottom);
+    } else {
+      merged.push({ top: b.top, bottom: b.bottom });
+    }
+  }
+
+  // Find gaps within [0, cloneHeight]
+  const gaps = [];
+  let scanPos = 0;
+  for (const b of merged) {
+    if (b.top > scanPos) {
+      gaps.push({ top: scanPos, size: b.top - scanPos });
+    }
+    scanPos = Math.max(scanPos, b.bottom);
+  }
+  if (scanPos < cloneHeight) {
+    gaps.push({ top: scanPos, size: cloneHeight - scanPos });
+  }
+
+  if (gaps.length === 0) return 0; // Fully covered, stay at top
+
+  // First gap that fully fits the text
+  const fittingGap = gaps.find(g => g.size >= textHeight);
+  if (fittingGap) return fittingGap.top;
+
+  // Nothing fits fully — pick the largest gap for maximum visibility
+  return gaps.reduce((a, b) => a.size > b.size ? a : b).top;
+}
+
 export function processCalendar() {
   log('Processing calendar for multi-day events...');
   
@@ -208,14 +266,17 @@ export function processCalendar() {
                 timeStr = `${formatTime(dayStartHour)} - ${formatTime(dayEndHour)}`;
              }
              
-             // Apply flex layout with padding
+             // Apply flex layout with base padding
+             const BASE_PADDING = 4;
              buttonClone.style.height = '100%';
              buttonClone.style.width = '100%';
              buttonClone.style.boxSizing = 'border-box';
              buttonClone.style.display = 'flex';
              buttonClone.style.flexDirection = 'column';
              buttonClone.style.alignItems = 'flex-start';
-             buttonClone.style.padding = '4px 8px'; // Top and left padding
+             buttonClone.style.paddingTop = `${BASE_PADDING}px`;
+             buttonClone.style.paddingLeft = '8px';
+             buttonClone.style.paddingRight = '8px';
              buttonClone.style.overflow = 'hidden';
              buttonClone.style.color = '#fff'; // Ensure text is visible
              
@@ -241,8 +302,16 @@ export function processCalendar() {
              timeDiv.style.overflow = 'hidden';
              timeDiv.style.width = '100%';
              
-             buttonClone.appendChild(titleDiv);
-             buttonClone.appendChild(timeDiv);
+             // Create a wrapper for the text content so we can measure its height dynamically
+             const contentWrapper = document.createElement('div');
+             contentWrapper.style.display = 'flex';
+             contentWrapper.style.flexDirection = 'column';
+             contentWrapper.style.width = '100%';
+             
+             contentWrapper.appendChild(titleDiv);
+             contentWrapper.appendChild(timeDiv);
+             
+             buttonClone.appendChild(contentWrapper);
              
              gridClone.appendChild(buttonClone);
           } else {
@@ -253,6 +322,20 @@ export function processCalendar() {
           
           col.style.position = 'relative';
           col.appendChild(gridClone);
+
+          // Now that the clone is in the live DOM, we can measure the text's actual height dynamically
+          if (innerButton) {
+             const buttonClone = gridClone.querySelector('[role="button"]');
+             const contentWrapper = buttonClone.firstElementChild;
+             const dynamicTextHeight = contentWrapper.offsetHeight;
+             
+             // Compute text offset using the dynamic height
+             const BASE_PADDING = 4;
+             const textOffset = findBestTextOffset(col, topPx, heightPx, dynamicTextHeight);
+             
+             // Update padding with the calculated optimal offset
+             buttonClone.style.paddingTop = `${textOffset + BASE_PADDING}px`;
+          }
         }
       }
     }
