@@ -141,7 +141,20 @@ export function processCalendar() {
 
   // Only rebuild clones when the calendar actually changed (navigation, event add/remove).
   // Skip rebuilds caused by clicks, popovers, hover effects, etc.
-  const fingerprint = buildFingerprint(allDayChips, gridColumns);
+  const fingerprint = [
+    buildFingerprint(allDayChips, gridColumns),
+    Array.from(gridColumns).map(column => {
+      const rect = column.getBoundingClientRect();
+      return `${rect.left},${rect.top},${rect.width},${rect.height}`;
+    }).join(';'),
+    Array.from(allDayChips)
+      .filter(chip => !chip.classList.contains('gcal-multiday-clone'))
+      .map(chip => {
+        const rect = chip.getBoundingClientRect();
+        return `${rect.left},${rect.top},${rect.width},${rect.height}`;
+      })
+      .join(';')
+  ].join('::');
   if (fingerprint === lastFingerprint && document.querySelector('.gcal-multiday-clone')) {
     log('Skipping rebuild — no structural change detected.');
     return;
