@@ -111,3 +111,14 @@
 - Support for various form field types (text, linear scales, dates, dropdowns, radios, and checkboxes).
 
 </details>
+
+## Google Calendar
+
+[Google Calendar Multi-Day Grid Viewer](https://raw.githubusercontent.com/nihaltp/uscripts/main/google_calendar/dist/gcal-multiday-grid.user.js) - Displays multi-day events in the hourly grid of Google Calendar rather than at the top.
+<details>
+<summary>Features</summary>
+
+- Displays multi-day events directly in the hourly grid view instead of stacking them at the top.
+- Accurately renders event start and end times across multiple days.
+
+</details>
