@@ -177,11 +177,73 @@ export function processCalendar() {
           
           const innerButton = chip.querySelector('[role="button"]');
           if (innerButton) {
-             const buttonClone = innerButton.cloneNode(true);
+             const buttonClone = innerButton.cloneNode(false); // Only clone the container
+             
+             // Extract title robustly
+             let titleText = 'Event';
+             const titleSpan = chip.querySelector('.WBi6vc, .I0UMhf');
+             if (titleSpan) {
+               titleText = titleSpan.textContent;
+             } else {
+               const ariaLabel = chip.getAttribute('aria-label') || '';
+               const parts = ariaLabel.split(',');
+               titleText = parts.length > 1 ? parts[1].trim() : chip.textContent;
+             }
+
+             // Format time
+             const formatTime = (decimal) => {
+               if (decimal === 0 || decimal === 24) return '12am';
+               const hrs = Math.floor(decimal);
+               const mins = Math.round((decimal - hrs) * 60);
+               const ampm = hrs >= 12 ? 'pm' : 'am';
+               const dispHrs = hrs % 12 || 12;
+               const dispMins = mins > 0 ? `:${mins.toString().padStart(2, '0')}` : '';
+               return `${dispHrs}${dispMins}${ampm}`;
+             };
+             
+             let timeStr = '';
+             if (dayStartHour === 0 && dayEndHour === 24) {
+                timeStr = 'All day';
+             } else {
+                timeStr = `${formatTime(dayStartHour)} - ${formatTime(dayEndHour)}`;
+             }
+             
+             // Apply flex layout with padding
              buttonClone.style.height = '100%';
              buttonClone.style.width = '100%';
              buttonClone.style.boxSizing = 'border-box';
-             buttonClone.style.display = 'block';
+             buttonClone.style.display = 'flex';
+             buttonClone.style.flexDirection = 'column';
+             buttonClone.style.alignItems = 'flex-start';
+             buttonClone.style.padding = '4px 8px'; // Top and left padding
+             buttonClone.style.overflow = 'hidden';
+             buttonClone.style.color = '#fff'; // Ensure text is visible
+             
+             // Create title element
+             const titleDiv = document.createElement('div');
+             titleDiv.textContent = titleText;
+             titleDiv.style.fontWeight = '500';
+             titleDiv.style.fontSize = '12px';
+             titleDiv.style.lineHeight = '14px';
+             titleDiv.style.marginBottom = '2px';
+             titleDiv.style.whiteSpace = 'nowrap';
+             titleDiv.style.textOverflow = 'ellipsis';
+             titleDiv.style.overflow = 'hidden';
+             titleDiv.style.width = '100%';
+             
+             // Create time element
+             const timeDiv = document.createElement('div');
+             timeDiv.textContent = timeStr;
+             timeDiv.style.fontSize = '11px';
+             timeDiv.style.lineHeight = '12px';
+             timeDiv.style.whiteSpace = 'nowrap';
+             timeDiv.style.textOverflow = 'ellipsis';
+             timeDiv.style.overflow = 'hidden';
+             timeDiv.style.width = '100%';
+             
+             buttonClone.appendChild(titleDiv);
+             buttonClone.appendChild(timeDiv);
+             
              gridClone.appendChild(buttonClone);
           } else {
              gridClone.style.backgroundColor = chip.style.borderColor || '#039be5';
