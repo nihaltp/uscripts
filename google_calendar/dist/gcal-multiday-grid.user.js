@@ -352,6 +352,7 @@
         observer.observe(document.body, { childList: true, subtree: true });
       }, 500);
     });
+    processCalendar();
     observer.observe(document.body, { childList: true, subtree: true });
   }
   var debounceTimer;
