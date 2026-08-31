@@ -16,5 +16,6 @@ export function setupObserver() {
     }, 500);
   });
 
+  processCalendar();
   observer.observe(document.body, { childList: true, subtree: true });
 }
