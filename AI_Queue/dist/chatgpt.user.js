@@ -22,7 +22,7 @@
 // @exclude      https://chatgpt.com/account-link/*
 // @exclude      https://chatgpt.com/gpts/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.0.25
+// @version      3.1.0
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js
@@ -368,7 +368,7 @@
 
   // AI_Queue/styles/ui.css
   var ui_default =
-    '@keyframes pq-pulse {\n  0% {\n    transform: scale(1);\n    opacity: 1;\n  }\n\n  50% {\n    transform: scale(1.06);\n    opacity: 0.75;\n  }\n\n  100% {\n    transform: scale(1);\n    opacity: 1;\n  }\n}';
+    '@keyframes pq-pulse {\n  0% {\n    transform: scale(1);\n    opacity: 1;\n  }\n\n  50% {\n    transform: scale(1.06);\n    opacity: 0.75;\n  }\n\n  100% {\n    transform: scale(1);\n    opacity: 1;\n  }\n}\n\n:root {\n  --pq-ui-bg: #202123;\n  --pq-ui-border: #444;\n  --pq-ui-text: white;\n  --pq-ui-btn-bg: #2a2a2a;\n  --pq-ui-btn-border: #555;\n  --pq-ui-input-bg: #222;\n  --pq-ui-accent: #7dd3fc;\n  --pq-ui-danger: #ff6b6b;\n}\n\n@media (prefers-color-scheme: light) {\n  :root {\n    --pq-ui-bg: #ffffff;\n    --pq-ui-border: #e5e7eb;\n    --pq-ui-text: #111827;\n    --pq-ui-btn-bg: #f3f4f6;\n    --pq-ui-btn-border: #d1d5db;\n    --pq-ui-input-bg: #f9fafb;\n    --pq-ui-accent: #0284c7;\n    --pq-ui-danger: #ef4444;\n  }\n}';
 
   // AI_Queue/core/ui.js
   var repairTimer = null;
@@ -477,8 +477,11 @@
         if (!state.queueState.running) {
           const target = host || editor;
           const rect = target.getBoundingClientRect();
+          const buttonRect = button.getBoundingClientRect();
           const windowHeight = window.innerHeight;
-          if (rect.top > windowHeight / 2) {
+          const isOverlappingHorizontally =
+            rect.right > buttonRect.left - 16 && rect.left < buttonRect.right + 16;
+          if (rect.top > windowHeight / 2 && isOverlappingHorizontally) {
             const distanceToTop = windowHeight - rect.top;
             const newBottom = Math.max(24, distanceToTop + 16);
             button.style.bottom = `${newBottom}px`;
@@ -637,9 +640,9 @@
         minHeight: '200px',
         maxHeight: '70vh',
         overflowY: 'auto',
-        background: '#202123',
-        color: 'white',
-        border: '1px solid #444',
+        background: 'var(--pq-ui-bg)',
+        color: 'var(--pq-ui-text)',
+        border: '1px solid var(--pq-ui-border)',
         borderRadius: '16px',
         padding: '12px',
         zIndex: '2147483647',
@@ -672,9 +675,9 @@
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: '50%',
-        border: '1px solid #555',
-        background: '#2a2a2a',
-        color: '#fff',
+        border: '1px solid var(--pq-ui-btn-border)',
+        background: 'var(--pq-ui-btn-bg)',
+        color: 'var(--pq-ui-text)',
         cursor: 'pointer',
         fontFamily: 'serif',
         fontStyle: 'italic',
@@ -694,9 +697,9 @@
       Object.assign(closeBtn.style, {
         padding: '4px 10px',
         borderRadius: '9999px',
-        border: '1px solid #555',
-        background: '#2a2a2a',
-        color: '#fff',
+        border: '1px solid var(--pq-ui-btn-border)',
+        background: 'var(--pq-ui-btn-bg)',
+        color: 'var(--pq-ui-text)',
         cursor: 'pointer',
       });
       closeBtn.addEventListener('click', () => hidePanel(panel));
@@ -711,9 +714,9 @@
         width: '100%',
         height: '80px',
         resize: 'vertical',
-        color: '#fff',
-        background: '#222',
-        border: '1px solid #444',
+        color: 'var(--pq-ui-text)',
+        background: 'var(--pq-ui-input-bg)',
+        border: '1px solid var(--pq-ui-border)',
         borderRadius: '6px',
         padding: '8px',
         boxSizing: 'border-box',
@@ -723,9 +726,9 @@
         width: '100%',
         padding: '8px',
         borderRadius: '6px',
-        border: '1px solid #555',
-        background: '#2a2a2a',
-        color: '#fff',
+        border: '1px solid var(--pq-ui-btn-border)',
+        background: 'var(--pq-ui-btn-bg)',
+        color: 'var(--pq-ui-text)',
         cursor: 'pointer',
       };
       const addBtn = document.createElement('button');
@@ -841,12 +844,13 @@
     text.textContent = item.prompt;
     text.style.flex = '1';
     text.style.wordBreak = 'break-word';
+    text.style.whiteSpace = 'pre-wrap';
     text.style.fontSize = '14px';
     const iconBtnStyle = {
       cursor: 'pointer',
       display: 'none',
-      background: '#2a2a2a',
-      border: '1px solid #555',
+      background: 'var(--pq-ui-btn-bg)',
+      border: '1px solid var(--pq-ui-btn-border)',
       borderRadius: '4px',
       padding: '2px 6px',
       fontSize: '12px',
@@ -854,11 +858,11 @@
     const editBtn = document.createElement('button');
     editBtn.textContent = '\u{1F589}';
     editBtn.title = 'Edit';
-    Object.assign(editBtn.style, iconBtnStyle, { color: '#7dd3fc' });
+    Object.assign(editBtn.style, iconBtnStyle, { color: 'var(--pq-ui-accent)' });
     const deleteBtn = document.createElement('button');
     deleteBtn.textContent = '\u2715';
     deleteBtn.title = 'Delete';
-    Object.assign(deleteBtn.style, iconBtnStyle, { color: '#ff6b6b' });
+    Object.assign(deleteBtn.style, iconBtnStyle, { color: 'var(--pq-ui-danger)' });
     row.appendChild(text);
     row.appendChild(editBtn);
     row.appendChild(deleteBtn);
@@ -905,7 +909,7 @@
       } catch (err) {
         error('Drag over dataTransfer error:', err);
       }
-      li.style.borderTop = '2px solid #7dd3fc';
+      li.style.borderTop = '2px solid var(--pq-ui-accent)';
     });
     li.addEventListener('dragleave', () => {
       li.style.borderTop = '';
@@ -1630,15 +1634,43 @@
         selection.addRange(range);
         document.execCommand('delete', false);
       }
-      editor.textContent = prompt;
-      editor.dispatchEvent(
-        new InputEvent('input', {
+      try {
+        const pasteEvent = new ClipboardEvent('paste', {
           bubbles: true,
           cancelable: true,
-          inputType: 'insertText',
-          data: prompt,
-        })
-      );
+          composed: true,
+        });
+        const mockDataTransfer = {
+          getData: (type) => (type.toLowerCase() === 'text/plain' ? prompt : ''),
+          types: ['text/plain'],
+          items: [{ kind: 'string', type: 'text/plain' }],
+          setData: () => {},
+          clearData: () => {},
+        };
+        Object.defineProperty(pasteEvent, 'clipboardData', { value: mockDataTransfer });
+        const notCancelled = editor.dispatchEvent(pasteEvent);
+        if (notCancelled) {
+          editor.textContent = prompt;
+          editor.dispatchEvent(
+            new InputEvent('input', {
+              bubbles: true,
+              composed: true,
+              inputType: 'insertText',
+              data: prompt,
+            })
+          );
+        }
+      } catch (err) {
+        editor.textContent = prompt;
+        editor.dispatchEvent(
+          new InputEvent('input', {
+            bubbles: true,
+            composed: true,
+            inputType: 'insertText',
+            data: prompt,
+          })
+        );
+      }
       editor.dispatchEvent(new Event('change', { bubbles: true }));
       return;
     }
@@ -1695,7 +1727,7 @@
 
   // AI_Queue/styles/chat-manager.css
   var chat_manager_default =
-    ':root {\n  color-scheme: dark;\n  --pq-manager-bg: #0b1220;\n  --pq-manager-panel: rgba(17, 24, 39, 0.96);\n  --pq-manager-card: rgba(31, 41, 55, 0.96);\n  --pq-manager-text: #f3f4f6;\n  --pq-manager-muted: #9ca3af;\n  --pq-manager-border: #374151;\n  --pq-manager-accent: #60a5fa;\n  --pq-manager-accent-strong: #22c55e;\n}\n\n#pq-chat-manager-panel {\n  position: fixed;\n  top: 6vh;\n  left: 50%;\n  transform: translateX(-50%);\n  width: min(1100px, calc(100vw - 32px));\n  height: min(760px, calc(100vh - 32px));\n  z-index: 2147483647;\n  display: flex;\n  flex-direction: column;\n  background: radial-gradient(circle at top right, rgba(31, 41, 55, 0.95), rgba(11, 18, 32, 0.98) 60%);\n  color: var(--pq-manager-text);\n  border: 1px solid var(--pq-manager-border);\n  border-radius: 16px;\n  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);\n  overflow: hidden;\n}\n\n.pq-manager-shell {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  min-height: 0;\n}\n\n.pq-manager-header {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 16px;\n  padding: 16px 18px 12px;\n  border-bottom: 1px solid var(--pq-manager-border);\n  background: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.82));\n}\n\n.pq-manager-title {\n  font-size: 18px;\n  font-weight: 700;\n  line-height: 1.2;\n  margin: 0;\n}\n\n.pq-manager-subtitle {\n  margin-top: 4px;\n  color: var(--pq-manager-muted);\n  font-size: 13px;\n  line-height: 1.4;\n  max-width: 72ch;\n}\n\n.pq-manager-actions {\n  display: flex;\n  gap: 8px;\n  flex-shrink: 0;\n}\n\n.pq-manager-actions button {\n  appearance: none;\n  border: 1px solid var(--pq-manager-border);\n  background: rgba(31, 41, 55, 0.95);\n  color: var(--pq-manager-text);\n  border-radius: 999px;\n  padding: 8px 12px;\n  font: inherit;\n  cursor: pointer;\n}\n\n.pq-manager-actions button:hover {\n  border-color: var(--pq-manager-accent);\n}\n\n.pq-manager-body {\n  display: flex;\n  flex-direction: column;\n  min-height: 0;\n  padding: 16px 18px 18px;\n  gap: 12px;\n  overflow: hidden;\n}\n\n.pq-manager-grid {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));\n  gap: 12px;\n  align-items: start;\n  flex: 1;\n  min-height: 0;\n  overflow: auto;\n  padding-right: 4px;\n}\n\n.chat-card {\n  background: linear-gradient(180deg, var(--pq-manager-panel), var(--pq-manager-card));\n  border: 1px solid var(--pq-manager-border);\n  border-radius: 12px;\n  overflow: hidden;\n  min-height: 140px;\n}\n\n.chat-title {\n  padding: 10px 12px;\n  border-bottom: 1px solid var(--pq-manager-border);\n  font-size: 12px;\n  letter-spacing: 0.2px;\n  text-transform: uppercase;\n  color: #d1d5db;\n  display: flex;\n  justify-content: space-between;\n  gap: 8px;\n}\n\n.chat-title .chat-controls {\n  display: inline-flex;\n  gap: 8px;\n  align-items: center;\n}\n\n.chat-delete {\n  appearance: none;\n  border: 1px solid transparent;\n  background: transparent;\n  color: var(--pq-manager-muted);\n  border-radius: 8px;\n  padding: 4px 8px;\n  font-size: 12px;\n  cursor: pointer;\n}\n\n.chat-delete:hover {\n  color: var(--pq-manager-accent);\n  border-color: rgba(96, 165, 250, 0.12);\n  background: rgba(96, 165, 250, 0.03);\n}\n\n.chat-list {\n  list-style: none;\n  margin: 0;\n  padding: 8px;\n  min-height: 90px;\n}\n\n.chat-item {\n  background: rgba(17, 24, 39, 0.7);\n  border: 1px solid #334155;\n  border-radius: 8px;\n  padding: 8px;\n  margin-bottom: 8px;\n  cursor: grab;\n  user-select: none;\n  font-size: 13px;\n  line-height: 1.35;\n  word-break: break-word;\n}\n\n.chat-item.dragging {\n  opacity: 0.5;\n}\n\n.chat-list.drag-over,\n.chat-item.drag-over {\n  outline: 2px dashed var(--pq-manager-accent);\n  outline-offset: 2px;\n}\n\n.empty {\n  color: var(--pq-manager-muted);\n  font-size: 12px;\n  padding: 8px;\n  border: 1px dashed var(--pq-manager-border);\n  border-radius: 8px;\n  text-align: center;\n}\n\n.pq-manager-footer {\n  color: var(--pq-manager-muted);\n  font-size: 12px;\n  border-top: 1px solid var(--pq-manager-border);\n  padding-top: 12px;\n}';
+    ':root {\n  color-scheme: light dark;\n  --pq-manager-bg: #0b1220;\n  --pq-manager-panel: rgba(17, 24, 39, 0.96);\n  --pq-manager-card: rgba(31, 41, 55, 0.96);\n  --pq-manager-text: #f3f4f6;\n  --pq-manager-muted: #9ca3af;\n  --pq-manager-border: #374151;\n  --pq-manager-accent: #60a5fa;\n  --pq-manager-accent-strong: #22c55e;\n  --pq-manager-panel-bg: radial-gradient(circle at top right, rgba(31, 41, 55, 0.95), rgba(11, 18, 32, 0.98) 60%);\n  --pq-manager-header-bg: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.82));\n  --pq-manager-btn-bg: rgba(31, 41, 55, 0.95);\n  --pq-manager-title-color: #d1d5db;\n  --pq-manager-delete-hover-bg: rgba(96, 165, 250, 0.03);\n  --pq-manager-delete-hover-border: rgba(96, 165, 250, 0.12);\n  --pq-manager-item-bg: rgba(17, 24, 39, 0.7);\n  --pq-manager-item-border: #334155;\n}\n\n@media (prefers-color-scheme: light) {\n  :root {\n    --pq-manager-bg: #f9fafb;\n    --pq-manager-panel: rgba(255, 255, 255, 0.96);\n    --pq-manager-card: rgba(243, 244, 246, 0.96);\n    --pq-manager-text: #111827;\n    --pq-manager-muted: #6b7280;\n    --pq-manager-border: #e5e7eb;\n    --pq-manager-accent: #3b82f6;\n    --pq-manager-accent-strong: #16a34a;\n    --pq-manager-panel-bg: radial-gradient(circle at top right, rgba(255, 255, 255, 0.95), rgba(243, 244, 246, 0.98) 60%);\n    --pq-manager-header-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.82));\n    --pq-manager-btn-bg: rgba(243, 244, 246, 0.95);\n    --pq-manager-title-color: #374151;\n    --pq-manager-delete-hover-bg: rgba(59, 130, 246, 0.05);\n    --pq-manager-delete-hover-border: rgba(59, 130, 246, 0.15);\n    --pq-manager-item-bg: rgba(255, 255, 255, 0.8);\n    --pq-manager-item-border: #d1d5db;\n  }\n}\n\n#pq-chat-manager-panel {\n  position: fixed;\n  top: 6vh;\n  left: 50%;\n  transform: translateX(-50%);\n  width: min(1100px, calc(100vw - 32px));\n  height: min(760px, calc(100vh - 32px));\n  z-index: 2147483647;\n  display: flex;\n  flex-direction: column;\n  background: var(--pq-manager-panel-bg);\n  color: var(--pq-manager-text);\n  border: 1px solid var(--pq-manager-border);\n  border-radius: 16px;\n  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);\n  overflow: hidden;\n}\n\n.pq-manager-shell {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  min-height: 0;\n}\n\n.pq-manager-header {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 16px;\n  padding: 16px 18px 12px;\n  border-bottom: 1px solid var(--pq-manager-border);\n  background: var(--pq-manager-header-bg);\n}\n\n.pq-manager-title {\n  font-size: 18px;\n  font-weight: 700;\n  line-height: 1.2;\n  margin: 0;\n}\n\n.pq-manager-subtitle {\n  margin-top: 4px;\n  color: var(--pq-manager-muted);\n  font-size: 13px;\n  line-height: 1.4;\n  max-width: 72ch;\n}\n\n.pq-manager-actions {\n  display: flex;\n  gap: 8px;\n  flex-shrink: 0;\n}\n\n.pq-manager-actions button {\n  appearance: none;\n  border: 1px solid var(--pq-manager-border);\n  background: var(--pq-manager-btn-bg);\n  color: var(--pq-manager-text);\n  border-radius: 999px;\n  padding: 8px 12px;\n  font: inherit;\n  cursor: pointer;\n}\n\n.pq-manager-actions button:hover {\n  border-color: var(--pq-manager-accent);\n}\n\n.pq-manager-body {\n  display: flex;\n  flex-direction: column;\n  min-height: 0;\n  padding: 16px 18px 18px;\n  gap: 12px;\n  overflow: hidden;\n}\n\n.pq-manager-grid {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));\n  gap: 12px;\n  align-items: start;\n  flex: 1;\n  min-height: 0;\n  overflow: auto;\n  padding-right: 4px;\n}\n\n.chat-card {\n  background: linear-gradient(180deg, var(--pq-manager-panel), var(--pq-manager-card));\n  border: 1px solid var(--pq-manager-border);\n  border-radius: 12px;\n  overflow: hidden;\n  min-height: 140px;\n}\n\n.chat-title {\n  padding: 10px 12px;\n  border-bottom: 1px solid var(--pq-manager-border);\n  font-size: 12px;\n  letter-spacing: 0.2px;\n  text-transform: uppercase;\n  color: var(--pq-manager-title-color);\n  display: flex;\n  justify-content: space-between;\n  gap: 8px;\n}\n\n.chat-title .chat-controls {\n  display: inline-flex;\n  gap: 8px;\n  align-items: center;\n}\n\n.chat-delete {\n  appearance: none;\n  border: 1px solid transparent;\n  background: transparent;\n  color: var(--pq-manager-muted);\n  border-radius: 8px;\n  padding: 4px 8px;\n  font-size: 12px;\n  cursor: pointer;\n}\n\n.chat-delete:hover {\n  color: var(--pq-manager-accent);\n  border-color: var(--pq-manager-delete-hover-border);\n  background: var(--pq-manager-delete-hover-bg);\n}\n\n.chat-list {\n  list-style: none;\n  margin: 0;\n  padding: 8px;\n  min-height: 90px;\n}\n\n.chat-item {\n  background: var(--pq-manager-item-bg);\n  border: 1px solid var(--pq-manager-item-border);\n  border-radius: 8px;\n  padding: 8px;\n  margin-bottom: 8px;\n  cursor: grab;\n  user-select: none;\n  font-size: 13px;\n  line-height: 1.35;\n  word-break: break-word;\n}\n\n.chat-item.dragging {\n  opacity: 0.5;\n}\n\n.chat-list.drag-over,\n.chat-item.drag-over {\n  outline: 2px dashed var(--pq-manager-accent);\n  outline-offset: 2px;\n}\n\n.empty {\n  color: var(--pq-manager-muted);\n  font-size: 12px;\n  padding: 8px;\n  border: 1px dashed var(--pq-manager-border);\n  border-radius: 8px;\n  text-align: center;\n}\n\n.pq-manager-footer {\n  color: var(--pq-manager-muted);\n  font-size: 12px;\n  border-top: 1px solid var(--pq-manager-border);\n  padding-top: 12px;\n}';
 
   // AI_Queue/core/chat-manager.js
   var GLOBAL_CHAT_KEY2 = '__global__';
@@ -2140,7 +2172,7 @@
 
   // AI_Queue/styles/selection-menu.css
   var selection_menu_default =
-    '#pq-selection-menu {\n  position: fixed;\n  z-index: 2147483647;\n  display: none;\n  min-width: 180px;\n  padding: 6px;\n  border: 1px solid #444;\n  border-radius: 12px;\n  background: #202123;\n  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);\n}\n\n#pq-selection-menu button {\n  appearance: none;\n  display: block;\n  width: 100%;\n  padding: 8px 12px;\n  border: 1px solid #555;\n  border-radius: 10px;\n  background: #2a2a2a;\n  color: #fff;\n  cursor: pointer;\n  font: inherit;\n  text-align: left;\n}\n\n#pq-selection-menu button:hover {\n  background: #343434;\n}';
+    ':root {\n  --pq-menu-bg: #202123;\n  --pq-menu-border: #444;\n  --pq-menu-btn-bg: #2a2a2a;\n  --pq-menu-btn-border: #555;\n  --pq-menu-btn-hover-bg: #343434;\n  --pq-menu-text: #fff;\n  --pq-menu-shadow: rgba(0, 0, 0, 0.45);\n}\n\n@media (prefers-color-scheme: light) {\n  :root {\n    --pq-menu-bg: #ffffff;\n    --pq-menu-border: #e5e7eb;\n    --pq-menu-btn-bg: #f3f4f6;\n    --pq-menu-btn-border: #d1d5db;\n    --pq-menu-btn-hover-bg: #e5e7eb;\n    --pq-menu-text: #111827;\n    --pq-menu-shadow: rgba(0, 0, 0, 0.15);\n  }\n}\n\n#pq-selection-menu {\n  position: fixed;\n  z-index: 2147483647;\n  display: none;\n  min-width: 180px;\n  padding: 6px;\n  border: 1px solid var(--pq-menu-border);\n  border-radius: 12px;\n  background: var(--pq-menu-bg);\n  box-shadow: 0 12px 30px var(--pq-menu-shadow);\n}\n\n#pq-selection-menu button {\n  appearance: none;\n  display: block;\n  width: 100%;\n  padding: 8px 12px;\n  border: 1px solid var(--pq-menu-btn-border);\n  border-radius: 10px;\n  background: var(--pq-menu-btn-bg);\n  color: var(--pq-menu-text);\n  cursor: pointer;\n  font: inherit;\n  text-align: left;\n}\n\n#pq-selection-menu button:hover {\n  background: var(--pq-menu-btn-hover-bg);\n}';
 
   // AI_Queue/core/selection-menu.js
   var SELECTION_MENU_ID = 'pq-selection-menu';
@@ -2171,16 +2203,6 @@
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = 'Add to Prompt Queue';
-    Object.assign(button.style, {
-      padding: '8px 12px',
-      border: '1px solid #555',
-      background: '#2a2a2a',
-      color: '#fff',
-      borderRadius: '6px',
-      cursor: 'pointer',
-      width: '100%',
-      textAlign: 'left',
-    });
     button.addEventListener('click', () => {
       const prompt = menu.dataset.prompt || '';
       if (prompt) {
@@ -2452,9 +2474,9 @@
       right: '24px',
       padding: '10px 14px',
       borderRadius: '9999px',
-      background: '#1f1f1f',
-      color: '#fff',
-      border: '1px solid #555',
+      background: 'var(--pq-ui-bg)',
+      color: 'var(--pq-ui-text)',
+      border: '1px solid var(--pq-ui-border)',
       boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
       zIndex: '2147483647',
       cursor: 'pointer',
