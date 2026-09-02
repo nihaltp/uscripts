@@ -280,15 +280,35 @@ export function setEditorValue(editor, prompt) {
       document.execCommand('delete', false);
     }
 
-    editor.textContent = prompt;
-    editor.dispatchEvent(
-      new InputEvent('input', {
+    try {
+      const pasteEvent = new ClipboardEvent('paste', {
         bubbles: true,
         cancelable: true,
-        inputType: 'insertText',
-        data: prompt,
-      })
-    );
+        composed: true,
+      });
+
+      const mockDataTransfer = {
+        getData: (type) => (type.toLowerCase() === 'text/plain' ? prompt : ''),
+        types: ['text/plain'],
+        items: [{ kind: 'string', type: 'text/plain' }],
+        setData: () => {},
+        clearData: () => {}
+      };
+
+      Object.defineProperty(pasteEvent, 'clipboardData', { value: mockDataTransfer });
+      
+      const notCancelled = editor.dispatchEvent(pasteEvent);
+      
+      if (notCancelled) {
+        // If Lexical didn't intercept it, fallback to naive insertion
+        editor.textContent = prompt;
+        editor.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: prompt }));
+      }
+    } catch (err) {
+      editor.textContent = prompt;
+      editor.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: prompt }));
+    }
+
     editor.dispatchEvent(new Event('change', { bubbles: true }));
     return;
   }

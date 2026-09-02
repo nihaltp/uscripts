@@ -17,6 +17,7 @@ export function createQueueItemElement(item, { renderQueue, saveQueue }) {
   text.textContent = item.prompt;
   text.style.flex = '1';
   text.style.wordBreak = 'break-word';
+  text.style.whiteSpace = 'pre-wrap';
   text.style.fontSize = '14px';
 
   const iconBtnStyle = {
