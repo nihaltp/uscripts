@@ -1,13 +1,35 @@
+:root {
+  --pq-menu-bg: #202123;
+  --pq-menu-border: #444;
+  --pq-menu-btn-bg: #2a2a2a;
+  --pq-menu-btn-border: #555;
+  --pq-menu-btn-hover-bg: #343434;
+  --pq-menu-text: #fff;
+  --pq-menu-shadow: rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --pq-menu-bg: #ffffff;
+    --pq-menu-border: #e5e7eb;
+    --pq-menu-btn-bg: #f3f4f6;
+    --pq-menu-btn-border: #d1d5db;
+    --pq-menu-btn-hover-bg: #e5e7eb;
+    --pq-menu-text: #111827;
+    --pq-menu-shadow: rgba(0, 0, 0, 0.15);
+  }
+}
+
 #pq-selection-menu {
   position: fixed;
   z-index: 2147483647;
   display: none;
   min-width: 180px;
   padding: 6px;
-  border: 1px solid #444;
+  border: 1px solid var(--pq-menu-border);
   border-radius: 12px;
-  background: #202123;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  background: var(--pq-menu-bg);
+  box-shadow: 0 12px 30px var(--pq-menu-shadow);
 }
 
 #pq-selection-menu button {
@@ -15,15 +37,15 @@
   display: block;
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #555;
+  border: 1px solid var(--pq-menu-btn-border);
   border-radius: 10px;
-  background: #2a2a2a;
-  color: #fff;
+  background: var(--pq-menu-btn-bg);
+  color: var(--pq-menu-text);
   cursor: pointer;
   font: inherit;
   text-align: left;
 }
 
 #pq-selection-menu button:hover {
-  background: #343434;
+  background: var(--pq-menu-btn-hover-bg);
 }

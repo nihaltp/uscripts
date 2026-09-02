@@ -1,5 +1,5 @@
 :root {
-  color-scheme: dark;
+  color-scheme: light dark;
   --pq-manager-bg: #0b1220;
   --pq-manager-panel: rgba(17, 24, 39, 0.96);
   --pq-manager-card: rgba(31, 41, 55, 0.96);
@@ -8,6 +8,35 @@
   --pq-manager-border: #374151;
   --pq-manager-accent: #60a5fa;
   --pq-manager-accent-strong: #22c55e;
+  --pq-manager-panel-bg: radial-gradient(circle at top right, rgba(31, 41, 55, 0.95), rgba(11, 18, 32, 0.98) 60%);
+  --pq-manager-header-bg: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.82));
+  --pq-manager-btn-bg: rgba(31, 41, 55, 0.95);
+  --pq-manager-title-color: #d1d5db;
+  --pq-manager-delete-hover-bg: rgba(96, 165, 250, 0.03);
+  --pq-manager-delete-hover-border: rgba(96, 165, 250, 0.12);
+  --pq-manager-item-bg: rgba(17, 24, 39, 0.7);
+  --pq-manager-item-border: #334155;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --pq-manager-bg: #f9fafb;
+    --pq-manager-panel: rgba(255, 255, 255, 0.96);
+    --pq-manager-card: rgba(243, 244, 246, 0.96);
+    --pq-manager-text: #111827;
+    --pq-manager-muted: #6b7280;
+    --pq-manager-border: #e5e7eb;
+    --pq-manager-accent: #3b82f6;
+    --pq-manager-accent-strong: #16a34a;
+    --pq-manager-panel-bg: radial-gradient(circle at top right, rgba(255, 255, 255, 0.95), rgba(243, 244, 246, 0.98) 60%);
+    --pq-manager-header-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.82));
+    --pq-manager-btn-bg: rgba(243, 244, 246, 0.95);
+    --pq-manager-title-color: #374151;
+    --pq-manager-delete-hover-bg: rgba(59, 130, 246, 0.05);
+    --pq-manager-delete-hover-border: rgba(59, 130, 246, 0.15);
+    --pq-manager-item-bg: rgba(255, 255, 255, 0.8);
+    --pq-manager-item-border: #d1d5db;
+  }
 }
 
 #pq-chat-manager-panel {
@@ -20,7 +49,7 @@
   z-index: 2147483647;
   display: flex;
   flex-direction: column;
-  background: radial-gradient(circle at top right, rgba(31, 41, 55, 0.95), rgba(11, 18, 32, 0.98) 60%);
+  background: var(--pq-manager-panel-bg);
   color: var(--pq-manager-text);
   border: 1px solid var(--pq-manager-border);
   border-radius: 16px;
@@ -42,7 +71,7 @@
   gap: 16px;
   padding: 16px 18px 12px;
   border-bottom: 1px solid var(--pq-manager-border);
-  background: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.82));
+  background: var(--pq-manager-header-bg);
 }
 
 .pq-manager-title {
@@ -69,7 +98,7 @@
 .pq-manager-actions button {
   appearance: none;
   border: 1px solid var(--pq-manager-border);
-  background: rgba(31, 41, 55, 0.95);
+  background: var(--pq-manager-btn-bg);
   color: var(--pq-manager-text);
   border-radius: 999px;
   padding: 8px 12px;
@@ -115,7 +144,7 @@
   font-size: 12px;
   letter-spacing: 0.2px;
   text-transform: uppercase;
-  color: #d1d5db;
+  color: var(--pq-manager-title-color);
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -140,8 +169,8 @@
 
 .chat-delete:hover {
   color: var(--pq-manager-accent);
-  border-color: rgba(96, 165, 250, 0.12);
-  background: rgba(96, 165, 250, 0.03);
+  border-color: var(--pq-manager-delete-hover-border);
+  background: var(--pq-manager-delete-hover-bg);
 }
 
 .chat-list {
@@ -152,8 +181,8 @@
 }
 
 .chat-item {
-  background: rgba(17, 24, 39, 0.7);
-  border: 1px solid #334155;
+  background: var(--pq-manager-item-bg);
+  border: 1px solid var(--pq-manager-item-border);
   border-radius: 8px;
   padding: 8px;
   margin-bottom: 8px;

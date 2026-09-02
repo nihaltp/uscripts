@@ -14,3 +14,27 @@
     opacity: 1;
   }
 }
+
+:root {
+  --pq-ui-bg: #202123;
+  --pq-ui-border: #444;
+  --pq-ui-text: white;
+  --pq-ui-btn-bg: #2a2a2a;
+  --pq-ui-btn-border: #555;
+  --pq-ui-input-bg: #222;
+  --pq-ui-accent: #7dd3fc;
+  --pq-ui-danger: #ff6b6b;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --pq-ui-bg: #ffffff;
+    --pq-ui-border: #e5e7eb;
+    --pq-ui-text: #111827;
+    --pq-ui-btn-bg: #f3f4f6;
+    --pq-ui-btn-border: #d1d5db;
+    --pq-ui-input-bg: #f9fafb;
+    --pq-ui-accent: #0284c7;
+    --pq-ui-danger: #ef4444;
+  }
+}

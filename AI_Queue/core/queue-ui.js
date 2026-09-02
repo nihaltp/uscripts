@@ -23,8 +23,8 @@ export function createQueueItemElement(item, { renderQueue, saveQueue }) {
   const iconBtnStyle = {
     cursor: 'pointer',
     display: 'none',
-    background: '#2a2a2a',
-    border: '1px solid #555',
+    background: 'var(--pq-ui-btn-bg)',
+    border: '1px solid var(--pq-ui-btn-border)',
     borderRadius: '4px',
     padding: '2px 6px',
     fontSize: '12px'
@@ -33,12 +33,12 @@ export function createQueueItemElement(item, { renderQueue, saveQueue }) {
   const editBtn = document.createElement('button');
   editBtn.textContent = '🖉';
   editBtn.title = 'Edit';
-  Object.assign(editBtn.style, iconBtnStyle, { color: '#7dd3fc' });
+  Object.assign(editBtn.style, iconBtnStyle, { color: 'var(--pq-ui-accent)' });
 
   const deleteBtn = document.createElement('button');
   deleteBtn.textContent = '✕';
   deleteBtn.title = 'Delete';
-  Object.assign(deleteBtn.style, iconBtnStyle, { color: '#ff6b6b' });
+  Object.assign(deleteBtn.style, iconBtnStyle, { color: 'var(--pq-ui-danger)' });
 
   row.appendChild(text);
   row.appendChild(editBtn);
@@ -95,7 +95,7 @@ export function createQueueItemElement(item, { renderQueue, saveQueue }) {
     } catch (err) {
       error('Drag over dataTransfer error:', err);
     }
-    li.style.borderTop = '2px solid #7dd3fc';
+    li.style.borderTop = '2px solid var(--pq-ui-accent)';
   });
   li.addEventListener('dragleave', () => {
     li.style.borderTop = '';

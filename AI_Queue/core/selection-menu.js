@@ -37,16 +37,6 @@ function ensureSelectionMenu(onAddSelection) {
   const button = document.createElement('button');
   button.type = 'button';
   button.textContent = 'Add to Prompt Queue';
-  Object.assign(button.style, {
-    padding: '8px 12px',
-    border: '1px solid #555',
-    background: '#2a2a2a',
-    color: '#fff',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    width: '100%',
-    textAlign: 'left'
-  });
 
   button.addEventListener('click', () => {
     const prompt = menu.dataset.prompt || '';
