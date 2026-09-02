@@ -145,10 +145,13 @@ export function observeInputBoundary(button) {
       if (!state.queueState.running) {
         const target = host || editor;
         const rect = target.getBoundingClientRect();
+        const buttonRect = button.getBoundingClientRect();
         const windowHeight = window.innerHeight;
         
-        // If the input box is in the bottom half of the screen
-        if (rect.top > windowHeight / 2) {
+        const isOverlappingHorizontally = rect.right > buttonRect.left - 16 && rect.left < buttonRect.right + 16;
+
+        // If the input box is in the bottom half of the screen and overlaps horizontally
+        if (rect.top > windowHeight / 2 && isOverlappingHorizontally) {
           const distanceToTop = windowHeight - rect.top;
           const newBottom = Math.max(24, distanceToTop + 16);
           button.style.bottom = `${newBottom}px`;
