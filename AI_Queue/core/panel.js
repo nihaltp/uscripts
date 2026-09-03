@@ -1,5 +1,6 @@
 import { ensurePanelAttached, hidePanel } from './ui.js';
 import { log } from './logging.js';
+import { showHelpModal } from './help-modal.js';
 
 export function createBasePanel(titleText, includeFailedList = false) {
   log('createBasePanel called');
@@ -74,7 +75,7 @@ export function createBasePanel(titleText, includeFailedList = false) {
       padding: '0',
     });
     infoBtn.addEventListener('click', () => {
-      alert("How to use AI Queue:\n\n1. Type your prompt in the text area.\n2. Click 'Add To Queue'.\n3. Add as many prompts as you like.\n4. Click 'Start Queue' to process them automatically.\n\nThe script will wait for the AI to finish each response before sending the next one.");
+      showHelpModal();
     });
 
     const closeBtn = document.createElement('button');
