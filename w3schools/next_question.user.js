@@ -3,7 +3,7 @@
 // @description  Auto-click the "Next Question" button on W3Schools quiz modals after clicking "Submit Answer".
 // @author       nihaltp
 // @namespace    https://github.com/nihaltp/uscripts
-// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=w3schools_next_question.yml
+// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=bug.yml
 // @homepageURL  https://github.com/nihaltp/uscripts
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT

@@ -3,7 +3,7 @@
 // @description  Click Enter to press the retest button.
 // @author       nihaltp
 // @namespace    https://github.com/nihaltp/uscripts
-// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=10fastfingers_enter_retest.yml
+// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=bug.yml
 // @homepageURL  https://github.com/nihaltp/uscripts
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT
