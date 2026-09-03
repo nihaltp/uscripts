@@ -291,6 +291,7 @@ export function setEditorValue(editor, prompt) {
         getData: (type) => (type.toLowerCase() === 'text/plain' ? prompt : ''),
         types: ['text/plain'],
         items: [{ kind: 'string', type: 'text/plain' }],
+        files: [],
         setData: () => {},
         clearData: () => {}
       };
