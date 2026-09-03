@@ -3,14 +3,14 @@
 // @description  Save and restore your Google Forms responses. Supports all field types, multiple named saves, and per-field conflict resolution.
 // @author       nihaltp
 // @namespace    https://github.com/nihaltp/uscripts
-// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=google_forms_saver.yml
+// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=bug.yml
 // @homepageURL  https://github.com/nihaltp/uscripts
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT
 // @include      https://docs.google.com/forms/d/e/*
 // @include      https://docs.google.com/forms/u/0/d/e/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=docs.google.com
-// @version      1.1.0
+// @version      1.2.0
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
