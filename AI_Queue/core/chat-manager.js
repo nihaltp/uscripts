@@ -433,3 +433,16 @@ export function refreshChatManager(storageKey) {
   renderCards(grid, storageKey, manager.state, manager.rerender);
   return true;
 }
+
+export function toggleChatManager(openManagerFn) {
+  let panel = document.getElementById(MANAGER_PANEL_ID);
+  if (!panel) {
+    if (typeof openManagerFn === 'function') {
+      openManagerFn();
+    }
+    return;
+  }
+
+  panel.style.display = panel.hidden ? 'flex' : 'none';
+  panel.hidden = !panel.hidden;
+}

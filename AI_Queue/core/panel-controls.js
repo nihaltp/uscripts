@@ -2,6 +2,7 @@ import { error, log, formatError } from './logging.js';
 import { setStatus } from './queue.js';
 import { updateToolbarButton, getPanel } from './ui.js';
 import { queueState } from './state.js';
+import { toggleChatManager } from './chat-manager.js';
 
 const boundPanels = new WeakSet();
 
@@ -51,7 +52,7 @@ export function setupPanelControls({ createItem, renderQueue, saveQueue, process
 
   if (manageChatsBtn) {
     manageChatsBtn.addEventListener('click', () => {
-      openChatManager?.();
+      toggleChatManager(openChatManager);
     });
   }
 
