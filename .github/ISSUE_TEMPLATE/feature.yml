@@ -1,0 +1,42 @@
+name: Feature Request
+description: Request a new feature for a userscript
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category / Main Script
+      description: Which script category is this feature for?
+      options:
+        - 10fastfingers
+        - AI Queue
+        - Google Forms
+        - Pixabay
+        - W3Schools
+        - YouTube
+        - New Script Request
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: specific_script
+    attributes:
+      label: Specific Script
+      description: If applicable, which specific script is this for? (e.g., ChatGPT Prompt Queue, Enter Retest)
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Description
+      description: Describe the feature you would like to see...
+    validations:
+      required: true
+  - type: textarea
+    id: justification
+    attributes:
+      label: Why is this feature needed?
+      description: Please provide context or use cases for this feature.
+    validations:
+      required: false
