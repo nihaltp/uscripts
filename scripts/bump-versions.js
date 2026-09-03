@@ -1,12 +1,12 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
-function runCmd(cmd) {
+function runGitLog(args) {
   try {
-    return execSync(cmd, { encoding: 'utf8' }).trim();
+    return execFileSync('git', ['log', ...args], { encoding: 'utf8' }).trim();
   } catch (e) {
-    console.error(`Command failed: ${cmd}`, e.message);
+    console.error(`Command failed: git log ${args.join(' ')}`, e.message);
     return '';
   }
 }
@@ -61,10 +61,10 @@ changedFolders.forEach(folder => {
   
   if (baseSha && headSha) {
     // We have a specific range
-    logOutput = runCmd(`git log ${baseSha}..${headSha} -- "${folder}"`);
+    logOutput = runGitLog([`${baseSha}..${headSha}`, '--', folder]);
   } else {
     // Fallback to checking the last commit for this folder
-    logOutput = runCmd(`git log -1 -- "${folder}"`);
+    logOutput = runGitLog(['-1', '--', folder]);
   }
 
   if (/feat/i.test(logOutput)) {
