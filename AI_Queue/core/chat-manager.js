@@ -213,6 +213,10 @@ function moveByDrop(state, fromChatKey, itemId, toChatKey, toIndex) {
 function persistState(storageKey, state) {
   state.data.chats = flattenGroups(state.groups, state.data.chats);
   writeScopedQueueData(storageKey, state.data);
+
+  if (queueState.syncFromStorage) {
+    queueState.syncFromStorage?.();
+  }
 }
 
 function renderCards(grid, storageKey, state, rerender) {
