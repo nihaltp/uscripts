@@ -3,6 +3,7 @@ import { readScopedQueueData, writeScopedQueueData } from './storage.js';
 import managerStyles from '../styles/chat-manager.css';
 import { queueState } from './state.js';
 import { setupPanelResize } from './resize.js';
+import { setupPanelDrag } from './drag.js';
 
 const GLOBAL_CHAT_KEY = '__global__';
 const MANAGER_PANEL_ID = 'pq-chat-manager-panel';
@@ -172,6 +173,7 @@ function ensureManagerShell(doc, title, mountTarget) {
   panel.hidden = false;
   panel.style.display = 'flex';
   setupPanelResize(panel);
+  setupPanelDrag(panel);
   return panel;
 }
 

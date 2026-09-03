@@ -87,6 +87,14 @@ export function setupPanelResize(panel) {
       currentHandle = handle;
       startX = e.clientX;
       startY = e.clientY;
+      const computedStyle = window.getComputedStyle(panel);
+      if (computedStyle.transform !== 'none') {
+        const matrix = new DOMMatrix(computedStyle.transform);
+        panel.style.transform = 'none';
+        panel.style.left = (panel.offsetLeft + matrix.m41) + 'px';
+        panel.style.top = (panel.offsetTop + matrix.m42) + 'px';
+      }
+
       const rect = panel.getBoundingClientRect();
       startWidth = rect.width;
       startHeight = rect.height;

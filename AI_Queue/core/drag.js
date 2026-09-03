@@ -1,32 +1,30 @@
 import { log } from './logging.js';
-import { getPanel } from './ui.js';
 
-let dragBoundPanel = null;
 let listenersBound = false;
 let dragging = false;
+let currentPanel = null;
 let dragStartX = 0;
 let dragStartY = 0;
 let panelStartX = 0;
 let panelStartY = 0;
 
 function onMouseMove(e) {
-  if (!dragging) return;
-
-  const panel = getPanel();
-  if (!panel) return;
+  if (!dragging || !currentPanel) return;
 
   const deltaX = e.clientX - dragStartX;
   const deltaY = e.clientY - dragStartY;
 
-  panel.style.left = panelStartX + deltaX + 'px';
-  panel.style.top = panelStartY + deltaY + 'px';
-  panel.style.right = 'auto';
-  panel.style.bottom = 'auto';
+  currentPanel.style.left = panelStartX + deltaX + 'px';
+  currentPanel.style.top = panelStartY + deltaY + 'px';
+  currentPanel.style.right = 'auto';
+  currentPanel.style.bottom = 'auto';
+  currentPanel.style.transform = 'none'; // Clear any transform like translate(-50%)
 }
 
 function onMouseUp() {
   if (dragging) {
     dragging = false;
+    currentPanel = null;
     log('panel drag ended');
   }
 }
@@ -39,14 +37,19 @@ function bindDocumentListeners() {
   listenersBound = true;
 }
 
-export function setupPanelDrag() {
-  const panel = getPanel();
-  if (!panel) return;
+export function setupPanelDrag(panel) {
+  if (!panel) {
+    import('./ui.js').then(m => {
+      const defaultPanel = m.getPanel();
+      if (defaultPanel) setupPanelDrag(defaultPanel);
+    });
+    return;
+  }
 
   bindDocumentListeners();
-  if (dragBoundPanel === panel) return;
-
-  dragBoundPanel = panel;
+  
+  if (panel._dragSetupDone) return;
+  panel._dragSetupDone = true;
 
   panel.addEventListener(
     'mousedown',
@@ -57,10 +60,22 @@ export function setupPanelDrag() {
       e.stopPropagation();
 
       dragging = true;
+      currentPanel = panel;
       dragStartX = e.clientX;
       dragStartY = e.clientY;
       panelStartX = panel.offsetLeft;
       panelStartY = panel.offsetTop;
+      
+      // If the panel has transform: translateX(-50%), we need to bake that into the left position so it doesn't jump
+      const computedStyle = window.getComputedStyle(panel);
+      if (computedStyle.transform !== 'none') {
+        const matrix = new DOMMatrix(computedStyle.transform);
+        panelStartX += matrix.m41;
+        panelStartY += matrix.m42;
+        panel.style.transform = 'none';
+        panel.style.left = panelStartX + 'px';
+        panel.style.top = panelStartY + 'px';
+      }
 
       log('panel drag started');
     },
