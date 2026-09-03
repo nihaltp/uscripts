@@ -10,7 +10,59 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v44
+      with:
+        dir_names: false
+
+    - name: Determine SHAs
+      id: shas
+      run: |
+        echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> $GITHUB_ENV
+        echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+
+    - name: Auto-Bump Versions
+      env:
+        CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+      run: |
+        echo "Running version bumper (Dry Run)..."
+        node scripts/bump-versions.js
+
+    - name: Build
+      env:
+        CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+      run: |
+        CHANGED_DIRS=$(echo "$CHANGED_FILES" | tr ' ' '\n' | cut -d'/' -f1 | sort -u)
+        for dir in $CHANGED_DIRS; do
+          if [ -d "$dir" ] && [ -f "$dir/build.js" ]; then
+            echo "Building $dir..."
+            node "$dir/build.js"
+          fi
+        done
+
+  build-push:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -19,50 +71,47 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    
+
     - name: Use Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
         cache: 'npm'
-        
+
     - name: Install dependencies
       run: npm ci
-      
+
     - name: Get changed files
       id: changed-files
       uses: tj-actions/changed-files@v44
       with:
         dir_names: false
-        
+
     - name: Determine SHAs
       id: shas
       run: |
-        if [ "${{ github.event_name }}" == "pull_request" ]; then
-          echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> $GITHUB_ENV
-          echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-        elif [ "${{ github.event_name }}" == "push" ]; then
+        if [ "${{ github.event_name }}" == "push" ]; then
           echo "BASE_SHA=${{ github.event.before }}" >> $GITHUB_ENV
           echo "HEAD_SHA=${{ github.event.after }}" >> $GITHUB_ENV
         else
           echo "BASE_SHA=HEAD~1" >> $GITHUB_ENV
           echo "HEAD_SHA=HEAD" >> $GITHUB_ENV
         fi
-
     - name: Auto-Bump Versions
       env:
         CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
       run: |
         echo "Running version bumper..."
         node scripts/bump-versions.js
-        
     - name: Build and Commit
+      env:
+        CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
       run: |
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         
         PUSH_NEEDED=false
-        CHANGED_DIRS=$(echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' | cut -d'/' -f1 | sort -u)
+        CHANGED_DIRS=$(echo "$CHANGED_FILES" | tr ' ' '\n' | cut -d'/' -f1 | sort -u)
         
         for dir in $CHANGED_DIRS; do
           if [ -d "$dir" ] && [ -f "$dir/build.js" ]; then
@@ -71,13 +120,13 @@ jobs:
               git commit -m "chore: bump version for $dir [skip ci]"
               PUSH_NEEDED=true
             fi
-
+            
             echo "Building $dir..."
             node "$dir/build.js"
             
             git add -f "$dir/dist/"
             if ! git diff --staged --quiet; then
-              git commit -m "chore: update $dir dist"
+              git commit -m "chore: update $dir dist [skip ci]"
               PUSH_NEEDED=true
             else
               echo "No changes to commit for $dir/dist"
@@ -85,6 +134,6 @@ jobs:
           fi
         done
         
-        if [ "$PUSH_NEEDED" = true ] && [ "${{ github.event_name }}" != "pull_request" ]; then
+        if [ "$PUSH_NEEDED" = true ]; then
           git push
         fi
