@@ -22,7 +22,7 @@
 // @exclude      https://chatgpt.com/account-link/*
 // @exclude      https://chatgpt.com/gpts/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.2.0
+// @version      3.3.0
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js
@@ -152,6 +152,15 @@
   }
   var init_utils = __esm({
     'AI_Queue/core/utils.js'() {},
+  });
+
+  // AI_Queue/styles/ui.css
+  var ui_default;
+  var init_ui = __esm({
+    'AI_Queue/styles/ui.css'() {
+      ui_default =
+        '@keyframes pq-pulse {\n  0% {\n    transform: scale(1);\n    opacity: 1;\n  }\n\n  50% {\n    transform: scale(1.06);\n    opacity: 0.75;\n  }\n\n  100% {\n    transform: scale(1);\n    opacity: 1;\n  }\n}\n\n:root {\n  --pq-ui-bg: #202123;\n  --pq-ui-border: #444;\n  --pq-ui-text: white;\n  --pq-ui-btn-bg: #2a2a2a;\n  --pq-ui-btn-border: #555;\n  --pq-ui-input-bg: #222;\n  --pq-ui-accent: #7dd3fc;\n  --pq-ui-danger: #ff6b6b;\n}\n\n@media (prefers-color-scheme: light) {\n  :root {\n    --pq-ui-bg: #ffffff;\n    --pq-ui-border: #e5e7eb;\n    --pq-ui-text: #111827;\n    --pq-ui-btn-bg: #f3f4f6;\n    --pq-ui-btn-border: #d1d5db;\n    --pq-ui-input-bg: #f9fafb;\n    --pq-ui-accent: #0284c7;\n    --pq-ui-danger: #ef4444;\n  }\n}';
+    },
   });
 
   // AI_Queue/core/dom.js
@@ -359,24 +368,23 @@
     },
   });
 
-  // AI_Queue/providers/chatgpt.js
-  init_state();
-
   // AI_Queue/core/ui.js
-  init_logging();
-  init_utils();
-
-  // AI_Queue/styles/ui.css
-  var ui_default =
-    '@keyframes pq-pulse {\n  0% {\n    transform: scale(1);\n    opacity: 1;\n  }\n\n  50% {\n    transform: scale(1.06);\n    opacity: 0.75;\n  }\n\n  100% {\n    transform: scale(1);\n    opacity: 1;\n  }\n}\n\n:root {\n  --pq-ui-bg: #202123;\n  --pq-ui-border: #444;\n  --pq-ui-text: white;\n  --pq-ui-btn-bg: #2a2a2a;\n  --pq-ui-btn-border: #555;\n  --pq-ui-input-bg: #222;\n  --pq-ui-accent: #7dd3fc;\n  --pq-ui-danger: #ff6b6b;\n}\n\n@media (prefers-color-scheme: light) {\n  :root {\n    --pq-ui-bg: #ffffff;\n    --pq-ui-border: #e5e7eb;\n    --pq-ui-text: #111827;\n    --pq-ui-btn-bg: #f3f4f6;\n    --pq-ui-btn-border: #d1d5db;\n    --pq-ui-input-bg: #f9fafb;\n    --pq-ui-accent: #0284c7;\n    --pq-ui-danger: #ef4444;\n  }\n}';
-
-  // AI_Queue/core/ui.js
-  var repairTimer = null;
-  var lastRepairAt = 0;
-  var repairing = false;
-  var urlWatcher = null;
-  var lastKnownUrl = location.href;
-  var mutationObserver = null;
+  var ui_exports = {};
+  __export(ui_exports, {
+    ensurePanelAttached: () => ensurePanelAttached,
+    ensureToolbarStyles: () => ensureToolbarStyles,
+    forceShowPanel: () => forceShowPanel,
+    getPanel: () => getPanel,
+    hidePanel: () => hidePanel,
+    observeInputBoundary: () => observeInputBoundary,
+    patchHistoryMethod: () => patchHistoryMethod,
+    repairUi: () => repairUi,
+    requestRepair: () => requestRepair,
+    showPanel: () => showPanel,
+    startDomObserver: () => startDomObserver,
+    startUrlWatcher: () => startUrlWatcher,
+    updateToolbarButton: () => updateToolbarButton,
+  });
   function ensureToolbarStyles() {
     if (document.querySelector('#pq-styles')) return;
     const style = document.createElement('style');
@@ -387,16 +395,24 @@
   function getPanel() {
     return document.querySelector('#pq-panel');
   }
+  function forceShowPanel(panel) {
+    if (!panel) return;
+    panel.hidden = false;
+    panel.style.visibility = 'visible';
+    panel.style.opacity = '1';
+    panel.style.setProperty('display', 'block', 'important');
+    panel.style.setProperty('pointer-events', 'auto', 'important');
+  }
   function ensurePanelAttached(panel = getPanel()) {
-    const currentPanel = getPanel() || panel || null;
-    if (!currentPanel) return false;
+    const currentPanel3 = getPanel() || panel || null;
+    if (!currentPanel3) return false;
     const root = document.documentElement || document.body;
     if (!root) return false;
-    if (!root.contains(currentPanel)) {
-      root.appendChild(currentPanel);
+    if (!root.contains(currentPanel3)) {
+      root.appendChild(currentPanel3);
     }
-    log('attached', root.contains(currentPanel));
-    log('parent node', currentPanel.parentNode);
+    log('attached', root.contains(currentPanel3));
+    log('parent node', currentPanel3.parentNode);
     return true;
   }
   function showPanel(createPanel) {
@@ -503,7 +519,7 @@
     repairing = true;
     try {
       log('repair', reason);
-      createPanel();
+      createPanel?.();
       setupPanelEvents?.();
       setupPanelDrag2?.();
       ensureToolbarButton?.();
@@ -576,12 +592,12 @@
       attributeFilter: ['aria-busy', 'aria-disabled', 'disabled'],
     });
   }
-  function patchHistoryMethod(methodName) {
+  function patchHistoryMethod(methodName, callback) {
     const original = history[methodName];
     if (typeof original !== 'function' || original.__pqPatched) return;
     const patched = function (...args) {
       const result = original.apply(this, args);
-      requestRepair('history-' + methodName);
+      callback?.();
       return result;
     };
     patched.__pqPatched = true;
@@ -598,8 +614,16 @@
       onUrlChange?.(previousUrl, currentUrl, reason);
       requestRepair(reason, createPanel, setupPanelEvents, setupPanelDrag2, ensureToolbarButton);
     };
-    patchHistoryMethod('pushState');
-    patchHistoryMethod('replaceState');
+    patchHistoryMethod('pushState', () => {
+      const previousUrl = lastKnownUrl;
+      lastKnownUrl = location.href;
+      handleUrlChange('history-pushState', previousUrl, lastKnownUrl);
+    });
+    patchHistoryMethod('replaceState', () => {
+      const previousUrl = lastKnownUrl;
+      lastKnownUrl = location.href;
+      handleUrlChange('history-replaceState', previousUrl, lastKnownUrl);
+    });
     window.addEventListener('popstate', () => {
       const previousUrl = lastKnownUrl;
       lastKnownUrl = location.href;
@@ -619,9 +643,90 @@
       }
     }, 1e3);
   }
+  var repairTimer, lastRepairAt, repairing, urlWatcher, lastKnownUrl, mutationObserver;
+  var init_ui2 = __esm({
+    'AI_Queue/core/ui.js'() {
+      init_logging();
+      init_utils();
+      init_ui();
+      repairTimer = null;
+      lastRepairAt = 0;
+      repairing = false;
+      urlWatcher = null;
+      lastKnownUrl = location.href;
+      mutationObserver = null;
+    },
+  });
+
+  // AI_Queue/providers/chatgpt.js
+  init_state();
 
   // AI_Queue/core/panel.js
+  init_ui2();
   init_logging();
+
+  // AI_Queue/core/help-modal.js
+  function showHelpModal() {
+    const overlay = document.createElement('div');
+    Object.assign(overlay.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100vw',
+      height: '100vh',
+      background: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: '10002',
+    });
+    const modal = document.createElement('div');
+    Object.assign(modal.style, {
+      background: 'var(--pq-ui-bg)',
+      color: 'var(--pq-ui-text)',
+      padding: '20px',
+      borderRadius: '8px',
+      border: '1px solid var(--pq-ui-border)',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      maxWidth: '400px',
+      width: '90%',
+      fontFamily: 'sans-serif',
+    });
+    modal.innerHTML = `
+    <h3 style="margin-top: 0; margin-bottom: 15px;">How to use AI Queue</h3>
+    <ul style="padding-left: 20px; line-height: 1.6; font-size: 14px; margin-bottom: 15px;">
+      <li>Type your prompt in the text area.</li>
+      <li>Press <strong>Ctrl + Enter</strong> to add prompt to queue.</li>
+      <li>Press <strong>Shift + Enter</strong> for next line.</li>
+      <li>Click <strong>'Add To Queue'</strong> as an alternative.</li>
+      <li>Add as many prompts as you like.</li>
+      <li>Click <strong>'Start Queue'</strong> to process them automatically.</li>
+    </ul>
+    <p style="font-size: 13px; opacity: 0.9; margin-bottom: 15px;">The script will wait for the AI to finish each response before sending the next one.</p>
+    <div style="text-align: right;">
+      <button id="pq-info-close" style="
+        padding: 6px 12px;
+        border-radius: 4px;
+        border: 1px solid var(--pq-ui-btn-border);
+        background: var(--pq-ui-btn-bg);
+        color: var(--pq-ui-text);
+        cursor: pointer;
+      ">Close</button>
+    </div>
+  `;
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    overlay.querySelector('#pq-info-close').addEventListener('click', () => {
+      document.body.removeChild(overlay);
+    });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay);
+      }
+    });
+  }
+
+  // AI_Queue/core/panel.js
   function createBasePanel(titleText, includeFailedList = false) {
     log('createBasePanel called');
     let panel = document.querySelector('#pq-panel');
@@ -639,7 +744,9 @@
         boxSizing: 'border-box',
         minHeight: '200px',
         maxHeight: '70vh',
+        overflowX: 'hidden',
         overflowY: 'auto',
+        resize: 'both',
         background: 'var(--pq-ui-bg)',
         color: 'var(--pq-ui-text)',
         border: '1px solid var(--pq-ui-border)',
@@ -686,9 +793,7 @@
         padding: '0',
       });
       infoBtn.addEventListener('click', () => {
-        alert(
-          "How to use AI Queue:\n\n1. Type your prompt in the text area.\n2. Click 'Add To Queue'.\n3. Add as many prompts as you like.\n4. Click 'Start Queue' to process them automatically.\n\nThe script will wait for the AI to finish each response before sending the next one."
-        );
+        showHelpModal();
       });
       const closeBtn = document.createElement('button');
       closeBtn.id = 'pq-close';
@@ -836,6 +941,10 @@
     const li = document.createElement('li');
     li.style.marginBottom = '10px';
     li.draggable = false;
+    li.style.border = '1px solid var(--pq-ui-btn-border)';
+    li.style.borderRadius = '8px';
+    li.style.padding = '8px';
+    li.style.background = 'var(--pq-ui-btn-bg)';
     const row = document.createElement('div');
     row.style.display = 'flex';
     row.style.gap = '6px';
@@ -959,7 +1068,8 @@
   }
   function resolveScopeKeys(currentScope = null) {
     const scope = resolveScope(currentScope);
-    return [...new Set([scope.groupId, scope.chatId].filter(Boolean))];
+    const keys = [...new Set([scope.groupId, scope.chatId].filter(Boolean))];
+    return keys.length > 0 ? keys : [GLOBAL_CHAT_KEY];
   }
   function hasItemScope(item) {
     return !!(item?.chatId || item?.chatCode || item?.groupId);
@@ -1188,9 +1298,597 @@
     }
   }
 
+  // AI_Queue/providers/chatgpt.js
+  init_ui2();
+
   // AI_Queue/core/panel-controls.js
   init_logging();
+  init_ui2();
   init_state();
+
+  // AI_Queue/core/chat-manager.js
+  init_logging();
+
+  // AI_Queue/styles/chat-manager.css
+  var chat_manager_default =
+    '#pq-chat-manager-panel {\n  position: fixed;\n  top: 6vh;\n  left: 50%;\n  transform: translateX(-50%);\n  width: min(1100px, calc(100vw - 32px));\n  height: min(760px, calc(100vh - 32px));\n  z-index: 2147483647;\n  display: flex;\n  flex-direction: column;\n  background: var(--pq-ui-bg);\n  color: var(--pq-ui-text);\n  border: 1px solid var(--pq-ui-border);\n  border-radius: 16px;\n  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);\n  overflow: hidden;\n}\n\n.pq-manager-shell {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  min-height: 0;\n}\n\n.pq-manager-header {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 16px;\n  padding: 16px 18px 12px;\n  border-bottom: 1px solid var(--pq-ui-border);\n  background: var(--pq-ui-bg);\n}\n\n.pq-manager-title {\n  font-size: 18px;\n  font-weight: 700;\n  line-height: 1.2;\n  margin: 0;\n}\n\n.pq-manager-subtitle {\n  margin-top: 4px;\n  opacity: 0.8;\n  font-size: 13px;\n  line-height: 1.4;\n  max-width: 72ch;\n}\n\n.pq-manager-actions {\n  display: flex;\n  gap: 8px;\n  flex-shrink: 0;\n}\n\n.pq-manager-actions button {\n  appearance: none;\n  border: 1px solid var(--pq-ui-btn-border);\n  background: var(--pq-ui-btn-bg);\n  color: var(--pq-ui-text);\n  border-radius: 999px;\n  padding: 8px 12px;\n  font: inherit;\n  cursor: pointer;\n}\n\n.pq-manager-actions button:hover {\n  border-color: var(--pq-ui-accent);\n}\n\n.pq-manager-body {\n  display: flex;\n  flex-direction: column;\n  min-height: 0;\n  padding: 16px 18px 18px;\n  gap: 12px;\n  overflow: hidden;\n  background: var(--pq-ui-bg);\n}\n\n.pq-manager-grid {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));\n  gap: 12px;\n  align-items: start;\n  flex: 1;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  padding-right: 4px;\n}\n\n.chat-card {\n  background: var(--pq-ui-bg);\n  border: 1px solid var(--pq-ui-border);\n  border-radius: 12px;\n  overflow: hidden;\n  min-height: 140px;\n}\n\n.chat-title {\n  padding: 10px 12px;\n  border-bottom: 1px solid var(--pq-ui-border);\n  font-size: 12px;\n  letter-spacing: 0.2px;\n  text-transform: uppercase;\n  color: var(--pq-ui-text);\n  display: flex;\n  justify-content: space-between;\n  gap: 8px;\n}\n\n.chat-title .chat-controls {\n  display: inline-flex;\n  gap: 8px;\n  align-items: center;\n}\n\n.chat-delete {\n  appearance: none;\n  border: 1px solid transparent;\n  background: transparent;\n  color: var(--pq-ui-danger);\n  border-radius: 8px;\n  padding: 4px 8px;\n  font-size: 12px;\n  cursor: pointer;\n  opacity: 0.8;\n}\n\n.chat-delete:hover {\n  opacity: 1;\n}\n\n.chat-list {\n  list-style: none;\n  margin: 0;\n  padding: 8px;\n  min-height: 90px;\n}\n\n.chat-item {\n  background: var(--pq-ui-btn-bg);\n  border: 1px solid var(--pq-ui-btn-border);\n  border-radius: 8px;\n  padding: 8px;\n  margin-bottom: 8px;\n  cursor: grab;\n  user-select: none;\n  font-size: 13px;\n  line-height: 1.35;\n  word-break: break-word;\n}\n\n.chat-item.dragging {\n  opacity: 0.5;\n}\n\n.chat-list.drag-over,\n.chat-item.drag-over {\n  outline: 2px dashed var(--pq-ui-accent);\n  outline-offset: 2px;\n}\n\n.empty {\n  opacity: 0.6;\n  font-size: 12px;\n  padding: 8px;\n  border: 1px dashed var(--pq-ui-border);\n  border-radius: 8px;\n  text-align: center;\n}\n\n.pq-manager-footer {\n  opacity: 0.8;\n  font-size: 12px;\n  border-top: 1px solid var(--pq-ui-border);\n  padding-top: 12px;\n}\n';
+
+  // AI_Queue/core/chat-manager.js
+  init_state();
+
+  // AI_Queue/core/resize.js
+  init_logging();
+  var isResizing = false;
+  var currentPanel = null;
+  var currentHandle = null;
+  var startX = 0;
+  var startY = 0;
+  var startWidth = 0;
+  var startHeight = 0;
+  var startLeft = 0;
+  var startTop = 0;
+  var listenersBound = false;
+  function onMouseMove(e) {
+    if (!isResizing || !currentPanel) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (currentHandle.includes('right')) {
+      currentPanel.style.width = startWidth + dx + 'px';
+    }
+    if (currentHandle.includes('bottom')) {
+      currentPanel.style.height = startHeight + dy + 'px';
+    }
+    if (currentHandle.includes('left')) {
+      currentPanel.style.width = startWidth - dx + 'px';
+      currentPanel.style.left = startLeft + dx + 'px';
+    }
+    if (currentHandle.includes('top')) {
+      currentPanel.style.height = startHeight - dy + 'px';
+      currentPanel.style.top = startTop + dy + 'px';
+    }
+  }
+  function onMouseUp() {
+    if (isResizing) {
+      isResizing = false;
+      currentPanel = null;
+      document.body.style.cursor = 'default';
+      log('panel resize ended');
+    }
+  }
+  function setupPanelResize(panel) {
+    if (!panel) {
+      Promise.resolve()
+        .then(() => (init_ui2(), ui_exports))
+        .then((m) => {
+          const defaultPanel = m.getPanel();
+          if (defaultPanel) setupPanelResize(defaultPanel);
+        });
+      return;
+    }
+    if (panel._resizeSetupDone) return;
+    panel._resizeSetupDone = true;
+    const handles = [
+      'top',
+      'right',
+      'bottom',
+      'left',
+      'top-left',
+      'top-right',
+      'bottom-left',
+      'bottom-right',
+    ];
+    const handleSize = 8;
+    handles.forEach((handle) => {
+      const el = document.createElement('div');
+      el.style.position = 'absolute';
+      el.style.zIndex = '2147483647';
+      if (handle.includes('top')) {
+        el.style.top = '-4px';
+        el.style.height = `${handleSize}px`;
+      }
+      if (handle.includes('bottom')) {
+        el.style.bottom = '-4px';
+        el.style.height = `${handleSize}px`;
+      }
+      if (handle.includes('left')) {
+        el.style.left = '-4px';
+        el.style.width = `${handleSize}px`;
+      }
+      if (handle.includes('right')) {
+        el.style.right = '-4px';
+        el.style.width = `${handleSize}px`;
+      }
+      if (handle === 'top' || handle === 'bottom') {
+        el.style.left = '4px';
+        el.style.right = '4px';
+        el.style.cursor = 'ns-resize';
+      } else if (handle === 'left' || handle === 'right') {
+        el.style.top = '4px';
+        el.style.bottom = '4px';
+        el.style.cursor = 'ew-resize';
+      } else if (handle === 'top-left' || handle === 'bottom-right') {
+        el.style.width = `${handleSize}px`;
+        el.style.height = `${handleSize}px`;
+        el.style.cursor = 'nwse-resize';
+      } else if (handle === 'top-right' || handle === 'bottom-left') {
+        el.style.width = `${handleSize}px`;
+        el.style.height = `${handleSize}px`;
+        el.style.cursor = 'nesw-resize';
+      }
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isResizing = true;
+        currentPanel = panel;
+        currentHandle = handle;
+        startX = e.clientX;
+        startY = e.clientY;
+        const computedStyle = window.getComputedStyle(panel);
+        if (computedStyle.transform !== 'none') {
+          const matrix = new DOMMatrix(computedStyle.transform);
+          panel.style.transform = 'none';
+          panel.style.left = panel.offsetLeft + matrix.m41 + 'px';
+          panel.style.top = panel.offsetTop + matrix.m42 + 'px';
+        }
+        const rect = panel.getBoundingClientRect();
+        startWidth = rect.width;
+        startHeight = rect.height;
+        startLeft = rect.left;
+        startTop = rect.top;
+        document.body.style.cursor = el.style.cursor;
+        log(`panel resize started: ${handle}`);
+      });
+      panel.appendChild(el);
+    });
+    if (!listenersBound) {
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      listenersBound = true;
+    }
+  }
+
+  // AI_Queue/core/drag.js
+  init_logging();
+  var listenersBound2 = false;
+  var dragging = false;
+  var currentPanel2 = null;
+  var dragStartX = 0;
+  var dragStartY = 0;
+  var panelStartX = 0;
+  var panelStartY = 0;
+  function onMouseMove2(e) {
+    if (!dragging || !currentPanel2) return;
+    const deltaX = e.clientX - dragStartX;
+    const deltaY = e.clientY - dragStartY;
+    currentPanel2.style.left = panelStartX + deltaX + 'px';
+    currentPanel2.style.top = panelStartY + deltaY + 'px';
+    currentPanel2.style.right = 'auto';
+    currentPanel2.style.bottom = 'auto';
+    currentPanel2.style.transform = 'none';
+  }
+  function onMouseUp2() {
+    if (dragging) {
+      dragging = false;
+      currentPanel2 = null;
+      log('panel drag ended');
+    }
+  }
+  function bindDocumentListeners() {
+    if (listenersBound2) return;
+    document.addEventListener('mousemove', onMouseMove2);
+    document.addEventListener('mouseup', onMouseUp2);
+    listenersBound2 = true;
+  }
+  function setupPanelDrag(panel) {
+    if (!panel) {
+      Promise.resolve()
+        .then(() => (init_ui2(), ui_exports))
+        .then((m) => {
+          const defaultPanel = m.getPanel();
+          if (defaultPanel) setupPanelDrag(defaultPanel);
+        });
+      return;
+    }
+    bindDocumentListeners();
+    if (panel._dragSetupDone) return;
+    panel._dragSetupDone = true;
+    panel.addEventListener(
+      'mousedown',
+      (e) => {
+        if (e.button !== 2) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dragging = true;
+        currentPanel2 = panel;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        panelStartX = panel.offsetLeft;
+        panelStartY = panel.offsetTop;
+        const computedStyle = window.getComputedStyle(panel);
+        if (computedStyle.transform !== 'none') {
+          const matrix = new DOMMatrix(computedStyle.transform);
+          panelStartX += matrix.m41;
+          panelStartY += matrix.m42;
+          panel.style.transform = 'none';
+          panel.style.left = panelStartX + 'px';
+          panel.style.top = panelStartY + 'px';
+        }
+        log('panel drag started');
+      },
+      true
+    );
+    panel.addEventListener('contextmenu', (e) => {
+      if (dragging) {
+        e.preventDefault();
+      }
+    });
+  }
+
+  // AI_Queue/core/chat-manager.js
+  var GLOBAL_CHAT_KEY2 = '__global__';
+  var MANAGER_PANEL_ID = 'pq-chat-manager-panel';
+  var MANAGER_GRID_ID = 'pq-chat-manager-grid';
+  var MANAGER_BODY_ID = 'pq-chat-manager-body';
+  var activeManagers = /* @__PURE__ */ new Map();
+  function toChatCode2(chatKey) {
+    return chatKey === GLOBAL_CHAT_KEY2 ? null : chatKey;
+  }
+  function chatLabel(chatKey) {
+    if (chatKey === GLOBAL_CHAT_KEY2) {
+      return 'Global Chat';
+    }
+    return chatKey;
+  }
+  function cloneItem(item) {
+    return { ...item };
+  }
+  function cloneItems(items) {
+    return Array.isArray(items) ? items.map((item) => cloneItem(item)) : [];
+  }
+  function groupItems(chats) {
+    const grouped = { [GLOBAL_CHAT_KEY2]: [] };
+    Object.entries(chats || {}).forEach(([chatKey, bucket]) => {
+      if (!grouped[chatKey]) {
+        grouped[chatKey] = [];
+      }
+      grouped[chatKey].push(...cloneItems(bucket?.items));
+    });
+    return grouped;
+  }
+  function orderedKeys(groups) {
+    const keys = Object.keys(groups).filter((key) => groups[key]?.length > 0);
+    const nonGlobal = keys
+      .filter((key) => key !== GLOBAL_CHAT_KEY2)
+      .sort((a, b) => a.localeCompare(b));
+    return [GLOBAL_CHAT_KEY2, ...nonGlobal];
+  }
+  function flattenGroups(groups, existingChats = {}) {
+    const nextChats = {};
+    orderedKeys(groups).forEach((key) => {
+      nextChats[key] = {
+        items: cloneItems(groups[key]),
+        failedItems: cloneItems(existingChats[key]?.failedItems),
+      };
+    });
+    Object.entries(existingChats).forEach(([chatKey, bucket]) => {
+      if (nextChats[chatKey]) return;
+      if (Array.isArray(bucket?.failedItems) && bucket.failedItems.length > 0) {
+        nextChats[chatKey] = {
+          items: [],
+          failedItems: cloneItems(bucket.failedItems),
+        };
+      }
+    });
+    return nextChats;
+  }
+  function findItemIndex(groups, chatKey, itemId) {
+    const list = groups[chatKey] || [];
+    return list.findIndex((item) => item.id === itemId);
+  }
+  function ensureManagerStyles(doc) {
+    if (doc.querySelector('#pq-chat-manager-styles')) return;
+    const style = doc.createElement('style');
+    style.id = 'pq-chat-manager-styles';
+    style.textContent = chat_manager_default;
+    doc.head.appendChild(style);
+  }
+  function ensureManagerShell(doc, title, mountTarget) {
+    ensureManagerStyles(doc);
+    let panel = doc.getElementById(MANAGER_PANEL_ID);
+    if (!panel) {
+      panel = doc.createElement('section');
+      panel.id = MANAGER_PANEL_ID;
+      const shell = doc.createElement('div');
+      shell.className = 'pq-manager-shell';
+      const header = doc.createElement('div');
+      header.className = 'pq-manager-header';
+      const titleWrap = doc.createElement('div');
+      const heading = doc.createElement('div');
+      heading.className = 'pq-manager-title';
+      const subtitle = doc.createElement('div');
+      subtitle.className = 'pq-manager-subtitle';
+      titleWrap.appendChild(heading);
+      titleWrap.appendChild(subtitle);
+      const actions = doc.createElement('div');
+      actions.className = 'pq-manager-actions';
+      const refreshButton = doc.createElement('button');
+      refreshButton.type = 'button';
+      refreshButton.id = 'pq-chat-manager-refresh';
+      refreshButton.textContent = 'Refresh';
+      const closeButton = doc.createElement('button');
+      closeButton.type = 'button';
+      closeButton.id = 'pq-chat-manager-close';
+      closeButton.textContent = 'Close';
+      actions.appendChild(refreshButton);
+      actions.appendChild(closeButton);
+      header.appendChild(titleWrap);
+      header.appendChild(actions);
+      const body = doc.createElement('div');
+      body.className = 'pq-manager-body';
+      body.id = MANAGER_BODY_ID;
+      const grid = doc.createElement('div');
+      grid.className = 'pq-manager-grid';
+      grid.id = MANAGER_GRID_ID;
+      const footer = doc.createElement('div');
+      footer.className = 'pq-manager-footer';
+      footer.textContent =
+        'Drag prompts between chats. Changes are saved immediately to localStorage.';
+      body.appendChild(grid);
+      body.appendChild(footer);
+      shell.appendChild(header);
+      shell.appendChild(body);
+      panel.appendChild(shell);
+      closeButton.addEventListener('click', () => {
+        panel.hidden = true;
+        panel.style.display = 'none';
+      });
+    }
+    const titleNode = panel.querySelector('.pq-manager-title');
+    const subtitleNode = panel.querySelector('.pq-manager-subtitle');
+    if (titleNode) {
+      titleNode.textContent = title;
+    }
+    if (subtitleNode) {
+      subtitleNode.textContent =
+        'Reorder prompts within a chat or move them into another chat card. This panel stays inside the page instead of opening a popup.';
+    }
+    const root = mountTarget || doc.documentElement || doc.body;
+    if (root && !root.contains(panel)) {
+      root.appendChild(panel);
+    }
+    panel.hidden = false;
+    panel.style.display = 'flex';
+    setupPanelResize(panel);
+    setupPanelDrag(panel);
+    return panel;
+  }
+  function moveByDrop(state, fromChatKey, itemId, toChatKey2, toIndex) {
+    const fromList = state.groups[fromChatKey] || [];
+    const fromIndex = findItemIndex(state.groups, fromChatKey, itemId);
+    if (fromIndex === -1) {
+      return false;
+    }
+    const [movedItem] = fromList.splice(fromIndex, 1);
+    if (!state.groups[toChatKey2]) {
+      state.groups[toChatKey2] = [];
+    }
+    const targetList = state.groups[toChatKey2];
+    let normalizedIndex = Number.isInteger(toIndex) ? toIndex : targetList.length;
+    if (normalizedIndex < 0) normalizedIndex = 0;
+    if (normalizedIndex > targetList.length) normalizedIndex = targetList.length;
+    if (fromChatKey === toChatKey2 && normalizedIndex > fromIndex) {
+      normalizedIndex -= 1;
+    }
+    movedItem.chatCode = toChatCode2(toChatKey2) || void 0;
+    targetList.splice(normalizedIndex, 0, movedItem);
+    if (fromChatKey !== GLOBAL_CHAT_KEY2 && (state.groups[fromChatKey] || []).length === 0) {
+      delete state.groups[fromChatKey];
+    }
+    return true;
+  }
+  function persistState(storageKey, state) {
+    state.data.chats = flattenGroups(state.groups, state.data.chats);
+    writeScopedQueueData(storageKey, state.data);
+    if (queueState.syncFromStorage) {
+      queueState.syncFromStorage?.();
+    }
+  }
+  function renderCards(grid, storageKey, state, rerender) {
+    if (!grid) return;
+    grid.replaceChildren();
+    const keys = orderedKeys(state.groups);
+    if (keys.length === 0) {
+      const doc2 = grid.ownerDocument;
+      const empty = doc2.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'No prompts found in storage.';
+      grid.appendChild(empty);
+      return;
+    }
+    const doc = grid.ownerDocument;
+    keys.forEach((chatKey) => {
+      const card = doc.createElement('section');
+      card.className = 'chat-card';
+      const title = doc.createElement('div');
+      title.className = 'chat-title';
+      const label = doc.createElement('span');
+      label.textContent = chatLabel(chatKey);
+      const count = doc.createElement('span');
+      count.textContent = String(state.groups[chatKey].length);
+      const controls = doc.createElement('span');
+      controls.className = 'chat-controls';
+      const deleteButton = doc.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'chat-delete';
+      deleteButton.textContent = 'Delete';
+      deleteButton.title = 'Delete all prompts in this chat';
+      deleteButton.addEventListener('click', () => {
+        const chatName = chatLabel(chatKey);
+        if (
+          !doc.defaultView?.confirm(`Delete all prompts in "${chatName}"? This cannot be undone.`)
+        )
+          return;
+        if (state.groups[chatKey]) {
+          delete state.groups[chatKey];
+        }
+        persistState(storageKey, state);
+        rerender();
+        if (queueState.syncFromStorage) {
+          queueState.syncFromStorage?.();
+        }
+      });
+      controls.appendChild(count);
+      controls.appendChild(deleteButton);
+      title.appendChild(label);
+      title.appendChild(controls);
+      const list = doc.createElement('ul');
+      list.className = 'chat-list';
+      list.dataset.chatKey = chatKey;
+      const items = state.groups[chatKey];
+      if (!items || items.length === 0) {
+        const empty = doc.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'Drop a prompt here.';
+        list.appendChild(empty);
+      } else {
+        items.forEach((item, index) => {
+          const entry = doc.createElement('li');
+          entry.className = 'chat-item';
+          entry.draggable = true;
+          entry.dataset.chatKey = chatKey;
+          entry.dataset.itemId = item.id;
+          entry.dataset.index = String(index);
+          entry.textContent = item.prompt;
+          entry.addEventListener('dragstart', (event) => {
+            state.drag = {
+              itemId: item.id,
+              fromChatKey: chatKey,
+            };
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', item.id);
+            entry.classList.add('dragging');
+          });
+          entry.addEventListener('dragend', () => {
+            state.drag = null;
+            entry.classList.remove('dragging');
+            doc.querySelectorAll(`#${MANAGER_PANEL_ID} .drag-over`).forEach((element) => {
+              element.classList.remove('drag-over');
+            });
+          });
+          entry.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            entry.classList.add('drag-over');
+          });
+          entry.addEventListener('dragleave', () => {
+            entry.classList.remove('drag-over');
+          });
+          entry.addEventListener('drop', (event) => {
+            event.preventDefault();
+            entry.classList.remove('drag-over');
+            if (!state.drag) return;
+            const moved = moveByDrop(
+              state,
+              state.drag.fromChatKey,
+              state.drag.itemId,
+              chatKey,
+              Number(entry.dataset.index)
+            );
+            if (!moved) return;
+            persistState(storageKey, state);
+            rerender();
+          });
+          list.appendChild(entry);
+        });
+      }
+      list.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        list.classList.add('drag-over');
+      });
+      list.addEventListener('dragleave', () => {
+        list.classList.remove('drag-over');
+      });
+      list.addEventListener('drop', (event) => {
+        event.preventDefault();
+        list.classList.remove('drag-over');
+        if (!state.drag) return;
+        const moved = moveByDrop(
+          state,
+          state.drag.fromChatKey,
+          state.drag.itemId,
+          chatKey,
+          state.groups[chatKey]?.length
+        );
+        if (!moved) return;
+        persistState(storageKey, state);
+        rerender();
+      });
+      card.appendChild(title);
+      card.appendChild(list);
+      grid.appendChild(card);
+    });
+  }
+  function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Manager', mountTarget) {
+    const data = readScopedQueueData(storageKey);
+    const state = {
+      data,
+      groups: groupItems(data.chats),
+      drag: null,
+    };
+    const doc = mountTarget?.ownerDocument || document;
+    const panel = ensureManagerShell(doc, title, mountTarget);
+    panel.dataset.storageKey = storageKey;
+    const rerender = () => {
+      const grid = panel.querySelector(`#${MANAGER_GRID_ID}`);
+      renderCards(grid, storageKey, state, rerender);
+    };
+    rerender();
+    const refreshButton = panel.querySelector('#pq-chat-manager-refresh');
+    if (refreshButton) {
+      refreshButton.onclick = () => {
+        if (queueState.syncFromStorage) {
+          queueState.syncFromStorage?.();
+          return;
+        }
+        const refreshedData = readScopedQueueData(storageKey);
+        state.data = refreshedData;
+        state.groups = groupItems(refreshedData.chats);
+        state.drag = null;
+        rerender();
+      };
+    }
+    panel.scrollIntoView?.({ block: 'start', inline: 'nearest', behavior: 'smooth' });
+    log('chat manager opened in-page', { storageKey });
+    activeManagers.set(storageKey, {
+      panel,
+      state,
+      title,
+      rerender,
+    });
+  }
+  function refreshChatManager(storageKey) {
+    const manager = activeManagers.get(storageKey);
+    if (!manager || !manager.panel || manager.panel.hidden) return false;
+    const refreshedData = readScopedQueueData(storageKey);
+    manager.state.data = refreshedData;
+    manager.state.groups = groupItems(refreshedData.chats);
+    manager.state.drag = null;
+    const grid = manager.panel.querySelector(`#${MANAGER_GRID_ID}`);
+    renderCards(grid, storageKey, manager.state, manager.rerender);
+    return true;
+  }
+  function toggleChatManager(openManagerFn) {
+    let panel = document.getElementById(MANAGER_PANEL_ID);
+    if (!panel) {
+      if (typeof openManagerFn === 'function') {
+        openManagerFn();
+      }
+      return;
+    }
+    panel.style.display = panel.hidden ? 'flex' : 'none';
+    panel.hidden = !panel.hidden;
+  }
+
+  // AI_Queue/core/panel-controls.js
   var boundPanels = /* @__PURE__ */ new WeakSet();
   function setupPanelControls({
     createItem,
@@ -1234,7 +1932,7 @@
     addBtn.addEventListener('click', handleAddClick);
     if (manageChatsBtn) {
       manageChatsBtn.addEventListener('click', () => {
-        openChatManager?.();
+        toggleChatManager(openChatManager);
       });
     }
     input.addEventListener('keydown', (e) => {
@@ -1271,66 +1969,6 @@
     });
     boundPanels.add(panel);
     updateStartStopButtons();
-  }
-
-  // AI_Queue/core/drag.js
-  init_logging();
-  var dragBoundPanel = null;
-  var listenersBound = false;
-  var dragging = false;
-  var dragStartX = 0;
-  var dragStartY = 0;
-  var panelStartX = 0;
-  var panelStartY = 0;
-  function onMouseMove(e) {
-    if (!dragging) return;
-    const panel = getPanel();
-    if (!panel) return;
-    const deltaX = e.clientX - dragStartX;
-    const deltaY = e.clientY - dragStartY;
-    panel.style.left = panelStartX + deltaX + 'px';
-    panel.style.top = panelStartY + deltaY + 'px';
-    panel.style.right = 'auto';
-    panel.style.bottom = 'auto';
-  }
-  function onMouseUp() {
-    if (dragging) {
-      dragging = false;
-      log('panel drag ended');
-    }
-  }
-  function bindDocumentListeners() {
-    if (listenersBound) return;
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-    listenersBound = true;
-  }
-  function setupPanelDrag() {
-    const panel = getPanel();
-    if (!panel) return;
-    bindDocumentListeners();
-    if (dragBoundPanel === panel) return;
-    dragBoundPanel = panel;
-    panel.addEventListener(
-      'mousedown',
-      (e) => {
-        if (e.button !== 2) return;
-        e.preventDefault();
-        e.stopPropagation();
-        dragging = true;
-        dragStartX = e.clientX;
-        dragStartY = e.clientY;
-        panelStartX = panel.offsetLeft;
-        panelStartY = panel.offsetTop;
-        log('panel drag started');
-      },
-      true
-    );
-    panel.addEventListener('contextmenu', (e) => {
-      if (dragging) {
-        e.preventDefault();
-      }
-    });
   }
 
   // AI_Queue/core/keyboard.js
@@ -1632,6 +2270,10 @@
         range.selectNodeContents(editor);
         selection.removeAllRanges();
         selection.addRange(range);
+        if (document.execCommand('insertText', false, prompt)) {
+          editor.dispatchEvent(new Event('change', { bubbles: true }));
+          return;
+        }
         document.execCommand('delete', false);
       }
       try {
@@ -1644,6 +2286,7 @@
           getData: (type) => (type.toLowerCase() === 'text/plain' ? prompt : ''),
           types: ['text/plain'],
           items: [{ kind: 'string', type: 'text/plain' }],
+          files: [],
           setData: () => {},
           clearData: () => {},
         };
@@ -1721,359 +2364,7 @@
   // AI_Queue/core/bootstrap.js
   init_logging();
   init_state();
-
-  // AI_Queue/core/chat-manager.js
-  init_logging();
-
-  // AI_Queue/styles/chat-manager.css
-  var chat_manager_default =
-    ':root {\n  color-scheme: light dark;\n  --pq-manager-bg: #0b1220;\n  --pq-manager-panel: rgba(17, 24, 39, 0.96);\n  --pq-manager-card: rgba(31, 41, 55, 0.96);\n  --pq-manager-text: #f3f4f6;\n  --pq-manager-muted: #9ca3af;\n  --pq-manager-border: #374151;\n  --pq-manager-accent: #60a5fa;\n  --pq-manager-accent-strong: #22c55e;\n  --pq-manager-panel-bg: radial-gradient(circle at top right, rgba(31, 41, 55, 0.95), rgba(11, 18, 32, 0.98) 60%);\n  --pq-manager-header-bg: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.82));\n  --pq-manager-btn-bg: rgba(31, 41, 55, 0.95);\n  --pq-manager-title-color: #d1d5db;\n  --pq-manager-delete-hover-bg: rgba(96, 165, 250, 0.03);\n  --pq-manager-delete-hover-border: rgba(96, 165, 250, 0.12);\n  --pq-manager-item-bg: rgba(17, 24, 39, 0.7);\n  --pq-manager-item-border: #334155;\n}\n\n@media (prefers-color-scheme: light) {\n  :root {\n    --pq-manager-bg: #f9fafb;\n    --pq-manager-panel: rgba(255, 255, 255, 0.96);\n    --pq-manager-card: rgba(243, 244, 246, 0.96);\n    --pq-manager-text: #111827;\n    --pq-manager-muted: #6b7280;\n    --pq-manager-border: #e5e7eb;\n    --pq-manager-accent: #3b82f6;\n    --pq-manager-accent-strong: #16a34a;\n    --pq-manager-panel-bg: radial-gradient(circle at top right, rgba(255, 255, 255, 0.95), rgba(243, 244, 246, 0.98) 60%);\n    --pq-manager-header-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.82));\n    --pq-manager-btn-bg: rgba(243, 244, 246, 0.95);\n    --pq-manager-title-color: #374151;\n    --pq-manager-delete-hover-bg: rgba(59, 130, 246, 0.05);\n    --pq-manager-delete-hover-border: rgba(59, 130, 246, 0.15);\n    --pq-manager-item-bg: rgba(255, 255, 255, 0.8);\n    --pq-manager-item-border: #d1d5db;\n  }\n}\n\n#pq-chat-manager-panel {\n  position: fixed;\n  top: 6vh;\n  left: 50%;\n  transform: translateX(-50%);\n  width: min(1100px, calc(100vw - 32px));\n  height: min(760px, calc(100vh - 32px));\n  z-index: 2147483647;\n  display: flex;\n  flex-direction: column;\n  background: var(--pq-manager-panel-bg);\n  color: var(--pq-manager-text);\n  border: 1px solid var(--pq-manager-border);\n  border-radius: 16px;\n  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);\n  overflow: hidden;\n}\n\n.pq-manager-shell {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  min-height: 0;\n}\n\n.pq-manager-header {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 16px;\n  padding: 16px 18px 12px;\n  border-bottom: 1px solid var(--pq-manager-border);\n  background: var(--pq-manager-header-bg);\n}\n\n.pq-manager-title {\n  font-size: 18px;\n  font-weight: 700;\n  line-height: 1.2;\n  margin: 0;\n}\n\n.pq-manager-subtitle {\n  margin-top: 4px;\n  color: var(--pq-manager-muted);\n  font-size: 13px;\n  line-height: 1.4;\n  max-width: 72ch;\n}\n\n.pq-manager-actions {\n  display: flex;\n  gap: 8px;\n  flex-shrink: 0;\n}\n\n.pq-manager-actions button {\n  appearance: none;\n  border: 1px solid var(--pq-manager-border);\n  background: var(--pq-manager-btn-bg);\n  color: var(--pq-manager-text);\n  border-radius: 999px;\n  padding: 8px 12px;\n  font: inherit;\n  cursor: pointer;\n}\n\n.pq-manager-actions button:hover {\n  border-color: var(--pq-manager-accent);\n}\n\n.pq-manager-body {\n  display: flex;\n  flex-direction: column;\n  min-height: 0;\n  padding: 16px 18px 18px;\n  gap: 12px;\n  overflow: hidden;\n}\n\n.pq-manager-grid {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));\n  gap: 12px;\n  align-items: start;\n  flex: 1;\n  min-height: 0;\n  overflow: auto;\n  padding-right: 4px;\n}\n\n.chat-card {\n  background: linear-gradient(180deg, var(--pq-manager-panel), var(--pq-manager-card));\n  border: 1px solid var(--pq-manager-border);\n  border-radius: 12px;\n  overflow: hidden;\n  min-height: 140px;\n}\n\n.chat-title {\n  padding: 10px 12px;\n  border-bottom: 1px solid var(--pq-manager-border);\n  font-size: 12px;\n  letter-spacing: 0.2px;\n  text-transform: uppercase;\n  color: var(--pq-manager-title-color);\n  display: flex;\n  justify-content: space-between;\n  gap: 8px;\n}\n\n.chat-title .chat-controls {\n  display: inline-flex;\n  gap: 8px;\n  align-items: center;\n}\n\n.chat-delete {\n  appearance: none;\n  border: 1px solid transparent;\n  background: transparent;\n  color: var(--pq-manager-muted);\n  border-radius: 8px;\n  padding: 4px 8px;\n  font-size: 12px;\n  cursor: pointer;\n}\n\n.chat-delete:hover {\n  color: var(--pq-manager-accent);\n  border-color: var(--pq-manager-delete-hover-border);\n  background: var(--pq-manager-delete-hover-bg);\n}\n\n.chat-list {\n  list-style: none;\n  margin: 0;\n  padding: 8px;\n  min-height: 90px;\n}\n\n.chat-item {\n  background: var(--pq-manager-item-bg);\n  border: 1px solid var(--pq-manager-item-border);\n  border-radius: 8px;\n  padding: 8px;\n  margin-bottom: 8px;\n  cursor: grab;\n  user-select: none;\n  font-size: 13px;\n  line-height: 1.35;\n  word-break: break-word;\n}\n\n.chat-item.dragging {\n  opacity: 0.5;\n}\n\n.chat-list.drag-over,\n.chat-item.drag-over {\n  outline: 2px dashed var(--pq-manager-accent);\n  outline-offset: 2px;\n}\n\n.empty {\n  color: var(--pq-manager-muted);\n  font-size: 12px;\n  padding: 8px;\n  border: 1px dashed var(--pq-manager-border);\n  border-radius: 8px;\n  text-align: center;\n}\n\n.pq-manager-footer {\n  color: var(--pq-manager-muted);\n  font-size: 12px;\n  border-top: 1px solid var(--pq-manager-border);\n  padding-top: 12px;\n}';
-
-  // AI_Queue/core/chat-manager.js
-  var GLOBAL_CHAT_KEY2 = '__global__';
-  var MANAGER_PANEL_ID = 'pq-chat-manager-panel';
-  var MANAGER_GRID_ID = 'pq-chat-manager-grid';
-  var MANAGER_BODY_ID = 'pq-chat-manager-body';
-  var activeManagers = /* @__PURE__ */ new Map();
-  function toChatCode2(chatKey) {
-    return chatKey === GLOBAL_CHAT_KEY2 ? null : chatKey;
-  }
-  function chatLabel(chatKey) {
-    if (chatKey === GLOBAL_CHAT_KEY2) {
-      return 'Global (all chats)';
-    }
-    return chatKey;
-  }
-  function cloneItem(item) {
-    return { ...item };
-  }
-  function cloneItems(items) {
-    return Array.isArray(items) ? items.map((item) => cloneItem(item)) : [];
-  }
-  function groupItems(chats) {
-    const grouped = { [GLOBAL_CHAT_KEY2]: [] };
-    Object.entries(chats || {}).forEach(([chatKey, bucket]) => {
-      if (!grouped[chatKey]) {
-        grouped[chatKey] = [];
-      }
-      grouped[chatKey].push(...cloneItems(bucket?.items));
-    });
-    return grouped;
-  }
-  function orderedKeys(groups) {
-    const keys = Object.keys(groups).filter((key) => groups[key]?.length > 0);
-    const nonGlobal = keys
-      .filter((key) => key !== GLOBAL_CHAT_KEY2)
-      .sort((a, b) => a.localeCompare(b));
-    if (groups[GLOBAL_CHAT_KEY2]?.length > 0) {
-      return [GLOBAL_CHAT_KEY2, ...nonGlobal];
-    }
-    return nonGlobal;
-  }
-  function flattenGroups(groups, existingChats = {}) {
-    const nextChats = {};
-    orderedKeys(groups).forEach((key) => {
-      nextChats[key] = {
-        items: cloneItems(groups[key]),
-        failedItems: cloneItems(existingChats[key]?.failedItems),
-      };
-    });
-    Object.entries(existingChats).forEach(([chatKey, bucket]) => {
-      if (nextChats[chatKey]) return;
-      if (Array.isArray(bucket?.failedItems) && bucket.failedItems.length > 0) {
-        nextChats[chatKey] = {
-          items: [],
-          failedItems: cloneItems(bucket.failedItems),
-        };
-      }
-    });
-    return nextChats;
-  }
-  function findItemIndex(groups, chatKey, itemId) {
-    const list = groups[chatKey] || [];
-    return list.findIndex((item) => item.id === itemId);
-  }
-  function ensureManagerStyles(doc) {
-    if (doc.querySelector('#pq-chat-manager-styles')) return;
-    const style = doc.createElement('style');
-    style.id = 'pq-chat-manager-styles';
-    style.textContent = chat_manager_default;
-    doc.head.appendChild(style);
-  }
-  function ensureManagerShell(doc, title, mountTarget) {
-    ensureManagerStyles(doc);
-    let panel = doc.getElementById(MANAGER_PANEL_ID);
-    if (!panel) {
-      panel = doc.createElement('section');
-      panel.id = MANAGER_PANEL_ID;
-      const shell = doc.createElement('div');
-      shell.className = 'pq-manager-shell';
-      const header = doc.createElement('div');
-      header.className = 'pq-manager-header';
-      const titleWrap = doc.createElement('div');
-      const heading = doc.createElement('div');
-      heading.className = 'pq-manager-title';
-      const subtitle = doc.createElement('div');
-      subtitle.className = 'pq-manager-subtitle';
-      titleWrap.appendChild(heading);
-      titleWrap.appendChild(subtitle);
-      const actions = doc.createElement('div');
-      actions.className = 'pq-manager-actions';
-      const refreshButton = doc.createElement('button');
-      refreshButton.type = 'button';
-      refreshButton.id = 'pq-chat-manager-refresh';
-      refreshButton.textContent = 'Refresh';
-      const closeButton = doc.createElement('button');
-      closeButton.type = 'button';
-      closeButton.id = 'pq-chat-manager-close';
-      closeButton.textContent = 'Close';
-      actions.appendChild(refreshButton);
-      actions.appendChild(closeButton);
-      header.appendChild(titleWrap);
-      header.appendChild(actions);
-      const body = doc.createElement('div');
-      body.className = 'pq-manager-body';
-      body.id = MANAGER_BODY_ID;
-      const grid = doc.createElement('div');
-      grid.className = 'pq-manager-grid';
-      grid.id = MANAGER_GRID_ID;
-      const footer = doc.createElement('div');
-      footer.className = 'pq-manager-footer';
-      footer.textContent =
-        'Drag prompts between chats. Changes are saved immediately to localStorage.';
-      body.appendChild(grid);
-      body.appendChild(footer);
-      shell.appendChild(header);
-      shell.appendChild(body);
-      panel.appendChild(shell);
-      closeButton.addEventListener('click', () => {
-        panel.hidden = true;
-        panel.style.display = 'none';
-      });
-    }
-    const titleNode = panel.querySelector('.pq-manager-title');
-    const subtitleNode = panel.querySelector('.pq-manager-subtitle');
-    if (titleNode) {
-      titleNode.textContent = title;
-    }
-    if (subtitleNode) {
-      subtitleNode.textContent =
-        'Reorder prompts within a chat or move them into another chat card. This panel stays inside the page instead of opening a popup.';
-    }
-    const root = mountTarget || doc.documentElement || doc.body;
-    if (root && !root.contains(panel)) {
-      root.appendChild(panel);
-    }
-    panel.hidden = false;
-    panel.style.display = 'flex';
-    return panel;
-  }
-  function moveByDrop(state, fromChatKey, itemId, toChatKey2, toIndex) {
-    const fromList = state.groups[fromChatKey] || [];
-    const fromIndex = findItemIndex(state.groups, fromChatKey, itemId);
-    if (fromIndex === -1) {
-      return false;
-    }
-    const [movedItem] = fromList.splice(fromIndex, 1);
-    if (!state.groups[toChatKey2]) {
-      state.groups[toChatKey2] = [];
-    }
-    const targetList = state.groups[toChatKey2];
-    let normalizedIndex = Number.isInteger(toIndex) ? toIndex : targetList.length;
-    if (normalizedIndex < 0) normalizedIndex = 0;
-    if (normalizedIndex > targetList.length) normalizedIndex = targetList.length;
-    if (fromChatKey === toChatKey2 && normalizedIndex > fromIndex) {
-      normalizedIndex -= 1;
-    }
-    movedItem.chatCode = toChatCode2(toChatKey2) || void 0;
-    targetList.splice(normalizedIndex, 0, movedItem);
-    if (fromChatKey !== GLOBAL_CHAT_KEY2 && (state.groups[fromChatKey] || []).length === 0) {
-      delete state.groups[fromChatKey];
-    }
-    return true;
-  }
-  function persistState(storageKey, state) {
-    state.data.chats = flattenGroups(state.groups, state.data.chats);
-    writeScopedQueueData(storageKey, state.data);
-  }
-  function renderCards(grid, storageKey, state, rerender) {
-    if (!grid) return;
-    grid.replaceChildren();
-    const keys = orderedKeys(state.groups);
-    if (keys.length === 0) {
-      const doc2 = grid.ownerDocument;
-      const empty = doc2.createElement('div');
-      empty.className = 'empty';
-      empty.textContent = 'No prompts found in storage.';
-      grid.appendChild(empty);
-      return;
-    }
-    const doc = grid.ownerDocument;
-    keys.forEach((chatKey) => {
-      const card = doc.createElement('section');
-      card.className = 'chat-card';
-      const title = doc.createElement('div');
-      title.className = 'chat-title';
-      const label = doc.createElement('span');
-      label.textContent = chatLabel(chatKey);
-      const count = doc.createElement('span');
-      count.textContent = String(state.groups[chatKey].length);
-      const controls = doc.createElement('span');
-      controls.className = 'chat-controls';
-      const deleteButton = doc.createElement('button');
-      deleteButton.type = 'button';
-      deleteButton.className = 'chat-delete';
-      deleteButton.textContent = 'Delete';
-      deleteButton.title = 'Delete all prompts in this chat';
-      deleteButton.addEventListener('click', () => {
-        const chatName = chatLabel(chatKey);
-        if (
-          !doc.defaultView?.confirm(`Delete all prompts in "${chatName}"? This cannot be undone.`)
-        )
-          return;
-        if (state.groups[chatKey]) {
-          delete state.groups[chatKey];
-        }
-        persistState(storageKey, state);
-        rerender();
-      });
-      controls.appendChild(count);
-      controls.appendChild(deleteButton);
-      title.appendChild(label);
-      title.appendChild(controls);
-      const list = doc.createElement('ul');
-      list.className = 'chat-list';
-      list.dataset.chatKey = chatKey;
-      const items = state.groups[chatKey];
-      if (!items || items.length === 0) {
-        const empty = doc.createElement('div');
-        empty.className = 'empty';
-        empty.textContent = 'Drop a prompt here.';
-        list.appendChild(empty);
-      } else {
-        items.forEach((item, index) => {
-          const entry = doc.createElement('li');
-          entry.className = 'chat-item';
-          entry.draggable = true;
-          entry.dataset.chatKey = chatKey;
-          entry.dataset.itemId = item.id;
-          entry.dataset.index = String(index);
-          entry.textContent = item.prompt;
-          entry.addEventListener('dragstart', (event) => {
-            state.drag = {
-              itemId: item.id,
-              fromChatKey: chatKey,
-            };
-            event.dataTransfer.effectAllowed = 'move';
-            event.dataTransfer.setData('text/plain', item.id);
-            entry.classList.add('dragging');
-          });
-          entry.addEventListener('dragend', () => {
-            state.drag = null;
-            entry.classList.remove('dragging');
-            doc.querySelectorAll(`#${MANAGER_PANEL_ID} .drag-over`).forEach((element) => {
-              element.classList.remove('drag-over');
-            });
-          });
-          entry.addEventListener('dragover', (event) => {
-            event.preventDefault();
-            entry.classList.add('drag-over');
-          });
-          entry.addEventListener('dragleave', () => {
-            entry.classList.remove('drag-over');
-          });
-          entry.addEventListener('drop', (event) => {
-            event.preventDefault();
-            entry.classList.remove('drag-over');
-            if (!state.drag) return;
-            const moved = moveByDrop(
-              state,
-              state.drag.fromChatKey,
-              state.drag.itemId,
-              chatKey,
-              Number(entry.dataset.index)
-            );
-            if (!moved) return;
-            persistState(storageKey, state);
-            rerender();
-          });
-          list.appendChild(entry);
-        });
-      }
-      list.addEventListener('dragover', (event) => {
-        event.preventDefault();
-        list.classList.add('drag-over');
-      });
-      list.addEventListener('dragleave', () => {
-        list.classList.remove('drag-over');
-      });
-      list.addEventListener('drop', (event) => {
-        event.preventDefault();
-        list.classList.remove('drag-over');
-        if (!state.drag) return;
-        const moved = moveByDrop(
-          state,
-          state.drag.fromChatKey,
-          state.drag.itemId,
-          chatKey,
-          state.groups[chatKey]?.length
-        );
-        if (!moved) return;
-        persistState(storageKey, state);
-        rerender();
-      });
-      card.appendChild(title);
-      card.appendChild(list);
-      grid.appendChild(card);
-    });
-  }
-  function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Manager', mountTarget) {
-    const data = readScopedQueueData(storageKey);
-    const state = {
-      data,
-      groups: groupItems(data.chats),
-      drag: null,
-    };
-    const doc = mountTarget?.ownerDocument || document;
-    const panel = ensureManagerShell(doc, title, mountTarget);
-    panel.dataset.storageKey = storageKey;
-    const rerender = () => {
-      const grid = panel.querySelector(`#${MANAGER_GRID_ID}`);
-      renderCards(grid, storageKey, state, rerender);
-    };
-    rerender();
-    const refreshButton = panel.querySelector('#pq-chat-manager-refresh');
-    if (refreshButton) {
-      refreshButton.onclick = () => {
-        const refreshedData = readScopedQueueData(storageKey);
-        state.data = refreshedData;
-        state.groups = groupItems(refreshedData.chats);
-        state.drag = null;
-        rerender();
-      };
-    }
-    panel.scrollIntoView?.({ block: 'start', inline: 'nearest', behavior: 'smooth' });
-    log('chat manager opened in-page', { storageKey });
-    activeManagers.set(storageKey, {
-      panel,
-      state,
-      title,
-      rerender,
-    });
-  }
-  function refreshChatManager(storageKey) {
-    const manager = activeManagers.get(storageKey);
-    if (!manager || !manager.panel || manager.panel.hidden) return false;
-    const refreshedData = readScopedQueueData(storageKey);
-    manager.state.data = refreshedData;
-    manager.state.groups = groupItems(refreshedData.chats);
-    manager.state.drag = null;
-    const grid = manager.panel.querySelector(`#${MANAGER_GRID_ID}`);
-    renderCards(grid, storageKey, manager.state, manager.rerender);
-    return true;
-  }
-
-  // AI_Queue/core/bootstrap.js
+  init_ui2();
   function bootstrapQueueApp(provider) {
     globalThis.aiQueue = queueState;
     log('AI_Queue running', true);
@@ -2087,6 +2378,7 @@
         refreshChatManager(storageKey);
       }
     };
+    queueState.syncFromStorage = syncFromStorage;
     const refreshForCurrentUrl = (previousUrl = location.href, currentUrl = location.href) => {
       const getScope = provider.getCurrentScope;
       const previousScope = typeof getScope === 'function' ? getScope(previousUrl) : null;
@@ -2128,6 +2420,7 @@
       openChatManager: provider.openChatManager,
     });
     provider.setupPanelDrag?.();
+    setupPanelResize();
     provider.renderQueue?.();
     provider.ensureToolbarButton?.();
     if (storageKey) {
@@ -2147,7 +2440,10 @@
           processQueue: provider.processQueue,
           openChatManager: provider.openChatManager,
         }),
-      provider.setupPanelDrag,
+      () => {
+        provider.setupPanelDrag?.();
+        setupPanelResize();
+      },
       provider.ensureToolbarButton,
       provider.isOwnMutation
     );
@@ -2161,7 +2457,10 @@
           processQueue: provider.processQueue,
           openChatManager: provider.openChatManager,
         }),
-      provider.setupPanelDrag,
+      () => {
+        provider.setupPanelDrag?.();
+        setupPanelResize();
+      },
       provider.ensureToolbarButton,
       refreshForCurrentUrl
     );
