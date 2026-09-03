@@ -14,7 +14,7 @@ function toChatCode(chatKey) {
 
 function chatLabel(chatKey) {
   if (chatKey === GLOBAL_CHAT_KEY) {
-    return 'Global (all chats)';
+    return 'Global Chat';
   }
   return chatKey;
 }
