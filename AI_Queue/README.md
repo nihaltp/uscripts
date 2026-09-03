@@ -4,8 +4,8 @@ This folder contains the source for the AI_Queue userscripts.
 
 ## Scripts
 
-- [`chatgpt.user.js`](https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/chatgpt.user.js) is the userscript for ChatGPT.
-- [`gemini.user.js`](https://raw.githubusercontent.com/nihaltp/uscripts/main/AI%20Queue/dist/gemini.user.js) is the userscript for Gemini.
+- [`chatgpt.user.js`](https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js) is the userscript for ChatGPT.
+- [`gemini.user.js`](https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/gemini.user.js) is the userscript for Gemini.
 
 ## Layout
 

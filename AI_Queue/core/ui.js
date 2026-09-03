@@ -178,7 +178,7 @@ export function repairUi(
 
   try {
     log('repair', reason);
-    createPanel();
+    createPanel?.();
     setupPanelEvents?.();
     setupPanelDrag?.();
     ensureToolbarButton?.();
@@ -261,14 +261,14 @@ export function startDomObserver(
   });
 }
 
-export function patchHistoryMethod(methodName) {
+export function patchHistoryMethod(methodName, callback) {
   const original = history[methodName];
 
   if (typeof original !== 'function' || original.__pqPatched) return;
 
   const patched = function (...args) {
     const result = original.apply(this, args);
-    requestRepair('history-' + methodName);
+    callback?.();
     return result;
   };
 
@@ -288,8 +288,16 @@ export function startUrlWatcher(
     requestRepair(reason, createPanel, setupPanelEvents, setupPanelDrag, ensureToolbarButton);
   };
 
-  patchHistoryMethod('pushState');
-  patchHistoryMethod('replaceState');
+  patchHistoryMethod('pushState', () => {
+    const previousUrl = lastKnownUrl;
+    lastKnownUrl = location.href;
+    handleUrlChange('history-pushState', previousUrl, lastKnownUrl);
+  });
+  patchHistoryMethod('replaceState', () => {
+    const previousUrl = lastKnownUrl;
+    lastKnownUrl = location.href;
+    handleUrlChange('history-replaceState', previousUrl, lastKnownUrl);
+  });
 
   window.addEventListener('popstate', () => {
     const previousUrl = lastKnownUrl;

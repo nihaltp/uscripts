@@ -1,6 +1,9 @@
 import { log } from './logging.js';
 import { readScopedQueueData, writeScopedQueueData } from './storage.js';
 import managerStyles from '../styles/chat-manager.css';
+import { queueState } from './state.js';
+import { setupPanelResize } from './resize.js';
+import { setupPanelDrag } from './drag.js';
 
 const GLOBAL_CHAT_KEY = '__global__';
 const MANAGER_PANEL_ID = 'pq-chat-manager-panel';
@@ -14,7 +17,7 @@ function toChatCode(chatKey) {
 
 function chatLabel(chatKey) {
   if (chatKey === GLOBAL_CHAT_KEY) {
-    return 'Global (all chats)';
+    return 'Global Chat';
   }
   return chatKey;
 }
@@ -43,12 +46,7 @@ function groupItems(chats) {
 function orderedKeys(groups) {
   const keys = Object.keys(groups).filter((key) => groups[key]?.length > 0);
   const nonGlobal = keys.filter((key) => key !== GLOBAL_CHAT_KEY).sort((a, b) => a.localeCompare(b));
-
-  if (groups[GLOBAL_CHAT_KEY]?.length > 0) {
-    return [GLOBAL_CHAT_KEY, ...nonGlobal];
-  }
-
-  return nonGlobal;
+  return [GLOBAL_CHAT_KEY, ...nonGlobal];
 }
 
 function flattenGroups(groups, existingChats = {}) {
@@ -174,6 +172,8 @@ function ensureManagerShell(doc, title, mountTarget) {
 
   panel.hidden = false;
   panel.style.display = 'flex';
+  setupPanelResize(panel);
+  setupPanelDrag(panel);
   return panel;
 }
 
@@ -212,6 +212,10 @@ function moveByDrop(state, fromChatKey, itemId, toChatKey, toIndex) {
 function persistState(storageKey, state) {
   state.data.chats = flattenGroups(state.groups, state.data.chats);
   writeScopedQueueData(storageKey, state.data);
+
+  if (queueState.syncFromStorage) {
+    queueState.syncFromStorage?.();
+  }
 }
 
 function renderCards(grid, storageKey, state, rerender) {
@@ -265,6 +269,10 @@ function renderCards(grid, storageKey, state, rerender) {
 
       persistState(storageKey, state);
       rerender();
+
+      if (queueState.syncFromStorage) {
+        queueState.syncFromStorage?.();
+      }
     });
 
     controls.appendChild(count);
@@ -401,6 +409,11 @@ export function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Man
   const refreshButton = panel.querySelector('#pq-chat-manager-refresh');
   if (refreshButton) {
     refreshButton.onclick = () => {
+      if (queueState.syncFromStorage) {
+        queueState.syncFromStorage?.();
+        return;
+      }
+
       const refreshedData = readScopedQueueData(storageKey);
       state.data = refreshedData;
       state.groups = groupItems(refreshedData.chats);
@@ -432,4 +445,17 @@ export function refreshChatManager(storageKey) {
   const grid = manager.panel.querySelector(`#${MANAGER_GRID_ID}`);
   renderCards(grid, storageKey, manager.state, manager.rerender);
   return true;
+}
+
+export function toggleChatManager(openManagerFn) {
+  let panel = document.getElementById(MANAGER_PANEL_ID);
+  if (!panel) {
+    if (typeof openManagerFn === 'function') {
+      openManagerFn();
+    }
+    return;
+  }
+
+  panel.style.display = panel.hidden ? 'flex' : 'none';
+  panel.hidden = !panel.hidden;
 }

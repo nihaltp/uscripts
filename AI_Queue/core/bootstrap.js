@@ -3,6 +3,7 @@ import { queueState, resetQueueState } from './state.js';
 import { startDomObserver, startUrlWatcher } from './ui.js';
 import { applyScopeToQueuedItems } from './storage.js';
 import { refreshChatManager } from './chat-manager.js';
+import { setupPanelResize } from './resize.js';
 
 export function bootstrapQueueApp(provider) {
   globalThis.aiQueue = queueState;
@@ -19,6 +20,8 @@ export function bootstrapQueueApp(provider) {
       refreshChatManager(storageKey);
     }
   };
+
+  queueState.syncFromStorage = syncFromStorage;
 
   const refreshForCurrentUrl = (previousUrl = location.href, currentUrl = location.href) => {
     const getScope = provider.getCurrentScope;
@@ -59,6 +62,7 @@ export function bootstrapQueueApp(provider) {
     openChatManager: provider.openChatManager,
   });
   provider.setupPanelDrag?.();
+  setupPanelResize();
   provider.renderQueue?.();
   provider.ensureToolbarButton?.();
 
@@ -80,7 +84,7 @@ export function bootstrapQueueApp(provider) {
         processQueue: provider.processQueue,
         openChatManager: provider.openChatManager,
       }),
-    provider.setupPanelDrag,
+    () => { provider.setupPanelDrag?.(); setupPanelResize(); },
     provider.ensureToolbarButton,
     provider.isOwnMutation
   );
@@ -94,7 +98,7 @@ export function bootstrapQueueApp(provider) {
         processQueue: provider.processQueue,
         openChatManager: provider.openChatManager,
       }),
-    provider.setupPanelDrag,
+    () => { provider.setupPanelDrag?.(); setupPanelResize(); },
     provider.ensureToolbarButton,
     refreshForCurrentUrl
   );
