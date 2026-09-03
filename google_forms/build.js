@@ -37,7 +37,7 @@ async function buildAll() {
     const excludeLines = app.excludes.map((e) => `// @exclude      ${e}`).join('\n');
     const grantLines = app.grants.map((g) => `// @grant        ${g}`).join('\n');
 
-    const supportUrl = `https://github.com/nihaltp/uscripts/issues/new?template=google_forms_saver.yml`;
+    const supportUrl = `https://github.com/nihaltp/uscripts/issues/new?template=bug.yml`;
     const downloadBase = `https://raw.githubusercontent.com/nihaltp/uscripts/main/google_forms/${app.outfile}`;
 
     const banner =
