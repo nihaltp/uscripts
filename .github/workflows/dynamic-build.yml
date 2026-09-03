@@ -33,8 +33,28 @@ jobs:
       id: changed-files
       uses: tj-actions/changed-files@v44
       with:
-        dir_names: true
-        dir_names_max_depth: 1
+        dir_names: false
+        
+    - name: Determine SHAs
+      id: shas
+      run: |
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> $GITHUB_ENV
+          echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+        elif [ "${{ github.event_name }}" == "push" ]; then
+          echo "BASE_SHA=${{ github.event.before }}" >> $GITHUB_ENV
+          echo "HEAD_SHA=${{ github.event.after }}" >> $GITHUB_ENV
+        else
+          echo "BASE_SHA=HEAD~1" >> $GITHUB_ENV
+          echo "HEAD_SHA=HEAD" >> $GITHUB_ENV
+        fi
+
+    - name: Auto-Bump Versions
+      env:
+        CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+      run: |
+        echo "Running version bumper..."
+        node scripts/bump-versions.js
         
     - name: Build and Commit
       run: |
@@ -42,16 +62,20 @@ jobs:
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         
         PUSH_NEEDED=false
+        CHANGED_DIRS=$(echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' | cut -d'/' -f1 | sort -u)
         
-        for dir in ${{ steps.changed-files.outputs.all_changed_files }}; do
-          # Check if the directory exists and has a build.js
+        for dir in $CHANGED_DIRS; do
           if [ -d "$dir" ] && [ -f "$dir/build.js" ]; then
+            if [ -f "$dir/versions.json" ] && ! git diff --quiet "$dir/versions.json"; then
+              git add "$dir/versions.json"
+              git commit -m "chore: bump version for $dir [skip ci]"
+              PUSH_NEEDED=true
+            fi
+
             echo "Building $dir..."
             node "$dir/build.js"
             
             git add -f "$dir/dist/"
-            
-            # Check if there are staged changes
             if ! git diff --staged --quiet; then
               git commit -m "chore: update $dir dist"
               PUSH_NEEDED=true
