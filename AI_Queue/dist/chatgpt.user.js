@@ -3,7 +3,7 @@
 // @description  A userscript to manage a queue of prompts for ChatGPT.
 // @author       nihaltp
 // @namespace    https://github.com/nihaltp/uscripts
-// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=chatgpt_prompt_queue.yml
+// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=bug.yml
 // @homepageURL  https://github.com/nihaltp/uscripts
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT
@@ -22,7 +22,7 @@
 // @exclude      https://chatgpt.com/account-link/*
 // @exclude      https://chatgpt.com/gpts/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.1.0
+// @version      3.2.0
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js

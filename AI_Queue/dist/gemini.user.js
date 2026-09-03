@@ -3,7 +3,7 @@
 // @description  A userscript to manage a queue of prompts for Gemini.
 // @author       nihaltp
 // @namespace    https://github.com/nihaltp/uscripts
-// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=gemini_prompt_queue.yml
+// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=bug.yml
 // @homepageURL  https://github.com/nihaltp/uscripts
 // @homepage     https://github.com/nihaltp/uscripts
 // @license      MIT
@@ -11,7 +11,7 @@
 // @match        https://gemini.google.com/app/*
 // @exclude      https://gemini.google.com/signin/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.1.0
+// @version      3.2.0
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/gemini.user.js
