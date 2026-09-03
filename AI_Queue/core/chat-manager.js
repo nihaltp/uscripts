@@ -270,6 +270,10 @@ function renderCards(grid, storageKey, state, rerender) {
 
       persistState(storageKey, state);
       rerender();
+
+      if (queueState.syncFromStorage) {
+        queueState.syncFromStorage?.();
+      }
     });
 
     controls.appendChild(count);
