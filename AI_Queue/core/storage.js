@@ -36,7 +36,8 @@ function resolveScope(currentScope = null) {
 
 function resolveScopeKeys(currentScope = null) {
   const scope = resolveScope(currentScope);
-  return [...new Set([scope.groupId, scope.chatId].filter(Boolean))];
+  const keys = [...new Set([scope.groupId, scope.chatId].filter(Boolean))];
+  return keys.length > 0 ? keys : [GLOBAL_CHAT_KEY];
 }
 
 function hasItemScope(item) {
