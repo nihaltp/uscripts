@@ -1,6 +1,7 @@
 import { log } from './logging.js';
 import { readScopedQueueData, writeScopedQueueData } from './storage.js';
 import managerStyles from '../styles/chat-manager.css';
+import { queueState } from './state.js';
 
 const GLOBAL_CHAT_KEY = '__global__';
 const MANAGER_PANEL_ID = 'pq-chat-manager-panel';
@@ -401,6 +402,11 @@ export function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Man
   const refreshButton = panel.querySelector('#pq-chat-manager-refresh');
   if (refreshButton) {
     refreshButton.onclick = () => {
+      if (queueState.syncFromStorage) {
+        queueState.syncFromStorage?.();
+        return;
+      }
+
       const refreshedData = readScopedQueueData(storageKey);
       state.data = refreshedData;
       state.groups = groupItems(refreshedData.chats);

@@ -20,6 +20,8 @@ export function bootstrapQueueApp(provider) {
     }
   };
 
+  queueState.syncFromStorage = syncFromStorage;
+
   const refreshForCurrentUrl = (previousUrl = location.href, currentUrl = location.href) => {
     const getScope = provider.getCurrentScope;
     const previousScope = typeof getScope === 'function' ? getScope(previousUrl) : null;
