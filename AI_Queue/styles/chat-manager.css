@@ -1,44 +1,3 @@
-:root {
-  color-scheme: light dark;
-  --pq-manager-bg: #0b1220;
-  --pq-manager-panel: rgba(17, 24, 39, 0.96);
-  --pq-manager-card: rgba(31, 41, 55, 0.96);
-  --pq-manager-text: #f3f4f6;
-  --pq-manager-muted: #9ca3af;
-  --pq-manager-border: #374151;
-  --pq-manager-accent: #60a5fa;
-  --pq-manager-accent-strong: #22c55e;
-  --pq-manager-panel-bg: radial-gradient(circle at top right, rgba(31, 41, 55, 0.95), rgba(11, 18, 32, 0.98) 60%);
-  --pq-manager-header-bg: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.82));
-  --pq-manager-btn-bg: rgba(31, 41, 55, 0.95);
-  --pq-manager-title-color: #d1d5db;
-  --pq-manager-delete-hover-bg: rgba(96, 165, 250, 0.03);
-  --pq-manager-delete-hover-border: rgba(96, 165, 250, 0.12);
-  --pq-manager-item-bg: rgba(17, 24, 39, 0.7);
-  --pq-manager-item-border: #334155;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --pq-manager-bg: #f9fafb;
-    --pq-manager-panel: rgba(255, 255, 255, 0.96);
-    --pq-manager-card: rgba(243, 244, 246, 0.96);
-    --pq-manager-text: #111827;
-    --pq-manager-muted: #6b7280;
-    --pq-manager-border: #e5e7eb;
-    --pq-manager-accent: #3b82f6;
-    --pq-manager-accent-strong: #16a34a;
-    --pq-manager-panel-bg: radial-gradient(circle at top right, rgba(255, 255, 255, 0.95), rgba(243, 244, 246, 0.98) 60%);
-    --pq-manager-header-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.82));
-    --pq-manager-btn-bg: rgba(243, 244, 246, 0.95);
-    --pq-manager-title-color: #374151;
-    --pq-manager-delete-hover-bg: rgba(59, 130, 246, 0.05);
-    --pq-manager-delete-hover-border: rgba(59, 130, 246, 0.15);
-    --pq-manager-item-bg: rgba(255, 255, 255, 0.8);
-    --pq-manager-item-border: #d1d5db;
-  }
-}
-
 #pq-chat-manager-panel {
   position: fixed;
   top: 6vh;
@@ -49,11 +8,11 @@
   z-index: 2147483647;
   display: flex;
   flex-direction: column;
-  background: var(--pq-manager-panel-bg);
-  color: var(--pq-manager-text);
-  border: 1px solid var(--pq-manager-border);
+  background: var(--pq-ui-bg);
+  color: var(--pq-ui-text);
+  border: 1px solid var(--pq-ui-border);
   border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
   overflow: hidden;
 }
 
@@ -70,8 +29,8 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px 18px 12px;
-  border-bottom: 1px solid var(--pq-manager-border);
-  background: var(--pq-manager-header-bg);
+  border-bottom: 1px solid var(--pq-ui-border);
+  background: var(--pq-ui-bg);
 }
 
 .pq-manager-title {
@@ -83,7 +42,7 @@
 
 .pq-manager-subtitle {
   margin-top: 4px;
-  color: var(--pq-manager-muted);
+  opacity: 0.8;
   font-size: 13px;
   line-height: 1.4;
   max-width: 72ch;
@@ -97,9 +56,9 @@
 
 .pq-manager-actions button {
   appearance: none;
-  border: 1px solid var(--pq-manager-border);
-  background: var(--pq-manager-btn-bg);
-  color: var(--pq-manager-text);
+  border: 1px solid var(--pq-ui-btn-border);
+  background: var(--pq-ui-btn-bg);
+  color: var(--pq-ui-text);
   border-radius: 999px;
   padding: 8px 12px;
   font: inherit;
@@ -107,7 +66,7 @@
 }
 
 .pq-manager-actions button:hover {
-  border-color: var(--pq-manager-accent);
+  border-color: var(--pq-ui-accent);
 }
 
 .pq-manager-body {
@@ -117,6 +76,7 @@
   padding: 16px 18px 18px;
   gap: 12px;
   overflow: hidden;
+  background: var(--pq-ui-bg);
 }
 
 .pq-manager-grid {
@@ -131,8 +91,8 @@
 }
 
 .chat-card {
-  background: linear-gradient(180deg, var(--pq-manager-panel), var(--pq-manager-card));
-  border: 1px solid var(--pq-manager-border);
+  background: var(--pq-ui-bg);
+  border: 1px solid var(--pq-ui-border);
   border-radius: 12px;
   overflow: hidden;
   min-height: 140px;
@@ -140,11 +100,11 @@
 
 .chat-title {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--pq-manager-border);
+  border-bottom: 1px solid var(--pq-ui-border);
   font-size: 12px;
   letter-spacing: 0.2px;
   text-transform: uppercase;
-  color: var(--pq-manager-title-color);
+  color: var(--pq-ui-text);
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -160,17 +120,16 @@
   appearance: none;
   border: 1px solid transparent;
   background: transparent;
-  color: var(--pq-manager-muted);
+  color: var(--pq-ui-danger);
   border-radius: 8px;
   padding: 4px 8px;
   font-size: 12px;
   cursor: pointer;
+  opacity: 0.8;
 }
 
 .chat-delete:hover {
-  color: var(--pq-manager-accent);
-  border-color: var(--pq-manager-delete-hover-border);
-  background: var(--pq-manager-delete-hover-bg);
+  opacity: 1;
 }
 
 .chat-list {
@@ -181,8 +140,8 @@
 }
 
 .chat-item {
-  background: var(--pq-manager-item-bg);
-  border: 1px solid var(--pq-manager-item-border);
+  background: var(--pq-ui-btn-bg);
+  border: 1px solid var(--pq-ui-btn-border);
   border-radius: 8px;
   padding: 8px;
   margin-bottom: 8px;
@@ -199,22 +158,22 @@
 
 .chat-list.drag-over,
 .chat-item.drag-over {
-  outline: 2px dashed var(--pq-manager-accent);
+  outline: 2px dashed var(--pq-ui-accent);
   outline-offset: 2px;
 }
 
 .empty {
-  color: var(--pq-manager-muted);
+  opacity: 0.6;
   font-size: 12px;
   padding: 8px;
-  border: 1px dashed var(--pq-manager-border);
+  border: 1px dashed var(--pq-ui-border);
   border-radius: 8px;
   text-align: center;
 }
 
 .pq-manager-footer {
-  color: var(--pq-manager-muted);
+  opacity: 0.8;
   font-size: 12px;
-  border-top: 1px solid var(--pq-manager-border);
+  border-top: 1px solid var(--pq-ui-border);
   padding-top: 12px;
 }
