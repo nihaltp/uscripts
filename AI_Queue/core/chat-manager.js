@@ -44,12 +44,7 @@ function groupItems(chats) {
 function orderedKeys(groups) {
   const keys = Object.keys(groups).filter((key) => groups[key]?.length > 0);
   const nonGlobal = keys.filter((key) => key !== GLOBAL_CHAT_KEY).sort((a, b) => a.localeCompare(b));
-
-  if (groups[GLOBAL_CHAT_KEY]?.length > 0) {
-    return [GLOBAL_CHAT_KEY, ...nonGlobal];
-  }
-
-  return nonGlobal;
+  return [GLOBAL_CHAT_KEY, ...nonGlobal];
 }
 
 function flattenGroups(groups, existingChats = {}) {
