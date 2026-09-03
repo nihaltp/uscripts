@@ -7,6 +7,10 @@ export function createQueueItemElement(item, { renderQueue, saveQueue }) {
   const li = document.createElement('li');
   li.style.marginBottom = '10px';
   li.draggable = false;
+  li.style.border = '1px solid var(--pq-ui-btn-border)';
+  li.style.borderRadius = '8px';
+  li.style.padding = '8px';
+  li.style.background = 'var(--pq-ui-btn-bg)';
 
   const row = document.createElement('div');
   row.style.display = 'flex';
