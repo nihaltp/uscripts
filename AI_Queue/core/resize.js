@@ -1,7 +1,7 @@
 import { log } from './logging.js';
-import { getPanel } from './ui.js';
 
 let isResizing = false;
+let currentPanel = null;
 let currentHandle = null;
 let startX = 0;
 let startY = 0;
@@ -9,42 +9,47 @@ let startWidth = 0;
 let startHeight = 0;
 let startLeft = 0;
 let startTop = 0;
+let listenersBound = false;
 
 function onMouseMove(e) {
-  if (!isResizing) return;
-  const panel = getPanel();
-  if (!panel) return;
+  if (!isResizing || !currentPanel) return;
 
   const dx = e.clientX - startX;
   const dy = e.clientY - startY;
   
   if (currentHandle.includes('right')) {
-    panel.style.width = startWidth + dx + 'px';
+    currentPanel.style.width = startWidth + dx + 'px';
   }
   if (currentHandle.includes('bottom')) {
-    panel.style.height = startHeight + dy + 'px';
+    currentPanel.style.height = startHeight + dy + 'px';
   }
   if (currentHandle.includes('left')) {
-    panel.style.width = startWidth - dx + 'px';
-    panel.style.left = startLeft + dx + 'px';
+    currentPanel.style.width = startWidth - dx + 'px';
+    currentPanel.style.left = startLeft + dx + 'px';
   }
   if (currentHandle.includes('top')) {
-    panel.style.height = startHeight - dy + 'px';
-    panel.style.top = startTop + dy + 'px';
+    currentPanel.style.height = startHeight - dy + 'px';
+    currentPanel.style.top = startTop + dy + 'px';
   }
 }
 
 function onMouseUp() {
   if (isResizing) {
     isResizing = false;
+    currentPanel = null;
     document.body.style.cursor = 'default';
     log('panel resize ended');
   }
 }
 
-export function setupPanelResize() {
-  const panel = getPanel();
-  if (!panel) return;
+export function setupPanelResize(panel) {
+  if (!panel) {
+    import('./ui.js').then(m => {
+      const defaultPanel = m.getPanel();
+      if (defaultPanel) setupPanelResize(defaultPanel);
+    });
+    return;
+  }
 
   if (panel._resizeSetupDone) return;
   panel._resizeSetupDone = true;
@@ -78,6 +83,7 @@ export function setupPanelResize() {
       e.preventDefault();
       e.stopPropagation();
       isResizing = true;
+      currentPanel = panel;
       currentHandle = handle;
       startX = e.clientX;
       startY = e.clientY;
@@ -93,6 +99,9 @@ export function setupPanelResize() {
     panel.appendChild(el);
   });
 
-  document.addEventListener('mousemove', onMouseMove);
-  document.addEventListener('mouseup', onMouseUp);
+  if (!listenersBound) {
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    listenersBound = true;
+  }
 }
