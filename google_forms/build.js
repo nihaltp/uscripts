@@ -1,12 +1,15 @@
 // build.js — Google Forms Saver build script
 // Mirrors the structure of AI_Queue/build.js
-const esbuild = require('esbuild');
-const fs = require('fs/promises');
-const path = require('path');
-const prettier = require('prettier');
 
-const rootDir = __dirname;
-const versions = require('./versions.json');
+import esbuild from 'esbuild';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from "url";
+import prettier from 'prettier';
+
+import versions from './versions.json' with { type: 'json' };
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 const builds = [
   {
