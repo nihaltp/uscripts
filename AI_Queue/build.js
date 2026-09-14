@@ -58,7 +58,7 @@ async function buildAll() {
     const excludeLines = app.excludes.map((e) => `// @exclude      ${e}`).join('\n');
     const grantLines = app.grants.map((g) => `// @grant        ${g}`).join('\n');
 
-    const downloadBase = `${config.downloadGithubRawUrl}/${rootDir}/${app.outfile}`;
+    const downloadBase = `${config.downloadGithubRawUrl}/${path.basename(rootDir)}/${app.outfile}`;
     const version = versions[path.basename(rootDir)][app.id];
 
     const banner = `// ==UserScript==
