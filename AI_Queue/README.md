@@ -13,7 +13,6 @@ This folder contains the source for the AI_Queue userscripts.
 - [`providers/`](providers/) contains the ChatGPT and Gemini entrypoints and provider-specific behavior.
 - [`dist/`](dist/) contains the built userscripts that should be installed in the browser.
 - [`build.js`](build.js) bundles the source files into the distributable scripts.
-- [`versions.json`](versions.json) tracks the published script versions.
 
 ## Build
 
