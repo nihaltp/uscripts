@@ -111,3 +111,9 @@
 - Support for various form field types (text, linear scales, dates, dropdowns, radios, and checkboxes).
 
 </details>
+
+## Wallhaven
+
+[Wallhaven Auto Resolution Filler](https://raw.githubusercontent.com/nihaltp/uscripts/main/wallhaven/original-resolution.js)
+
+> Automatically fills resolution in the popup shown when the "crop and download" button is clicked, resolution of the original image is used from sidebar
