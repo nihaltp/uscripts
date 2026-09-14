@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from "url";
 import prettier from 'prettier';
 
+import { config } from '../config.js';
 import versions from './versions.json' with { type: 'json' };
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
@@ -35,7 +36,7 @@ const builds = [
     grants: ['none'],
     runAt: 'document-idle',
     entry: 'providers/chatgpt.js',
-    outfile: 'dist/chatgpt.user.js',
+    outfile: `${config.outputDir}/chatgpt.user.js`,
   },
   {
     id: 'gemini',
@@ -47,7 +48,7 @@ const builds = [
     grants: ['none'],
     runAt: 'document-idle',
     entry: 'providers/gemini.js',
-    outfile: 'dist/gemini.user.js',
+    outfile: `${config.outputDir}/gemini.user.js`,
   },
 ];
 
@@ -57,21 +58,17 @@ async function buildAll() {
     const excludeLines = app.excludes.map((e) => `// @exclude      ${e}`).join('\n');
     const grantLines = app.grants.map((g) => `// @grant        ${g}`).join('\n');
 
-    const githubUsername = `nihaltp`;
-    const githubRepo = `${githubUsername}/uscripts`;
-    const githubUrl = `https://github.com/${githubRepo}`;
-    const supportUrl = `${githubUrl}/issues/new?template=bug.yml`;
-    const downloadBase = `https://raw.githubusercontent.com/${githubRepo}/main/AI_Queue/${app.outfile}`;
+    const downloadBase = `${config.downloadGithubRawUrl}/AI_Queue/${app.outfile}`;
 
     const banner = `// ==UserScript==
 // @name         ${app.name}
 // @description  ${app.description}
-// @author       ${githubUsername}
-// @namespace    ${githubUrl}
-// @supportURL   ${supportUrl}
-// @homepageURL  ${githubUrl}
-// @homepage     ${githubUrl}
-// @license      MIT
+// @author       ${config.username}
+// @namespace    ${config.githubRepo}
+// @supportURL   ${config.supportUrl}
+// @homepageURL  ${config.githubRepo}
+// @homepage     ${config.githubRepo}
+// @license      ${config.defaultLicense}
 ${matchLines}
 ${excludeLines}
 // @icon         ${app.icon}
