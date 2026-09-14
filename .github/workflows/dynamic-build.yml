@@ -115,8 +115,8 @@ jobs:
         
         for dir in $CHANGED_DIRS; do
           if [ -d "$dir" ] && [ -f "$dir/build.js" ]; then
-            if [ -f "$dir/versions.json" ] && ! git diff --quiet "$dir/versions.json"; then
-              git add "$dir/versions.json"
+            if ! git diff --quiet versions.json; then
+              git add versions.json
               git commit -m "chore: bump version for $dir [skip ci]"
               PUSH_NEEDED=true
             fi
