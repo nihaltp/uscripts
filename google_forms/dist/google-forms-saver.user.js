@@ -21,56 +21,25 @@
 // ==/UserScript==
 
 (() => {
-  var __getOwnPropNames = Object.getOwnPropertyNames;
-  var __esm = (fn, res, err) =>
-    function __init() {
-      if (err) throw err[0];
-      try {
-        return (fn && (res = (0, fn[__getOwnPropNames(fn)[0]])((fn = 0))), res);
-      } catch (e) {
-        throw ((err = [e]), e);
-      }
-    };
-  var __commonJS = (cb, mod) =>
-    function __require() {
-      try {
-        return (
-          mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod),
-          mod.exports
-        );
-      } catch (e) {
-        throw ((mod = 0), e);
-      }
-    };
-
   // google_forms/core/constants.js
-  var DEBUG, SCHEMA_VERSION, GM_KEY_PREFIX, FORM_READY_SELECTOR, DOM_ID_PREFIX;
-  var init_constants = __esm({
-    'google_forms/core/constants.js'() {
-      DEBUG = false;
-      SCHEMA_VERSION = 1;
-      GM_KEY_PREFIX = 'gf-saver-';
-      FORM_READY_SELECTOR = 'form[action*="formResponse"], form#mG61Hd, form[jsmodel]';
-      DOM_ID_PREFIX = 'gf-saver-';
-    },
-  });
+  var DEBUG = false;
+  var SCHEMA_VERSION = 1;
+  var GM_KEY_PREFIX = 'gf-saver-';
+  var FORM_READY_SELECTOR = 'form[action*="formResponse"], form#mG61Hd, form[jsmodel]';
+  var DOM_ID_PREFIX = 'gf-saver-';
 
   // google_forms/core/logging.js
+  var PREFIX = '[GF-Saver]';
   function log(...args) {
     if (DEBUG) console.log(PREFIX, ...args);
   }
   function error(...args) {
     console.error(PREFIX, ...args);
   }
-  var PREFIX;
-  var init_logging = __esm({
-    'google_forms/core/logging.js'() {
-      init_constants();
-      PREFIX = '[GF-Saver]';
-    },
-  });
 
   // google_forms/core/init.js
+  var TIMEOUT_MS = 3e4;
+  var POLL_INTERVAL_MS = 300;
   function waitForForm(callback) {
     if (document.querySelector(FORM_READY_SELECTOR)) {
       log('form already rendered');
@@ -113,15 +82,6 @@
       error('Timed out waiting for Google Form to render.');
     }, TIMEOUT_MS);
   }
-  var TIMEOUT_MS, POLL_INTERVAL_MS;
-  var init_init = __esm({
-    'google_forms/core/init.js'() {
-      init_constants();
-      init_logging();
-      TIMEOUT_MS = 3e4;
-      POLL_INTERVAL_MS = 300;
-    },
-  });
 
   // google_forms/core/storage.js
   function getFormId(url) {
@@ -208,18 +168,9 @@
       throw err;
     }
   }
-  var init_storage = __esm({
-    'google_forms/core/storage.js'() {
-      init_constants();
-      init_logging();
-    },
-  });
 
   // google_forms/styles/main.css
-  var main_default;
-  var init_main = __esm({
-    'google_forms/styles/main.css'() {
-      main_default = `/* Google Forms Saver \u2014 styles/main.css
+  var main_default = `/* Google Forms Saver \u2014 styles/main.css
  * All UI injected by the userscript lives under #gf-saver-* IDs.
  * Font stack intentionally uses system fonts already loaded by Google Forms.
  */
@@ -705,8 +656,6 @@
   to { transform: rotate(360deg); }
 }
 `;
-    },
-  });
 
   // google_forms/core/hash.js
   function djb2(str) {
@@ -721,9 +670,6 @@
     const normalized = `${label.trim().toLowerCase()}|${type}`;
     return djb2(normalized).toString(16).padStart(8, '0');
   }
-  var init_hash = __esm({
-    'google_forms/core/hash.js'() {},
-  });
 
   // google_forms/core/fields.js
   function dispatchNativeEvents(el2) {
@@ -752,6 +698,8 @@
   function delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+  var WIDGET_SELECTOR =
+    'input, textarea, [role="radiogroup"], [role="radio"], [role="checkbox"], [role="listbox"], select';
   function getQuestionLabel(container) {
     const heading = container.querySelector('[role="heading"]');
     if (heading) return heading.textContent.trim();
@@ -775,6 +723,275 @@
     if (inner) return inner.textContent.trim();
     return el2.textContent.trim();
   }
+  var linearScaleHandler = {
+    type: 'linearScale',
+    detect(container) {
+      const group = container.querySelector('[role="radiogroup"]');
+      if (!group) return false;
+      const radios = [...group.querySelectorAll('[role="radio"]')];
+      if (radios.length < 2) return false;
+      return radios.every((r) => /^\d+$/.test(getOptionLabel(r).trim()));
+    },
+    read(container) {
+      const checked = container.querySelector('[role="radio"][aria-checked="true"]');
+      return checked ? [getOptionLabel(checked)] : [];
+    },
+    readOptions(container) {
+      const group = container.querySelector('[role="radiogroup"]');
+      if (!group) return null;
+      return [...group.querySelectorAll('[role="radio"]')].map((r) => getOptionLabel(r).trim());
+    },
+    async write(container, values) {
+      if (!values[0]) return;
+      const radios = [...container.querySelectorAll('[role="radio"]')];
+      const target = radios.find((r) => getOptionLabel(r).trim() === values[0].trim());
+      if (!target) return;
+      simulateClick(target);
+      dispatchNativeEvents(target);
+    },
+  };
+  var dateHandler = {
+    type: 'date',
+    detect(container) {
+      if (container.querySelector('input[type="date"]')) return true;
+      if (!container.querySelector('[role="group"]')) return false;
+      return !!(
+        container.querySelector('[aria-label*="month" i]') ||
+        container.querySelector('[aria-label*="day" i]') ||
+        container.querySelector('[aria-label*="year" i]')
+      );
+    },
+    read(container) {
+      const native = container.querySelector('input[type="date"]');
+      if (native) return native.value ? [native.value] : [];
+      const month = container.querySelector('[aria-label*="month" i]')?.value?.trim() || '';
+      const day = container.querySelector('[aria-label*="day" i]')?.value?.trim() || '';
+      const year = container.querySelector('[aria-label*="year" i]')?.value?.trim() || '';
+      if (!month && !day && !year) return [];
+      return [
+        `${year}-${String(parseInt(month) || 0).padStart(2, '0')}-${String(parseInt(day) || 0).padStart(2, '0')}`,
+      ];
+    },
+    async write(container, values) {
+      if (!values[0]) return;
+      const native = container.querySelector('input[type="date"]');
+      if (native) {
+        setNativeValue(native, values[0]);
+        return;
+      }
+      const parts = values[0].split('-');
+      const year = parts[0] || '';
+      const month = String(parseInt(parts[1]) || 0);
+      const day = String(parseInt(parts[2]) || 0);
+      const setField = (selector, val) => {
+        const el2 = container.querySelector(selector);
+        if (el2) setNativeValue(el2, val);
+      };
+      setField('[aria-label*="month" i]', month);
+      setField('[aria-label*="day" i]', day);
+      setField('[aria-label*="year" i]', year);
+    },
+  };
+  var timeHandler = {
+    type: 'time',
+    detect(container) {
+      if (container.querySelector('input[type="time"]')) return true;
+      if (!container.querySelector('[role="group"]')) return false;
+      return !!(
+        container.querySelector('[aria-label*="hour" i]') ||
+        container.querySelector('[aria-label*="minute" i]')
+      );
+    },
+    read(container) {
+      const native = container.querySelector('input[type="time"]');
+      if (native) return native.value ? [native.value] : [];
+      const hour = container.querySelector('[aria-label*="hour" i]')?.value?.trim() || '';
+      const minute = container.querySelector('[aria-label*="minute" i]')?.value?.trim() || '';
+      if (!hour && !minute) return [];
+      return [
+        `${String(parseInt(hour) || 0).padStart(2, '0')}:${String(parseInt(minute) || 0).padStart(2, '0')}`,
+      ];
+    },
+    async write(container, values) {
+      if (!values[0]) return;
+      const native = container.querySelector('input[type="time"]');
+      if (native) {
+        setNativeValue(native, values[0]);
+        return;
+      }
+      const [hour, minute] = values[0].split(':');
+      const setField = (selector, val) => {
+        const el2 = container.querySelector(selector);
+        if (el2) setNativeValue(el2, val);
+      };
+      setField('[aria-label*="hour" i]', String(parseInt(hour) || 0));
+      setField('[aria-label*="minute" i]', String(parseInt(minute) || 0));
+      const ampm = container.querySelector('[aria-label*="AM" i], [aria-label*="PM" i]');
+      if (ampm) {
+        const h = parseInt(hour) || 0;
+        setNativeValue(ampm, h >= 12 ? 'PM' : 'AM');
+      }
+    },
+  };
+  var textareaHandler = {
+    type: 'textarea',
+    detect(container) {
+      return !!container.querySelector('textarea');
+    },
+    read(container) {
+      const ta = container.querySelector('textarea');
+      return ta?.value ? [ta.value] : [];
+    },
+    async write(container, values) {
+      const ta = container.querySelector('textarea');
+      if (!ta || !values[0]) return;
+      setNativeValue(ta, values[0]);
+    },
+  };
+  var checkboxHandler = {
+    type: 'checkbox',
+    detect(container) {
+      return container.querySelectorAll('[role="checkbox"]').length > 0;
+    },
+    read(container) {
+      return [...container.querySelectorAll('[role="checkbox"][aria-checked="true"]')].map(
+        getOptionLabel
+      );
+    },
+    readOptions(container) {
+      return [...container.querySelectorAll('[role="checkbox"]')].map((cb) =>
+        getOptionLabel(cb).trim()
+      );
+    },
+    async write(container, values) {
+      const checkboxes = [...container.querySelectorAll('[role="checkbox"]')];
+      for (const cb of checkboxes) {
+        const label = getOptionLabel(cb).trim();
+        const shouldBeChecked = values.some((v) => v.trim() === label);
+        const isChecked = cb.getAttribute('aria-checked') === 'true';
+        if (shouldBeChecked !== isChecked) {
+          simulateClick(cb);
+          dispatchNativeEvents(cb);
+          await delay(30);
+        }
+      }
+    },
+  };
+  var dropdownHandler = {
+    type: 'dropdown',
+    detect(container) {
+      return !!(container.querySelector('[role="listbox"]') || container.querySelector('select'));
+    },
+    read(container) {
+      const select = container.querySelector('select');
+      if (select && select.value) {
+        return [select.options[select.selectedIndex]?.text?.trim() || select.value];
+      }
+      const listbox = container.querySelector('[role="listbox"]');
+      if (!listbox) return [];
+      const selected = listbox.querySelector('[aria-selected="true"]');
+      if (selected) return [selected.textContent.trim()];
+      const text = listbox.textContent.trim();
+      return text && text.toLowerCase() !== 'choose' ? [text] : [];
+    },
+    readOptions(container) {
+      const select = container.querySelector('select');
+      if (select) {
+        return [...select.options]
+          .map((o) => o.text.trim())
+          .filter((t) => t.toLowerCase() !== 'choose' && t !== '');
+      }
+      const listbox = container.querySelector('[role="listbox"]');
+      if (!listbox) return null;
+      const options = [...listbox.querySelectorAll('[role="option"]')];
+      if (options.length > 0) {
+        return options
+          .map((o) => getOptionLabel(o).trim())
+          .filter((t) => t.toLowerCase() !== 'choose' && t !== '');
+      }
+      return null;
+    },
+    async write(container, values) {
+      if (!values[0]) return;
+      const select = container.querySelector('select');
+      if (select) {
+        const option = [...select.options].find((o) => o.text.trim() === values[0].trim());
+        if (option) {
+          select.value = option.value;
+          dispatchNativeEvents(select);
+        }
+        return;
+      }
+      const listbox = container.querySelector('[role="listbox"]');
+      if (!listbox) return;
+      simulateClick(listbox);
+      await delay(250);
+      const options = [...document.querySelectorAll('[role="option"]')];
+      const target = options.find((o) => o.textContent.trim() === values[0].trim());
+      if (target) {
+        simulateClick(target);
+        await delay(50);
+        dispatchNativeEvents(listbox);
+      } else {
+        document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      }
+    },
+  };
+  var radioHandler = {
+    type: 'radio',
+    detect(container) {
+      return !!(
+        container.querySelector('[role="radiogroup"]') || container.querySelector('[role="radio"]')
+      );
+    },
+    read(container) {
+      const checked = container.querySelector('[role="radio"][aria-checked="true"]');
+      return checked ? [getOptionLabel(checked)] : [];
+    },
+    readOptions(container) {
+      return [...container.querySelectorAll('[role="radio"]')].map((r) => getOptionLabel(r).trim());
+    },
+    async write(container, values) {
+      if (!values[0]) return;
+      const radios = [...container.querySelectorAll('[role="radio"]')];
+      const target = radios.find((r) => getOptionLabel(r).trim() === values[0].trim());
+      if (!target) return;
+      simulateClick(target);
+      dispatchNativeEvents(target);
+    },
+  };
+  var textHandler = {
+    type: 'text',
+    detect(container) {
+      const input = container.querySelector('input[type="text"], input:not([type])');
+      if (!input) return false;
+      if (container.querySelector('[role="group"]')) return false;
+      return true;
+    },
+    read(container) {
+      const input = container.querySelector('input[type="text"], input:not([type])');
+      return input?.value ? [input.value] : [];
+    },
+    async write(container, values) {
+      const input = container.querySelector('input[type="text"], input:not([type])');
+      if (!input || !values[0]) return;
+      setNativeValue(input, values[0]);
+    },
+  };
+  var HANDLERS = [
+    linearScaleHandler,
+    // before radio (both use radiogroup)
+    dateHandler,
+    // before text (date containers have plain inputs)
+    timeHandler,
+    // before text (time containers have plain inputs)
+    textareaHandler,
+    checkboxHandler,
+    dropdownHandler,
+    radioHandler,
+    textHandler,
+    // most generic — always last
+  ];
   function detectHandler(container) {
     return HANDLERS.find((h) => h.detect(container)) || null;
   }
@@ -938,300 +1155,9 @@
     }
     return merged;
   }
-  var WIDGET_SELECTOR,
-    linearScaleHandler,
-    dateHandler,
-    timeHandler,
-    textareaHandler,
-    checkboxHandler,
-    dropdownHandler,
-    radioHandler,
-    textHandler,
-    HANDLERS;
-  var init_fields = __esm({
-    'google_forms/core/fields.js'() {
-      init_hash();
-      init_logging();
-      WIDGET_SELECTOR =
-        'input, textarea, [role="radiogroup"], [role="radio"], [role="checkbox"], [role="listbox"], select';
-      linearScaleHandler = {
-        type: 'linearScale',
-        detect(container) {
-          const group = container.querySelector('[role="radiogroup"]');
-          if (!group) return false;
-          const radios = [...group.querySelectorAll('[role="radio"]')];
-          if (radios.length < 2) return false;
-          return radios.every((r) => /^\d+$/.test(getOptionLabel(r).trim()));
-        },
-        read(container) {
-          const checked = container.querySelector('[role="radio"][aria-checked="true"]');
-          return checked ? [getOptionLabel(checked)] : [];
-        },
-        readOptions(container) {
-          const group = container.querySelector('[role="radiogroup"]');
-          if (!group) return null;
-          return [...group.querySelectorAll('[role="radio"]')].map((r) => getOptionLabel(r).trim());
-        },
-        async write(container, values) {
-          if (!values[0]) return;
-          const radios = [...container.querySelectorAll('[role="radio"]')];
-          const target = radios.find((r) => getOptionLabel(r).trim() === values[0].trim());
-          if (!target) return;
-          simulateClick(target);
-          dispatchNativeEvents(target);
-        },
-      };
-      dateHandler = {
-        type: 'date',
-        detect(container) {
-          if (container.querySelector('input[type="date"]')) return true;
-          if (!container.querySelector('[role="group"]')) return false;
-          return !!(
-            container.querySelector('[aria-label*="month" i]') ||
-            container.querySelector('[aria-label*="day" i]') ||
-            container.querySelector('[aria-label*="year" i]')
-          );
-        },
-        read(container) {
-          const native = container.querySelector('input[type="date"]');
-          if (native) return native.value ? [native.value] : [];
-          const month = container.querySelector('[aria-label*="month" i]')?.value?.trim() || '';
-          const day = container.querySelector('[aria-label*="day" i]')?.value?.trim() || '';
-          const year = container.querySelector('[aria-label*="year" i]')?.value?.trim() || '';
-          if (!month && !day && !year) return [];
-          return [
-            `${year}-${String(parseInt(month) || 0).padStart(2, '0')}-${String(parseInt(day) || 0).padStart(2, '0')}`,
-          ];
-        },
-        async write(container, values) {
-          if (!values[0]) return;
-          const native = container.querySelector('input[type="date"]');
-          if (native) {
-            setNativeValue(native, values[0]);
-            return;
-          }
-          const parts = values[0].split('-');
-          const year = parts[0] || '';
-          const month = String(parseInt(parts[1]) || 0);
-          const day = String(parseInt(parts[2]) || 0);
-          const setField = (selector, val) => {
-            const el2 = container.querySelector(selector);
-            if (el2) setNativeValue(el2, val);
-          };
-          setField('[aria-label*="month" i]', month);
-          setField('[aria-label*="day" i]', day);
-          setField('[aria-label*="year" i]', year);
-        },
-      };
-      timeHandler = {
-        type: 'time',
-        detect(container) {
-          if (container.querySelector('input[type="time"]')) return true;
-          if (!container.querySelector('[role="group"]')) return false;
-          return !!(
-            container.querySelector('[aria-label*="hour" i]') ||
-            container.querySelector('[aria-label*="minute" i]')
-          );
-        },
-        read(container) {
-          const native = container.querySelector('input[type="time"]');
-          if (native) return native.value ? [native.value] : [];
-          const hour = container.querySelector('[aria-label*="hour" i]')?.value?.trim() || '';
-          const minute = container.querySelector('[aria-label*="minute" i]')?.value?.trim() || '';
-          if (!hour && !minute) return [];
-          return [
-            `${String(parseInt(hour) || 0).padStart(2, '0')}:${String(parseInt(minute) || 0).padStart(2, '0')}`,
-          ];
-        },
-        async write(container, values) {
-          if (!values[0]) return;
-          const native = container.querySelector('input[type="time"]');
-          if (native) {
-            setNativeValue(native, values[0]);
-            return;
-          }
-          const [hour, minute] = values[0].split(':');
-          const setField = (selector, val) => {
-            const el2 = container.querySelector(selector);
-            if (el2) setNativeValue(el2, val);
-          };
-          setField('[aria-label*="hour" i]', String(parseInt(hour) || 0));
-          setField('[aria-label*="minute" i]', String(parseInt(minute) || 0));
-          const ampm = container.querySelector('[aria-label*="AM" i], [aria-label*="PM" i]');
-          if (ampm) {
-            const h = parseInt(hour) || 0;
-            setNativeValue(ampm, h >= 12 ? 'PM' : 'AM');
-          }
-        },
-      };
-      textareaHandler = {
-        type: 'textarea',
-        detect(container) {
-          return !!container.querySelector('textarea');
-        },
-        read(container) {
-          const ta = container.querySelector('textarea');
-          return ta?.value ? [ta.value] : [];
-        },
-        async write(container, values) {
-          const ta = container.querySelector('textarea');
-          if (!ta || !values[0]) return;
-          setNativeValue(ta, values[0]);
-        },
-      };
-      checkboxHandler = {
-        type: 'checkbox',
-        detect(container) {
-          return container.querySelectorAll('[role="checkbox"]').length > 0;
-        },
-        read(container) {
-          return [...container.querySelectorAll('[role="checkbox"][aria-checked="true"]')].map(
-            getOptionLabel
-          );
-        },
-        readOptions(container) {
-          return [...container.querySelectorAll('[role="checkbox"]')].map((cb) =>
-            getOptionLabel(cb).trim()
-          );
-        },
-        async write(container, values) {
-          const checkboxes = [...container.querySelectorAll('[role="checkbox"]')];
-          for (const cb of checkboxes) {
-            const label = getOptionLabel(cb).trim();
-            const shouldBeChecked = values.some((v) => v.trim() === label);
-            const isChecked = cb.getAttribute('aria-checked') === 'true';
-            if (shouldBeChecked !== isChecked) {
-              simulateClick(cb);
-              dispatchNativeEvents(cb);
-              await delay(30);
-            }
-          }
-        },
-      };
-      dropdownHandler = {
-        type: 'dropdown',
-        detect(container) {
-          return !!(
-            container.querySelector('[role="listbox"]') || container.querySelector('select')
-          );
-        },
-        read(container) {
-          const select = container.querySelector('select');
-          if (select && select.value) {
-            return [select.options[select.selectedIndex]?.text?.trim() || select.value];
-          }
-          const listbox = container.querySelector('[role="listbox"]');
-          if (!listbox) return [];
-          const selected = listbox.querySelector('[aria-selected="true"]');
-          if (selected) return [selected.textContent.trim()];
-          const text = listbox.textContent.trim();
-          return text && text.toLowerCase() !== 'choose' ? [text] : [];
-        },
-        readOptions(container) {
-          const select = container.querySelector('select');
-          if (select) {
-            return [...select.options]
-              .map((o) => o.text.trim())
-              .filter((t) => t.toLowerCase() !== 'choose' && t !== '');
-          }
-          const listbox = container.querySelector('[role="listbox"]');
-          if (!listbox) return null;
-          const options = [...listbox.querySelectorAll('[role="option"]')];
-          if (options.length > 0) {
-            return options
-              .map((o) => getOptionLabel(o).trim())
-              .filter((t) => t.toLowerCase() !== 'choose' && t !== '');
-          }
-          return null;
-        },
-        async write(container, values) {
-          if (!values[0]) return;
-          const select = container.querySelector('select');
-          if (select) {
-            const option = [...select.options].find((o) => o.text.trim() === values[0].trim());
-            if (option) {
-              select.value = option.value;
-              dispatchNativeEvents(select);
-            }
-            return;
-          }
-          const listbox = container.querySelector('[role="listbox"]');
-          if (!listbox) return;
-          simulateClick(listbox);
-          await delay(250);
-          const options = [...document.querySelectorAll('[role="option"]')];
-          const target = options.find((o) => o.textContent.trim() === values[0].trim());
-          if (target) {
-            simulateClick(target);
-            await delay(50);
-            dispatchNativeEvents(listbox);
-          } else {
-            document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-          }
-        },
-      };
-      radioHandler = {
-        type: 'radio',
-        detect(container) {
-          return !!(
-            container.querySelector('[role="radiogroup"]') ||
-            container.querySelector('[role="radio"]')
-          );
-        },
-        read(container) {
-          const checked = container.querySelector('[role="radio"][aria-checked="true"]');
-          return checked ? [getOptionLabel(checked)] : [];
-        },
-        readOptions(container) {
-          return [...container.querySelectorAll('[role="radio"]')].map((r) =>
-            getOptionLabel(r).trim()
-          );
-        },
-        async write(container, values) {
-          if (!values[0]) return;
-          const radios = [...container.querySelectorAll('[role="radio"]')];
-          const target = radios.find((r) => getOptionLabel(r).trim() === values[0].trim());
-          if (!target) return;
-          simulateClick(target);
-          dispatchNativeEvents(target);
-        },
-      };
-      textHandler = {
-        type: 'text',
-        detect(container) {
-          const input = container.querySelector('input[type="text"], input:not([type])');
-          if (!input) return false;
-          if (container.querySelector('[role="group"]')) return false;
-          return true;
-        },
-        read(container) {
-          const input = container.querySelector('input[type="text"], input:not([type])');
-          return input?.value ? [input.value] : [];
-        },
-        async write(container, values) {
-          const input = container.querySelector('input[type="text"], input:not([type])');
-          if (!input || !values[0]) return;
-          setNativeValue(input, values[0]);
-        },
-      };
-      HANDLERS = [
-        linearScaleHandler,
-        // before radio (both use radiogroup)
-        dateHandler,
-        // before text (date containers have plain inputs)
-        timeHandler,
-        // before text (time containers have plain inputs)
-        textareaHandler,
-        checkboxHandler,
-        dropdownHandler,
-        radioHandler,
-        textHandler,
-        // most generic — always last
-      ];
-    },
-  });
 
   // google_forms/core/ui.js
+  var currentFormId = null;
   function ensureStyles() {
     const id = `${DOM_ID_PREFIX}styles`;
     if (document.getElementById(id)) return;
@@ -1901,61 +1827,41 @@
       error('[GF-Saver] autoLoadIfSingleSave error:', err);
     }
   }
-  var currentFormId;
-  var init_ui = __esm({
-    'google_forms/core/ui.js'() {
-      init_main();
-      init_storage();
-      init_fields();
-      init_logging();
-      init_constants();
-      currentFormId = null;
-    },
-  });
 
   // google_forms/entry.js
-  var require_entry = __commonJS({
-    'google_forms/entry.js'() {
-      init_init();
-      init_storage();
-      init_ui();
-      init_logging();
-      var lastInitUrl = '';
-      function init() {
-        const href = location.href;
-        if (href === lastInitUrl) return;
-        lastInitUrl = href;
-        const formId = getFormId(href);
-        if (!formId) {
-          log('no form ID in URL, skipping init');
-          return;
-        }
-        log('initialising for', href, '\u2014 form ID:', formId);
-        waitForForm(() => {
-          log('form ready \u2014 injecting/refreshing UI');
-          createFloatingButton(formId);
-          autoLoadIfSingleSave(formId);
-        });
-      }
-      (function patchHistory() {
-        function onNav() {
-          setTimeout(init, 300);
-        }
-        const origPush = history.pushState.bind(history);
-        history.pushState = function (...args) {
-          origPush(...args);
-          onNav();
-        };
-        const origReplace = history.replaceState.bind(history);
-        history.replaceState = function (...args) {
-          origReplace(...args);
-          onNav();
-        };
-        window.addEventListener('popstate', onNav);
-      })();
-      init();
-    },
-  });
-  require_entry();
+  var lastInitUrl = '';
+  function init() {
+    const href = location.href;
+    if (href === lastInitUrl) return;
+    lastInitUrl = href;
+    const formId = getFormId(href);
+    if (!formId) {
+      log('no form ID in URL, skipping init');
+      return;
+    }
+    log('initialising for', href, '\u2014 form ID:', formId);
+    waitForForm(() => {
+      log('form ready \u2014 injecting/refreshing UI');
+      createFloatingButton(formId);
+      autoLoadIfSingleSave(formId);
+    });
+  }
+  (function patchHistory() {
+    function onNav() {
+      setTimeout(init, 300);
+    }
+    const origPush = history.pushState.bind(history);
+    history.pushState = function (...args) {
+      origPush(...args);
+      onNav();
+    };
+    const origReplace = history.replaceState.bind(history);
+    history.replaceState = function (...args) {
+      origReplace(...args);
+      onNav();
+    };
+    window.addEventListener('popstate', onNav);
+  })();
+  init();
 })();
 //# sourceMappingURL=google-forms-saver.user.js.map
