@@ -37,18 +37,21 @@ async function buildAll() {
     const excludeLines = app.excludes.map((e) => `// @exclude      ${e}`).join('\n');
     const grantLines = app.grants.map((g) => `// @grant        ${g}`).join('\n');
 
-    const supportUrl = `https://github.com/nihaltp/uscripts/issues/new?template=bug.yml`;
-    const downloadBase = `https://raw.githubusercontent.com/nihaltp/uscripts/main/google_forms/${app.outfile}`;
+    const githubUsername = `nihaltp`;
+    const githubRepo = `${githubUsername}/uscripts`;
+    const githubUrl = `https://github.com/${githubRepo}`;
+    const supportUrl = `${githubUrl}/issues/new?template=bug.yml`;
+    const downloadBase = `https://raw.githubusercontent.com/${githubRepo}/main/google_forms/${app.outfile}`;
 
     const banner =
       `// ==UserScript==\n` +
       `// @name         ${app.name}\n` +
       `// @description  ${app.description}\n` +
-      `// @author       nihaltp\n` +
-      `// @namespace    https://github.com/nihaltp/uscripts\n` +
+      `// @author       ${githubUsername}\n` +
+      `// @namespace    ${githubUrl}\n` +
       `// @supportURL   ${supportUrl}\n` +
-      `// @homepageURL  https://github.com/nihaltp/uscripts\n` +
-      `// @homepage     https://github.com/nihaltp/uscripts\n` +
+      `// @homepageURL  ${githubUrl}\n` +
+      `// @homepage     ${githubUrl}\n` +
       `// @license      MIT\n` +
       `${matchLines}${matchLines ? '\n' : ''}` +
       (includeLines ? `${includeLines}\n` : '') +

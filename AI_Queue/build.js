@@ -55,22 +55,28 @@ async function buildAll() {
     const excludeLines = app.excludes.map((e) => `// @exclude      ${e}`).join('\n');
     const grantLines = app.grants.map((g) => `// @grant        ${g}`).join('\n');
 
+    const githubUsername = `nihaltp`;
+    const githubRepo = `${githubUsername}/uscripts`;
+    const githubUrl = `https://github.com/${githubRepo}`;
+    const supportUrl = `${githubUrl}/issues/new?template=bug.yml`;
+    const downloadBase = `https://raw.githubusercontent.com/${githubRepo}/main/AI_Queue/${app.outfile}`;
+
     const banner = `// ==UserScript==
 // @name         ${app.name}
 // @description  ${app.description}
-// @author       nihaltp
-// @namespace    https://github.com/nihaltp/uscripts
-// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=bug.yml
-// @homepageURL  https://github.com/nihaltp/uscripts
-// @homepage     https://github.com/nihaltp/uscripts
+// @author       ${githubUsername}
+// @namespace    ${githubUrl}
+// @supportURL   ${supportUrl}
+// @homepageURL  ${githubUrl}
+// @homepage     ${githubUrl}
 // @license      MIT
 ${matchLines}
 ${excludeLines}
 // @icon         ${app.icon}
 // @version      ${versions[app.id]}
 ${grantLines}
-// @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/${app.outfile}
-// @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/${app.outfile}
+// @downloadURL  ${downloadBase}
+// @updateURL    ${downloadBase}
 // @run-at       ${app.runAt}
 // ==/UserScript==
 `;
