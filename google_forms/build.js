@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 import prettier from 'prettier';
 
 import { config } from '../config.js';
-import versions from './versions.json' with { type: 'json' };
+import versions from '../versions.json' with { type: 'json' };
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 

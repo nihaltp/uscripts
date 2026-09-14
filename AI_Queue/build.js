@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import prettier from 'prettier';
 
 import { config } from '../config.js';
-import versions from './versions.json' with { type: 'json' };
+import versions from '../versions.json' with { type: 'json' };
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -59,6 +59,7 @@ async function buildAll() {
     const grantLines = app.grants.map((g) => `// @grant        ${g}`).join('\n');
 
     const downloadBase = `${config.downloadGithubRawUrl}/${rootDir}/${app.outfile}`;
+    const version = versions[path.basename(rootDir)][app.id];
 
     const banner = `// ==UserScript==
 // @name         ${app.name}
@@ -72,7 +73,7 @@ async function buildAll() {
 ${matchLines}
 ${excludeLines}
 // @icon         ${app.icon}
-// @version      ${versions[app.id]}
+// @version      ${version}
 ${grantLines}
 // @downloadURL  ${downloadBase}
 // @updateURL    ${downloadBase}
