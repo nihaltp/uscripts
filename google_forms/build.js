@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from "url";
 import prettier from 'prettier';
 
+import { config } from '../config.js';
 import versions from './versions.json' with { type: 'json' };
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
@@ -29,7 +30,7 @@ const builds = [
     icon: 'https://www.google.com/s2/favicons?sz=64&domain=docs.google.com',
     runAt: 'document-idle',
     entry: 'entry.js',
-    outfile: 'dist/google-forms-saver.user.js',
+    outfile: `${config.outputDir}/google-forms-saver.user.js`,
   },
 ];
 
@@ -40,22 +41,18 @@ async function buildAll() {
     const excludeLines = app.excludes.map((e) => `// @exclude      ${e}`).join('\n');
     const grantLines = app.grants.map((g) => `// @grant        ${g}`).join('\n');
 
-    const githubUsername = `nihaltp`;
-    const githubRepo = `${githubUsername}/uscripts`;
-    const githubUrl = `https://github.com/${githubRepo}`;
-    const supportUrl = `${githubUrl}/issues/new?template=bug.yml`;
-    const downloadBase = `https://raw.githubusercontent.com/${githubRepo}/main/google_forms/${app.outfile}`;
+    const downloadBase = `${config.downloadGithubRawUrl}/google_forms/${app.outfile}`;
 
     const banner =
       `// ==UserScript==\n` +
       `// @name         ${app.name}\n` +
       `// @description  ${app.description}\n` +
-      `// @author       ${githubUsername}\n` +
-      `// @namespace    ${githubUrl}\n` +
-      `// @supportURL   ${supportUrl}\n` +
-      `// @homepageURL  ${githubUrl}\n` +
-      `// @homepage     ${githubUrl}\n` +
-      `// @license      MIT\n` +
+      `// @author       ${config.username}\n` +
+      `// @namespace    ${config.githubRepo}\n` +
+      `// @supportURL   ${config.supportUrl}\n` +
+      `// @homepageURL  ${config.githubRepo}\n` +
+      `// @homepage     ${config.githubRepo}\n` +
+      `// @license      ${config.defaultLicense}\n` +
       `${matchLines}${matchLines ? '\n' : ''}` +
       (includeLines ? `${includeLines}\n` : '') +
       (excludeLines ? `${excludeLines}\n` : '') +
