@@ -41,7 +41,7 @@ async function buildAll() {
     const excludeLines = app.excludes.map((e) => `// @exclude      ${e}`).join('\n');
     const grantLines = app.grants.map((g) => `// @grant        ${g}`).join('\n');
 
-    const downloadBase = `${config.downloadGithubRawUrl}/google_forms/${app.outfile}`;
+    const downloadBase = `${config.downloadGithubRawUrl}/${rootDir}/${app.outfile}`;
 
     const banner =
       `// ==UserScript==\n` +
