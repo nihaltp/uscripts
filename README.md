@@ -117,3 +117,9 @@
 [Wallhaven Auto Resolution Filler](https://raw.githubusercontent.com/nihaltp/uscripts/main/wallhaven/original-resolution.user.js)
 
 > Automatically fills resolution in the popup shown when the "crop and download" button is clicked, resolution of the original image is used from sidebar
+
+## etlab
+
+[Assignment Table Sorter](https://raw.githubusercontent.com/nihaltp/uscripts/main/etlab/assignment_table.user.js)
+
+> Sort the table in /student/assignment page, remember preference
