@@ -1,4 +1,4 @@
-## W3Schools
+## <img src="https://www.google.com/s2/favicons?sz=64&domain=w3schools.com" width="20" height="20" alt=""> W3Schools
 
 [Auto-continue on w3schools lessons after clicking "Next" button](https://raw.githubusercontent.com/nihaltp/uscripts/main/w3schools/auto_continue.user.js)
 <details>
@@ -27,7 +27,7 @@
 
 </details>
 
-## Pixabay
+## <img src="https://www.google.com/s2/favicons?sz=64&domain=pixabay.com" width="20" height="20" alt=""> Pixabay
 
 [Hide AI Images in Pixabay](https://raw.githubusercontent.com/nihaltp/uscripts/main/pixabay/hide_ai.user.js)
 <details>
@@ -47,7 +47,7 @@
 
 </details>
 
-## YouTube
+## <img src="https://www.google.com/s2/favicons?sz=64&domain=youtube.com" width="20" height="20" alt=""> YouTube
 
 [Persistant Playback Speed](https://raw.githubusercontent.com/nihaltp/uscripts/main/yt/playback_speed.user.js) - Remember your preferred playback speed on YouTube and apply it to all videos. updates the speed in real-time as you change it.
 <details>
@@ -59,7 +59,7 @@
 
 </details>
 
-## 10FastFingers
+## <img src="https://www.google.com/s2/favicons?sz=64&domain=10fastfingers.com" width="20" height="20" alt=""> 10FastFingers
 
 [Retest on Enter](https://raw.githubusercontent.com/nihaltp/uscripts/main/10fastfingers/enter_retest.user.js) - Press reset button when enter key is pressed
 <details>
@@ -70,7 +70,7 @@
 
 </details>
 
-## ChatGPT
+## <img src="https://www.google.com/s2/favicons?sz=64&domain=chatgpt.com" width="20" height="20" alt=""> ChatGPT
 
 [ChatGPT Prompt Queue](https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js) - A script to manage multiple AI conversations in a queue, allowing you to switch between them and keep track of their status.
 <details>
@@ -83,7 +83,7 @@
 
 </details>
 
-## Gemini
+## <img src="https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com" width="20" height="20" alt=""> Gemini
 
 [Gemini Prompt Queue](https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/gemini.user.js) - A script to manage multiple Gemini prompts in a queue, allowing you to switch between them and keep track of their status.
 <details>
@@ -96,7 +96,7 @@
 
 </details>
 
-## Google Forms
+## <img src="https://www.google.com/s2/favicons?sz=64&domain=docs.google.com" width="20" height="20" alt=""> Google Forms
 
 [Google Forms Auto Fill](https://raw.githubusercontent.com/nihaltp/uscripts/main/google_forms/dist/google-forms-saver.user.js) - A script to automatically fill Google Forms with saved data, making it easier to complete forms quickly.
 
@@ -112,13 +112,13 @@
 
 </details>
 
-## Wallhaven
+## <img src="https://www.google.com/s2/favicons?sz=64&domain=wallhaven.cc" width="20" height="20" alt=""> Wallhaven
 
 [Wallhaven Auto Resolution Filler](https://raw.githubusercontent.com/nihaltp/uscripts/main/wallhaven/original-resolution.user.js)
 
 > Automatically fills resolution in the popup shown when the "crop and download" button is clicked, resolution of the original image is used from sidebar
 
-## etlab
+## <img src="https://rit.etlab.in/favicon.ico" width="20" height="20" alt=""> etlab
 
 [Assignment Table Sorter](https://raw.githubusercontent.com/nihaltp/uscripts/main/etlab/assignment_table.user.js)
 
