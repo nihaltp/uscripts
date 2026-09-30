@@ -2,5 +2,6 @@
 
 Provider-specific logic for each AI platform lives here.
 
-- [`chatgpt.js`](chatgpt.js) contains ChatGPT-specific panel, rendering, and drag behavior.
-- [`gemini.js`](gemini.js) contains Gemini-specific panel, rendering, and drag behavior.
+- [`provider-base.js`](provider-base.js) contains shared provider logic via a `createProvider` factory function.
+- [`chatgpt.js`](chatgpt.js) contains ChatGPT-specific URL parsing and provider configuration.
+- [`gemini.js`](gemini.js) contains Gemini-specific URL parsing and provider configuration.
