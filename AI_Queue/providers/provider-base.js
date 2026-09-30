@@ -285,7 +285,7 @@ export function createProvider(config) {
         await sleep(2000);
 
         const settings = getSettings();
-        if (settings.autoRetryEnabled && hasErrorState()) {
+        if (settings.autoRetryEnabled && hasErrorState(prompt)) {
           queueState.recentErrorIds.add(item.id);
           if (queueState.recentErrorIds.size > 5) {
             const firstId = queueState.recentErrorIds.values().next().value;
@@ -298,14 +298,14 @@ export function createProvider(config) {
             queueState.currentRetryCount++;
             setStatus(panel, `Retrying (${queueState.currentRetryCount}/${settings.maxRetries}): ${prompt.slice(0, 40)}...`);
 
-            const retryButton = findRetryButton();
+            const retryButton = findRetryButton(prompt);
             if (retryButton) {
               safeClick(retryButton);
               await sleep(300);
               await waitForIdle();
               await sleep(2000);
 
-              if (!hasErrorState()) {
+              if (!hasErrorState(prompt)) {
                 log('Retry successful');
                 item.attempts = 0;
                 queueState.currentRetryCount = 0;
@@ -317,7 +317,7 @@ export function createProvider(config) {
             }
           }
 
-          if (hasErrorState() && queueState.currentRetryCount >= settings.maxRetries) {
+          if (hasErrorState(prompt) && queueState.currentRetryCount >= settings.maxRetries) {
             log('Retry limit reached, applying action:', settings.retryLimitAction);
             if (settings.retryLimitAction === 'stop') {
               setStatus(panel, 'Retry limit reached, stopping queue');
