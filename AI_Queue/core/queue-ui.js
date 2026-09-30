@@ -39,6 +39,11 @@ export function createQueueItemElement(item, { renderQueue, saveQueue }) {
   editBtn.title = 'Edit';
   Object.assign(editBtn.style, iconBtnStyle, { color: 'var(--pq-ui-accent)' });
 
+  const sendBtn = document.createElement('button');
+  sendBtn.textContent = '➤';
+  sendBtn.title = 'Send';
+  Object.assign(sendBtn.style, iconBtnStyle, { color: 'var(--pq-ui-accent)' });
+
   const deleteBtn = document.createElement('button');
   deleteBtn.textContent = '✕';
   deleteBtn.title = 'Delete';
@@ -46,6 +51,7 @@ export function createQueueItemElement(item, { renderQueue, saveQueue }) {
 
   row.appendChild(text);
   row.appendChild(editBtn);
+  row.appendChild(sendBtn);
   row.appendChild(deleteBtn);
 
   const dragHandle = document.createElement('span');
@@ -80,13 +86,18 @@ export function createQueueItemElement(item, { renderQueue, saveQueue }) {
   // hover show/hide
   li.addEventListener('mouseenter', () => {
     editBtn.style.display = 'inline-block';
+    sendBtn.style.display = 'inline-block';
     deleteBtn.style.display = 'inline-block';
     dragHandle.style.display = 'inline-block';
   });
+
   li.addEventListener('mouseleave', () => {
     if (queueState.editingId === item.id) return;
+
     editBtn.style.display = 'none';
+    sendBtn.style.display = 'none';
     deleteBtn.style.display = 'none';
+
     if (queueState.draggedId === item.id) return;
     dragHandle.style.display = 'none';
   });
@@ -116,5 +127,5 @@ export function createQueueItemElement(item, { renderQueue, saveQueue }) {
   });
 
   // expose controls for provider to wire
-  return { li, text, editBtn, deleteBtn };
+  return { li, text, editBtn, sendBtn, deleteBtn };
 }
