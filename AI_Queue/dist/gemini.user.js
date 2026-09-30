@@ -11,7 +11,7 @@
 // @match        https://gemini.google.com/app/*
 // @exclude      https://gemini.google.com/signin/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gemini.google.com
-// @version      3.3.0
+// @version      3.4.0
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/gemini.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/gemini.user.js
@@ -647,7 +647,7 @@
     },
   });
 
-  // AI_Queue/providers/gemini.js
+  // AI_Queue/providers/provider-base.js
   init_state();
 
   // AI_Queue/core/panel.js
@@ -957,12 +957,17 @@
     editBtn.textContent = '\u{1F589}';
     editBtn.title = 'Edit';
     Object.assign(editBtn.style, iconBtnStyle, { color: 'var(--pq-ui-accent)' });
+    const sendBtn = document.createElement('button');
+    sendBtn.textContent = '\u27A4';
+    sendBtn.title = 'Send';
+    Object.assign(sendBtn.style, iconBtnStyle, { color: 'var(--pq-ui-accent)' });
     const deleteBtn = document.createElement('button');
     deleteBtn.textContent = '\u2715';
     deleteBtn.title = 'Delete';
     Object.assign(deleteBtn.style, iconBtnStyle, { color: 'var(--pq-ui-danger)' });
     row.appendChild(text);
     row.appendChild(editBtn);
+    row.appendChild(sendBtn);
     row.appendChild(deleteBtn);
     const dragHandle = document.createElement('span');
     dragHandle.textContent = '\u2630';
@@ -990,12 +995,14 @@
     li.appendChild(row);
     li.addEventListener('mouseenter', () => {
       editBtn.style.display = 'inline-block';
+      sendBtn.style.display = 'inline-block';
       deleteBtn.style.display = 'inline-block';
       dragHandle.style.display = 'inline-block';
     });
     li.addEventListener('mouseleave', () => {
       if (queueState.editingId === item.id) return;
       editBtn.style.display = 'none';
+      sendBtn.style.display = 'none';
       deleteBtn.style.display = 'none';
       if (queueState.draggedId === item.id) return;
       dragHandle.style.display = 'none';
@@ -1022,7 +1029,7 @@
         moveQueueItem(draggedId, item.id, queueState.queue, renderQueue, saveQueue2);
       }
     });
-    return { li, text, editBtn, deleteBtn };
+    return { li, text, editBtn, sendBtn, deleteBtn };
   }
 
   // AI_Queue/core/storage.js
@@ -1287,7 +1294,7 @@
     }
   }
 
-  // AI_Queue/providers/gemini.js
+  // AI_Queue/providers/provider-base.js
   init_ui2();
 
   // AI_Queue/core/panel-controls.js
@@ -1960,9 +1967,6 @@
     updateStartStopButtons();
   }
 
-  // AI_Queue/providers/gemini.js
-  init_logging();
-
   // AI_Queue/core/keyboard.js
   init_logging();
   init_utils();
@@ -2350,110 +2354,8 @@
     }, scrollTargets);
   }
 
-  // AI_Queue/core/bootstrap.js
+  // AI_Queue/providers/provider-base.js
   init_logging();
-  init_state();
-  init_ui2();
-  function bootstrapQueueApp(provider) {
-    globalThis.aiQueue = queueState;
-    log('AI_Queue running', true);
-    const storageKey = provider.storageKey;
-    const syncFromStorage = () => {
-      resetQueueState({ includeFailedQueue: !!provider.includeFailedQueue });
-      provider.loadQueue?.();
-      provider.renderQueue?.();
-      provider.ensureToolbarButton?.();
-      if (storageKey) {
-        refreshChatManager(storageKey);
-      }
-    };
-    queueState.syncFromStorage = syncFromStorage;
-    const refreshForCurrentUrl = (previousUrl = location.href, currentUrl = location.href) => {
-      const getScope = provider.getCurrentScope;
-      const previousScope = typeof getScope === 'function' ? getScope(previousUrl) : null;
-      const currentScope = typeof getScope === 'function' ? getScope(currentUrl) : null;
-      if (
-        queueState.running &&
-        queueState.awaitingChatScopeSync &&
-        !previousScope &&
-        currentScope
-      ) {
-        const updated = applyScopeToQueuedItems(
-          queueState.queue,
-          queueState.failedQueue,
-          currentScope
-        );
-        if (updated) {
-          provider.saveQueue?.();
-          provider.renderQueue?.();
-          provider.ensureToolbarButton?.();
-          if (storageKey) {
-            refreshChatManager(storageKey);
-          }
-        }
-        queueState.awaitingChatScopeSync = false;
-        return;
-      }
-      if (queueState.running) {
-        queueState.running = false;
-      }
-      syncFromStorage();
-    };
-    syncFromStorage();
-    provider.createPanel();
-    provider.setupPanelControls?.({
-      createItem: provider.createItem,
-      renderQueue: provider.renderQueue,
-      saveQueue: provider.saveQueue,
-      processQueue: provider.processQueue,
-      openChatManager: provider.openChatManager,
-    });
-    provider.setupPanelDrag?.();
-    setupPanelResize();
-    provider.renderQueue?.();
-    provider.ensureToolbarButton?.();
-    if (storageKey) {
-      window.addEventListener('storage', (event) => {
-        if (event.storageArea !== localStorage) return;
-        if (event.key !== storageKey) return;
-        syncFromStorage();
-      });
-    }
-    startDomObserver(
-      provider.createPanel,
-      () =>
-        provider.setupPanelControls?.({
-          createItem: provider.createItem,
-          renderQueue: provider.renderQueue,
-          saveQueue: provider.saveQueue,
-          processQueue: provider.processQueue,
-          openChatManager: provider.openChatManager,
-        }),
-      () => {
-        provider.setupPanelDrag?.();
-        setupPanelResize();
-      },
-      provider.ensureToolbarButton,
-      provider.isOwnMutation
-    );
-    startUrlWatcher(
-      provider.createPanel,
-      () =>
-        provider.setupPanelControls?.({
-          createItem: provider.createItem,
-          renderQueue: provider.renderQueue,
-          saveQueue: provider.saveQueue,
-          processQueue: provider.processQueue,
-          openChatManager: provider.openChatManager,
-        }),
-      () => {
-        provider.setupPanelDrag?.();
-        setupPanelResize();
-      },
-      provider.ensureToolbarButton,
-      refreshForCurrentUrl
-    );
-  }
 
   // AI_Queue/core/selection-menu.js
   init_state();
@@ -2570,6 +2472,428 @@
     window.addEventListener('resize', hideSelectionMenu);
   }
 
+  // AI_Queue/providers/provider-base.js
+  function queryPanel() {
+    return document.querySelector('#pq-panel');
+  }
+  function queryInput() {
+    return queryPanel()?.querySelector('#pq-input');
+  }
+  function queryAddButton() {
+    return queryPanel()?.querySelector('#pq-add');
+  }
+  function createProvider(config) {
+    const {
+      storageKey,
+      panelTitle,
+      getCurrentScope,
+      includeFailedQueue = false,
+      toolbarButtonClass = null,
+      maxRetries = 0,
+    } = config;
+    function createPanel() {
+      return createBasePanel(panelTitle, includeFailedQueue);
+    }
+    function renderQueue() {
+      const panel = queryPanel();
+      if (!panel) return;
+      const list = panel.querySelector('#pq-list');
+      const failedList = panel.querySelector('#pq-failed-list');
+      const failedTitle = panel.querySelector('#pq-failed-title');
+      if (!list) return;
+      while (list.firstChild) {
+        list.removeChild(list.firstChild);
+      }
+      queueState.queue.forEach((item) => {
+        const { li, text, editBtn, sendBtn, deleteBtn } = createQueueItemElement(item, {
+          renderQueue,
+          saveQueue: saveQueueFn,
+        });
+        if (queueState.editingId == item.id) {
+          li.querySelector('div').style.backgroundColor = '#333';
+          li.querySelector('div').style.padding = '4px';
+          li.querySelector('div').style.borderRadius = '4px';
+        }
+        text.addEventListener('dblclick', () => {
+          editQueueItem(item.id, queueState.queue, (id, prompt) => {
+            queueState.editingId = id;
+            const input = queryInput();
+            const addButton = queryAddButton();
+            if (input && addButton) {
+              input.value = prompt;
+              addButton.textContent = 'Save Changes';
+              input.focus();
+              input.selectionStart = input.selectionEnd = input.value.length;
+            }
+            editBtn.style.display = 'inline-block';
+            deleteBtn.style.display = 'inline-block';
+          });
+        });
+        editBtn.addEventListener('click', () => {
+          editQueueItem(item.id, queueState.queue, (id, prompt) => {
+            queueState.editingId = id;
+            const input = queryInput();
+            const addButton = queryAddButton();
+            if (input && addButton) {
+              input.value = prompt;
+              addButton.textContent = 'Save Changes';
+              input.focus();
+              input.selectionStart = input.selectionEnd = input.value.length;
+            }
+          });
+        });
+        sendBtn.addEventListener('click', async () => {
+          if (queueState.running || sendBtn.disabled) return;
+          const index = queueState.queue.findIndex((queuedItem) => queuedItem.id === item.id);
+          if (index === -1) return;
+          queueState.queue.splice(index, 1);
+          sendBtn.disabled = true;
+          saveQueueFn();
+          renderQueue();
+          try {
+            await waitForIdle();
+            await sendPrompt(item.prompt);
+          } catch (err) {
+            queueState.queue.splice(index, 0, item);
+            error('Failed to send queued prompt:', formatError(err));
+            saveQueueFn();
+            renderQueue();
+          }
+        });
+        deleteBtn.addEventListener('click', () => {
+          deleteQueueItem(item.id, queueState.queue, renderQueue, saveQueueFn);
+        });
+        list.appendChild(li);
+      });
+      if (includeFailedQueue && failedList && failedTitle) {
+        while (failedList.firstChild) {
+          failedList.removeChild(failedList.firstChild);
+        }
+        failedTitle.style.display = queueState.failedQueue.length > 0 ? 'block' : 'none';
+        queueState.failedQueue.forEach((item) => {
+          const li = document.createElement('li');
+          li.style.marginBottom = '8px';
+          li.style.color = '#ff9999';
+          li.style.fontSize = '13px';
+          const row = document.createElement('div');
+          row.style.display = 'flex';
+          row.style.gap = '6px';
+          row.style.alignItems = 'flex-start';
+          const text = document.createElement('div');
+          text.textContent = item.prompt;
+          text.style.flex = '1';
+          text.style.wordBreak = 'break-word';
+          const retryBtn = document.createElement('button');
+          retryBtn.textContent = '\u{1F504}';
+          retryBtn.title = 'Retry';
+          retryBtn.style.cursor = 'pointer';
+          retryBtn.style.color = '#7dd3fc';
+          retryBtn.style.fontSize = '12px';
+          retryBtn.addEventListener('click', () => {
+            const index = queueState.failedQueue.findIndex((i) => i.id === item.id);
+            if (index !== -1) {
+              const [retryItem] = queueState.failedQueue.splice(index, 1);
+              retryItem.attempts = 0;
+              retryItem.status = 'queued';
+              queueState.queue.push(retryItem);
+              renderQueue();
+              saveQueueFn();
+            }
+          });
+          const deleteBtn = document.createElement('button');
+          deleteBtn.textContent = '\u2715';
+          deleteBtn.title = 'Delete';
+          deleteBtn.style.cursor = 'pointer';
+          deleteBtn.style.color = '#ff6b6b';
+          deleteBtn.style.fontSize = '12px';
+          deleteBtn.addEventListener('click', () => {
+            deleteQueueItem(item.id, queueState.failedQueue, renderQueue, saveQueueFn);
+          });
+          row.appendChild(text);
+          row.appendChild(retryBtn);
+          row.appendChild(deleteBtn);
+          li.appendChild(row);
+          failedList.appendChild(li);
+        });
+      }
+      updateToolbarButton(
+        document.querySelector('#pq-toolbar-button'),
+        queueState.queue,
+        queueState.running
+      );
+    }
+    function saveQueueFn() {
+      const scope = getCurrentScope();
+      const queue = queueState.queue;
+      const failedQueue = includeFailedQueue ? queueState.failedQueue : null;
+      saveQueue(queue, failedQueue, storageKey, scope);
+      refreshChatManager(storageKey);
+    }
+    function syncQueuedItemsToCurrentScope(scope) {
+      if (!scope) return false;
+      const queue = queueState.queue;
+      const failedQueue = includeFailedQueue ? queueState.failedQueue : null;
+      const updated = applyScopeToQueuedItems(queue, failedQueue, scope);
+      if (!updated) return false;
+      saveQueueFn();
+      refreshChatManager(storageKey);
+      return true;
+    }
+    function loadQueueFn() {
+      const scope = getCurrentScope();
+      const queue = queueState.queue;
+      const failedQueue = includeFailedQueue ? queueState.failedQueue : null;
+      loadQueue(queue, failedQueue, storageKey, scope);
+    }
+    function openChatManager() {
+      openChatManagerWindow(
+        storageKey,
+        `${panelTitle} Prompt Manager`,
+        document.querySelector('#pq-panel')
+      );
+    }
+    async function processQueue() {
+      const panel = queryPanel();
+      if (!panel) return;
+      setStatus(panel, 'Running');
+      while (queueState.queue.length > 0 && queueState.running) {
+        await waitForIdle();
+        const item = queueState.queue.shift();
+        if (!item || typeof item.prompt !== 'string') {
+          error('Skipping invalid queue item:', item);
+          continue;
+        }
+        const prompt = item.prompt;
+        const beforeScope = getCurrentScope();
+        queueState.awaitingChatScopeSync = !beforeScope;
+        updateToolbarButton(
+          document.querySelector('#pq-toolbar-button'),
+          queueState.queue,
+          queueState.running
+        );
+        renderQueue();
+        setStatus(panel, `Sending: ${prompt.slice(0, 40)}...`);
+        try {
+          await sendPrompt(prompt);
+          const afterScope = getCurrentScope();
+          if (!beforeScope && afterScope) {
+            syncQueuedItemsToCurrentScope(afterScope);
+          }
+          if (afterScope) {
+            queueState.awaitingChatScopeSync = false;
+          }
+          item.attempts = 0;
+        } catch (err) {
+          queueState.awaitingChatScopeSync = false;
+          error('Failed to send prompt:', formatError(err));
+          if (maxRetries > 0) {
+            item.status = 'failed';
+            item.attempts = (item.attempts || 0) + 1;
+            if (item.attempts < maxRetries) {
+              item.status = 'queued';
+              queueState.queue.push(item);
+            } else if (includeFailedQueue) {
+              queueState.failedQueue.push(item);
+            }
+          }
+        }
+        if (beforeScope) {
+          queueState.awaitingChatScopeSync = false;
+        }
+        saveQueueFn();
+      }
+      setStatus(panel, queueState.running ? 'Finished' : 'Stopped');
+      queueState.running = false;
+      updateToolbarButton(
+        document.querySelector('#pq-toolbar-button'),
+        queueState.queue,
+        queueState.running
+      );
+    }
+    function ensureToolbarButton() {
+      ensureToolbarStyles();
+      installSelectionPromptMenu({
+        createItem: provider.createItem,
+        renderQueue,
+        saveQueue: saveQueueFn,
+        updateToolbarButton,
+      });
+      let button = document.querySelector('#pq-toolbar-button');
+      if (!button) {
+        button = document.createElement('button');
+        button.id = 'pq-toolbar-button';
+        button.type = 'button';
+        button.textContent = 'Queue';
+        button.addEventListener('click', () => showPanel(() => createPanel()));
+      }
+      if (toolbarButtonClass) {
+        button.classList.add(toolbarButtonClass);
+      }
+      Object.assign(button.style, {
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        padding: '10px 14px',
+        borderRadius: '9999px',
+        background: 'var(--pq-ui-bg)',
+        color: 'var(--pq-ui-text)',
+        border: '1px solid var(--pq-ui-border)',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+        zIndex: '2147483647',
+        cursor: 'pointer',
+      });
+      if (button.parentElement !== document.body) {
+        document.body.appendChild(button);
+      }
+      observeInputBoundary(button);
+    }
+    const provider = {
+      storageKey,
+      includeFailedQueue,
+      getCurrentScope,
+      createItem(text) {
+        const scope = getCurrentScope();
+        const baseItem = {
+          id: crypto.randomUUID(),
+          prompt: text,
+          attempts: 0,
+          status: 'queued',
+          createdAt: Date.now(),
+        };
+        if (scope) {
+          if (typeof scope === 'string') {
+            baseItem.chatCode = scope;
+          } else if (scope.chatId) {
+            baseItem.chatId = scope.chatId;
+            baseItem.chatCode = scope.chatId;
+          }
+          if (scope.groupId) {
+            baseItem.groupId = scope.groupId;
+          }
+        }
+        return baseItem;
+      },
+      createPanel,
+      renderQueue,
+      saveQueue: saveQueueFn,
+      loadQueue: loadQueueFn,
+      processQueue,
+      setupPanelControls,
+      setupPanelDrag,
+      ensureToolbarButton,
+      openChatManager,
+      isOwnMutation(target) {
+        return !!target && (target.closest?.('#pq-panel') || target.closest?.('.pq-toolbar'));
+      },
+    };
+    return provider;
+  }
+
+  // AI_Queue/core/bootstrap.js
+  init_logging();
+  init_state();
+  init_ui2();
+  function bootstrapQueueApp(provider) {
+    globalThis.aiQueue = queueState;
+    log('AI_Queue running', true);
+    const storageKey = provider.storageKey;
+    const syncFromStorage = () => {
+      resetQueueState({ includeFailedQueue: !!provider.includeFailedQueue });
+      provider.loadQueue?.();
+      provider.renderQueue?.();
+      provider.ensureToolbarButton?.();
+      if (storageKey) {
+        refreshChatManager(storageKey);
+      }
+    };
+    queueState.syncFromStorage = syncFromStorage;
+    const refreshForCurrentUrl = (previousUrl = location.href, currentUrl = location.href) => {
+      const getScope = provider.getCurrentScope;
+      const previousScope = typeof getScope === 'function' ? getScope(previousUrl) : null;
+      const currentScope = typeof getScope === 'function' ? getScope(currentUrl) : null;
+      if (
+        queueState.running &&
+        queueState.awaitingChatScopeSync &&
+        !previousScope &&
+        currentScope
+      ) {
+        const updated = applyScopeToQueuedItems(
+          queueState.queue,
+          queueState.failedQueue,
+          currentScope
+        );
+        if (updated) {
+          provider.saveQueue?.();
+          provider.renderQueue?.();
+          provider.ensureToolbarButton?.();
+          if (storageKey) {
+            refreshChatManager(storageKey);
+          }
+        }
+        queueState.awaitingChatScopeSync = false;
+        return;
+      }
+      if (queueState.running) {
+        queueState.running = false;
+      }
+      syncFromStorage();
+    };
+    syncFromStorage();
+    provider.createPanel();
+    provider.setupPanelControls?.({
+      createItem: provider.createItem,
+      renderQueue: provider.renderQueue,
+      saveQueue: provider.saveQueue,
+      processQueue: provider.processQueue,
+      openChatManager: provider.openChatManager,
+    });
+    provider.setupPanelDrag?.();
+    setupPanelResize();
+    provider.renderQueue?.();
+    provider.ensureToolbarButton?.();
+    if (storageKey) {
+      window.addEventListener('storage', (event) => {
+        if (event.storageArea !== localStorage) return;
+        if (event.key !== storageKey) return;
+        syncFromStorage();
+      });
+    }
+    startDomObserver(
+      provider.createPanel,
+      () =>
+        provider.setupPanelControls?.({
+          createItem: provider.createItem,
+          renderQueue: provider.renderQueue,
+          saveQueue: provider.saveQueue,
+          processQueue: provider.processQueue,
+          openChatManager: provider.openChatManager,
+        }),
+      () => {
+        provider.setupPanelDrag?.();
+        setupPanelResize();
+      },
+      provider.ensureToolbarButton,
+      provider.isOwnMutation
+    );
+    startUrlWatcher(
+      provider.createPanel,
+      () =>
+        provider.setupPanelControls?.({
+          createItem: provider.createItem,
+          renderQueue: provider.renderQueue,
+          saveQueue: provider.saveQueue,
+          processQueue: provider.processQueue,
+          openChatManager: provider.openChatManager,
+        }),
+      () => {
+        provider.setupPanelDrag?.();
+        setupPanelResize();
+      },
+      provider.ensureToolbarButton,
+      refreshForCurrentUrl
+    );
+  }
+
   // AI_Queue/providers/gemini.js
   var STORAGE_KEY = 'pq-gemini-queue';
   var DOMAINS = ['gemini.google.com'];
@@ -2591,267 +2915,14 @@
       return null;
     }
   }
-  function queryPanel() {
-    return document.querySelector('#pq-panel');
-  }
-  function queryInput() {
-    return queryPanel()?.querySelector('#pq-input');
-  }
-  function queryAddButton() {
-    return queryPanel()?.querySelector('#pq-add');
-  }
-  function createGeminiPanel() {
-    return createBasePanel('Gemini Prompt Queue', true);
-  }
-  function renderGeminiQueue() {
-    const panel = queryPanel();
-    if (!panel) return;
-    const list = panel.querySelector('#pq-list');
-    const failedList = panel.querySelector('#pq-failed-list');
-    const failedTitle = panel.querySelector('#pq-failed-title');
-    if (!list) return;
-    while (list.firstChild) {
-      list.removeChild(list.firstChild);
-    }
-    queueState.queue.forEach((item) => {
-      const { li, text, editBtn, deleteBtn } = createQueueItemElement(item, {
-        renderQueue: renderGeminiQueue,
-        saveQueue: saveGeminiQueue,
-      });
-      if (queueState.editingId == item.id) {
-        li.querySelector('div').style.backgroundColor = '#333';
-        li.querySelector('div').style.padding = '4px';
-        li.querySelector('div').style.borderRadius = '4px';
-      }
-      text.addEventListener('dblclick', () => {
-        editQueueItem(item.id, queueState.queue, (id, prompt) => {
-          queueState.editingId = id;
-          const input = queryInput();
-          const addButton = queryAddButton();
-          if (input && addButton) {
-            input.value = prompt;
-            addButton.textContent = 'Save Changes';
-            input.focus();
-            input.selectionStart = input.selectionEnd = input.value.length;
-          }
-          editBtn.style.display = 'inline-block';
-          deleteBtn.style.display = 'inline-block';
-        });
-      });
-      editBtn.addEventListener('click', () => {
-        editQueueItem(item.id, queueState.queue, (id, prompt) => {
-          queueState.editingId = id;
-          const input = queryInput();
-          const addButton = queryAddButton();
-          if (input && addButton) {
-            input.value = prompt;
-            addButton.textContent = 'Save Changes';
-            input.focus();
-            input.selectionStart = input.selectionEnd = input.value.length;
-          }
-        });
-      });
-      deleteBtn.addEventListener('click', () => {
-        deleteQueueItem(item.id, queueState.queue, renderGeminiQueue, saveGeminiQueue);
-      });
-      list.appendChild(li);
-    });
-    if (failedList && failedTitle) {
-      while (failedList.firstChild) {
-        failedList.removeChild(failedList.firstChild);
-      }
-      failedTitle.style.display = queueState.failedQueue.length > 0 ? 'block' : 'none';
-      queueState.failedQueue.forEach((item) => {
-        const li = document.createElement('li');
-        li.style.marginBottom = '8px';
-        li.style.color = '#ff9999';
-        li.style.fontSize = '13px';
-        const row = document.createElement('div');
-        row.style.display = 'flex';
-        row.style.gap = '6px';
-        row.style.alignItems = 'flex-start';
-        const text = document.createElement('div');
-        text.textContent = item.prompt;
-        text.style.flex = '1';
-        text.style.wordBreak = 'break-word';
-        const retryBtn = document.createElement('button');
-        retryBtn.textContent = '\u{1F504}';
-        retryBtn.title = 'Retry';
-        retryBtn.style.cursor = 'pointer';
-        retryBtn.style.color = '#7dd3fc';
-        retryBtn.style.fontSize = '12px';
-        retryBtn.addEventListener('click', () => {
-          const index = queueState.failedQueue.findIndex((i) => i.id === item.id);
-          if (index !== -1) {
-            const [retryItem] = queueState.failedQueue.splice(index, 1);
-            retryItem.attempts = 0;
-            retryItem.status = 'queued';
-            queueState.queue.push(retryItem);
-            renderGeminiQueue();
-            saveGeminiQueue();
-          }
-        });
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = '\u2715';
-        deleteBtn.title = 'Delete';
-        deleteBtn.style.cursor = 'pointer';
-        deleteBtn.style.color = '#ff6b6b';
-        deleteBtn.style.fontSize = '12px';
-        deleteBtn.addEventListener('click', () => {
-          deleteQueueItem(item.id, queueState.failedQueue, renderGeminiQueue, saveGeminiQueue);
-        });
-        row.appendChild(text);
-        row.appendChild(retryBtn);
-        row.appendChild(deleteBtn);
-        li.appendChild(row);
-        failedList.appendChild(li);
-      });
-    }
-    updateToolbarButton(
-      document.querySelector('#pq-toolbar-button'),
-      queueState.queue,
-      queueState.running
-    );
-    log('queue rendered safely');
-  }
-  function saveGeminiQueue() {
-    saveQueue(queueState.queue, queueState.failedQueue, STORAGE_KEY, getCurrentGeminiChatCode());
-    refreshChatManager(STORAGE_KEY);
-  }
-  function syncQueuedItemsToCurrentChatCode(chatCode) {
-    if (!chatCode) return false;
-    const updated = applyScopeToQueuedItems(queueState.queue, queueState.failedQueue, chatCode);
-    if (!updated) return false;
-    saveGeminiQueue();
-    refreshChatManager(STORAGE_KEY);
-    return true;
-  }
-  function loadGeminiQueue() {
-    loadQueue(queueState.queue, queueState.failedQueue, STORAGE_KEY, getCurrentGeminiChatCode());
-  }
-  function openGeminiChatManager() {
-    openChatManagerWindow(STORAGE_KEY, 'Gemini Chat Prompt Manager');
-  }
-  async function processGeminiQueue() {
-    const panel = queryPanel();
-    if (!panel) return;
-    setStatus(panel, 'Running');
-    while (queueState.queue.length > 0 && queueState.running) {
-      await waitForIdle();
-      const item = queueState.queue.shift();
-      if (!item || typeof item.prompt !== 'string') {
-        error('Skipping invalid queue item:', item);
-        continue;
-      }
-      const prompt = item.prompt;
-      const beforeChatCode = getCurrentGeminiChatCode();
-      queueState.awaitingChatScopeSync = !beforeChatCode;
-      updateToolbarButton(
-        document.querySelector('#pq-toolbar-button'),
-        queueState.queue,
-        queueState.running
-      );
-      renderGeminiQueue();
-      setStatus(panel, `Sending: ${prompt.slice(0, 40)}...`);
-      try {
-        await sendPrompt(prompt);
-        const afterChatCode = getCurrentGeminiChatCode();
-        if (!beforeChatCode && afterChatCode) {
-          syncQueuedItemsToCurrentChatCode(afterChatCode);
-        }
-        if (afterChatCode) {
-          queueState.awaitingChatScopeSync = false;
-        }
-        item.attempts = 0;
-      } catch (err) {
-        queueState.awaitingChatScopeSync = false;
-        error('Failed to send prompt:', formatError(err));
-        item.status = 'failed';
-        item.attempts = (item.attempts || 0) + 1;
-        if (item.attempts < 3) {
-          item.status = 'queued';
-          queueState.queue.push(item);
-        } else {
-          queueState.failedQueue.push(item);
-        }
-      }
-      if (beforeChatCode) {
-        queueState.awaitingChatScopeSync = false;
-      }
-      saveGeminiQueue();
-    }
-    setStatus(panel, queueState.running ? 'Finished' : 'Stopped');
-    queueState.running = false;
-    updateToolbarButton(
-      document.querySelector('#pq-toolbar-button'),
-      queueState.queue,
-      queueState.running
-    );
-  }
-  function ensureGeminiToolbarButton() {
-    ensureToolbarStyles();
-    installSelectionPromptMenu({
-      createItem: geminiProvider.createItem,
-      renderQueue: renderGeminiQueue,
-      saveQueue: saveGeminiQueue,
-      updateToolbarButton,
-    });
-    let button = document.querySelector('#pq-toolbar-button');
-    if (!button) {
-      button = document.createElement('button');
-      button.id = 'pq-toolbar-button';
-      button.classList.add('pq-toolbar');
-      button.type = 'button';
-      button.textContent = 'Queue';
-      button.addEventListener('click', () => showPanel(() => createGeminiPanel()));
-    }
-    button.className = 'pq-toolbar';
-    Object.assign(button.style, {
-      position: 'fixed',
-      bottom: '24px',
-      right: '24px',
-      padding: '10px 14px',
-      borderRadius: '9999px',
-      background: 'var(--pq-ui-bg)',
-      color: 'var(--pq-ui-text)',
-      border: '1px solid var(--pq-ui-border)',
-      boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
-      zIndex: '2147483647',
-      cursor: 'pointer',
-    });
-    if (button.parentElement !== document.body) {
-      document.body.appendChild(button);
-    }
-    observeInputBoundary(button);
-  }
-  var geminiProvider = {
+  var geminiProvider = createProvider({
     storageKey: STORAGE_KEY,
-    includeFailedQueue: true,
+    panelTitle: 'Gemini Prompt Queue',
     getCurrentScope: getCurrentGeminiChatCode,
-    createItem(text) {
-      const chatCode = getCurrentGeminiChatCode();
-      return {
-        id: crypto.randomUUID(),
-        prompt: text,
-        attempts: 0,
-        status: 'queued',
-        createdAt: Date.now(),
-        ...(chatCode ? { chatCode } : {}),
-      };
-    },
-    createPanel: createGeminiPanel,
-    renderQueue: renderGeminiQueue,
-    saveQueue: saveGeminiQueue,
-    loadQueue: loadGeminiQueue,
-    processQueue: processGeminiQueue,
-    setupPanelControls,
-    setupPanelDrag,
-    ensureToolbarButton: ensureGeminiToolbarButton,
-    openChatManager: openGeminiChatManager,
-    isOwnMutation(target) {
-      return !!target && (target.closest?.('#pq-panel') || target.closest?.('.pq-toolbar'));
-    },
-  };
+    includeFailedQueue: true,
+    maxRetries: 3,
+    toolbarButtonClass: 'pq-toolbar',
+  });
   bootstrapQueueApp(geminiProvider);
 })();
 //# sourceMappingURL=gemini.user.js.map
