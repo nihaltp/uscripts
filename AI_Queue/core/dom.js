@@ -219,3 +219,45 @@ export function hasBusyIndicators() {
     ...document.querySelectorAll('[aria-busy="true"], [data-loading="true"], [role="progressbar"]'),
   ].some(isActionButtonVisible);
 }
+
+export function findRetryButton() {
+  const selectors = [
+    'button[data-testid="regenerate-thread-error-button"]',
+    'button[aria-label*="Retry" i]',
+    'button[aria-label*="Regenerate" i]',
+    'button[title*="Retry" i]',
+    'button[title*="Regenerate" i]',
+    'button[data-testid*="retry" i]',
+  ];
+
+  for (const selector of selectors) {
+    const button = [...document.querySelectorAll(selector)].find(isActionButtonVisible) || null;
+    if (button) {
+      log('retry button found', button);
+      return button;
+    }
+  }
+
+  return null;
+}
+
+export function hasErrorState() {
+  const errorSelectors = [
+    'div.text-token-text-error',
+    'div[class*="bg-token-surface-error"]',
+    '[role="alert"]',
+  ];
+
+  for (const selector of errorSelectors) {
+    const element = document.querySelector(selector);
+    if (element && isAttached(element) && isVisible(element)) {
+      const text = element.textContent || '';
+      if (text.includes('wrong') || text.includes('error') || text.includes('Error')) {
+        log('error state detected', { selector, text: text.slice(0, 50) });
+        return true;
+      }
+    }
+  }
+
+  return false;
+}

@@ -1,6 +1,7 @@
 import { ensurePanelAttached, hidePanel } from './ui.js';
 import { log } from './logging.js';
 import { showHelpModal } from './help-modal.js';
+import { showSettingsModal } from './settings-modal.js';
 
 export function createBasePanel(titleText, includeFailedList = false) {
   log('createBasePanel called');
@@ -78,6 +79,29 @@ export function createBasePanel(titleText, includeFailedList = false) {
       showHelpModal();
     });
 
+    const settingsBtn = document.createElement('button');
+    settingsBtn.id = 'pq-settings';
+    settingsBtn.type = 'button';
+    settingsBtn.textContent = '⚙';
+    settingsBtn.title = 'Settings';
+    Object.assign(settingsBtn.style, {
+      width: '24px',
+      height: '24px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: '50%',
+      border: '1px solid var(--pq-ui-btn-border)',
+      background: 'var(--pq-ui-btn-bg)',
+      color: 'var(--pq-ui-text)',
+      cursor: 'pointer',
+      fontSize: '14px',
+      padding: '0',
+    });
+    settingsBtn.addEventListener('click', () => {
+      showSettingsModal();
+    });
+
     const closeBtn = document.createElement('button');
     closeBtn.id = 'pq-close';
     closeBtn.type = 'button';
@@ -94,6 +118,7 @@ export function createBasePanel(titleText, includeFailedList = false) {
     closeBtn.addEventListener('click', () => hidePanel(panel));
 
     rightControls.appendChild(infoBtn);
+    rightControls.appendChild(settingsBtn);
     rightControls.appendChild(closeBtn);
 
     title.appendChild(titleLabel);
