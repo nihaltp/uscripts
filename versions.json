@@ -1,7 +1,7 @@
 {
   "AI_Queue": {
-    "chatgpt": "3.4.1",
-    "gemini": "3.4.1"
+    "chatgpt": "3.5.0",
+    "gemini": "3.5.0"
   },
   "google-forms-saver": "1.2.0"
 }
