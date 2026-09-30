@@ -220,7 +220,7 @@ export function hasBusyIndicators() {
   ].some(isActionButtonVisible);
 }
 
-export function findRetryButton() {
+export function findRetryButton(promptText = null) {
   const selectors = [
     'button[data-testid="regenerate-thread-error-button"]',
     'button[aria-label*="Retry" i]',
@@ -231,17 +231,34 @@ export function findRetryButton() {
   ];
 
   for (const selector of selectors) {
-    const button = [...document.querySelectorAll(selector)].find(isActionButtonVisible) || null;
-    if (button) {
-      log('retry button found', button);
-      return button;
+    const retryButtons = [...document.querySelectorAll(selector)].filter(isActionButtonVisible);
+    for (const button of retryButtons) {
+      if (!promptText) {
+        log('retry button found (no prompt correlation)', button);
+        return button;
+      }
+
+      const messageContainer = button.closest('[data-message-author-role="assistant"]');
+      if (!messageContainer) continue;
+
+      const previousSibling = messageContainer.previousElementSibling;
+      if (!previousSibling) continue;
+
+      const previousText = previousSibling.textContent || '';
+      const promptLower = promptText.toLowerCase().trim();
+      const previousLower = previousText.toLowerCase();
+
+      if (previousLower.includes(promptLower) || promptLower.includes(previousLower.slice(0, 50))) {
+        log('retry button found and correlated with prompt', button);
+        return button;
+      }
     }
   }
 
   return null;
 }
 
-export function hasErrorState() {
+export function hasErrorState(promptText = null) {
   const errorSelectors = [
     'div.text-token-text-error',
     'div[class*="bg-token-surface-error"]',
@@ -249,11 +266,30 @@ export function hasErrorState() {
   ];
 
   for (const selector of errorSelectors) {
-    const element = document.querySelector(selector);
-    if (element && isAttached(element) && isVisible(element)) {
+    const errorElements = document.querySelectorAll(selector);
+    for (const element of errorElements) {
+      if (!isAttached(element) || !isVisible(element)) continue;
+
       const text = element.textContent || '';
-      if (text.includes('wrong') || text.includes('error') || text.includes('Error')) {
-        log('error state detected', { selector, text: text.slice(0, 50) });
+      if (!text.includes('wrong') && !text.includes('error') && !text.includes('Error')) continue;
+
+      if (!promptText) {
+        log('error state detected (no prompt correlation)', { selector, text: text.slice(0, 50) });
+        return true;
+      }
+
+      const messageContainer = element.closest('[data-message-author-role="assistant"]');
+      if (!messageContainer) continue;
+
+      const previousSibling = messageContainer.previousElementSibling;
+      if (!previousSibling) continue;
+
+      const previousText = previousSibling.textContent || '';
+      const promptLower = promptText.toLowerCase().trim();
+      const previousLower = previousText.toLowerCase();
+
+      if (previousLower.includes(promptLower) || promptLower.includes(previousLower.slice(0, 50))) {
+        log('error state detected and correlated with prompt', { selector, text: text.slice(0, 50) });
         return true;
       }
     }
