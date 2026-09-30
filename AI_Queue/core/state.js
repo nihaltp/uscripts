@@ -5,6 +5,8 @@ export const queueState = {
   editingId: null,
   draggedId: null,
   awaitingChatScopeSync: false,
+  recentErrorIds: new Set(),
+  currentRetryCount: 0,
 };
 
 export function resetQueueState({ includeFailedQueue = false } = {}) {
@@ -17,4 +19,6 @@ export function resetQueueState({ includeFailedQueue = false } = {}) {
   queueState.editingId = null;
   queueState.draggedId = null;
   queueState.awaitingChatScopeSync = false;
+  queueState.recentErrorIds.clear();
+  queueState.currentRetryCount = 0;
 }

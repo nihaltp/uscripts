@@ -9,9 +9,12 @@ import { setupPanelDrag } from '../core/drag.js';
 import { setStatus } from '../core/queue.js';
 import { sendPrompt } from '../core/keyboard.js';
 import { waitForIdle } from '../core/generation.js';
-import { error, formatError } from '../core/logging.js';
+import { error, formatError, log } from '../core/logging.js';
 import { openChatManagerWindow, refreshChatManager } from '../core/chat-manager.js';
 import { installSelectionPromptMenu } from '../core/selection-menu.js';
+import { getSettings } from '../core/settings.js';
+import { findRetryButton, hasErrorState, safeClick } from '../core/dom.js';
+import { sleep } from '../core/utils.js';
 
 function queryPanel() {
   return document.querySelector('#pq-panel');
@@ -236,6 +239,14 @@ export function createProvider(config) {
     while (queueState.queue.length > 0 && queueState.running) {
       await waitForIdle();
 
+      const nextItem = queueState.queue[0];
+      if (nextItem && queueState.recentErrorIds.has(nextItem.id)) {
+        log('Loop detected: next prompt recently failed, stopping queue');
+        setStatus(panel, 'Loop detected, stopping queue');
+        queueState.running = false;
+        break;
+      }
+
       const item = queueState.queue.shift();
       if (!item || typeof item.prompt !== 'string') {
         error('Skipping invalid queue item:', item);
@@ -269,6 +280,57 @@ export function createProvider(config) {
         }
 
         item.attempts = 0;
+        queueState.currentRetryCount = 0;
+
+        await sleep(2000);
+
+        const settings = getSettings();
+        if (settings.autoRetryEnabled && hasErrorState()) {
+          queueState.recentErrorIds.add(item.id);
+          if (queueState.recentErrorIds.size > 5) {
+            const firstId = queueState.recentErrorIds.values().next().value;
+            queueState.recentErrorIds.delete(firstId);
+          }
+
+          queueState.currentRetryCount = 0;
+
+          while (queueState.currentRetryCount < settings.maxRetries && queueState.running) {
+            queueState.currentRetryCount++;
+            setStatus(panel, `Retrying (${queueState.currentRetryCount}/${settings.maxRetries}): ${prompt.slice(0, 40)}...`);
+
+            const retryButton = findRetryButton();
+            if (retryButton) {
+              safeClick(retryButton);
+              await sleep(300);
+              await waitForIdle();
+              await sleep(2000);
+
+              if (!hasErrorState()) {
+                log('Retry successful');
+                item.attempts = 0;
+                queueState.currentRetryCount = 0;
+                break;
+              }
+            } else {
+              error('Retry button not found');
+              break;
+            }
+          }
+
+          if (hasErrorState() && queueState.currentRetryCount >= settings.maxRetries) {
+            log('Retry limit reached, applying action:', settings.retryLimitAction);
+            if (settings.retryLimitAction === 'stop') {
+              setStatus(panel, 'Retry limit reached, stopping queue');
+              queueState.running = false;
+              if (includeFailedQueue) {
+                queueState.failedQueue.push(item);
+              }
+            } else if (settings.retryLimitAction === 'continue') {
+              setStatus(panel, 'Retry limit reached, continuing with next');
+              queueState.queue.push(item);
+            }
+          }
+        }
       } catch (err) {
         queueState.awaitingChatScopeSync = false;
         error('Failed to send prompt:', formatError(err));
