@@ -69,7 +69,7 @@ export function renderGeminiQueue() {
   }
 
   queueState.queue.forEach((item) => {
-    const { li, text, editBtn, deleteBtn } = createQueueItemElement(item, {
+    const { li, text, editBtn, sendBtn, deleteBtn } = createQueueItemElement(item, {
       renderQueue: renderGeminiQueue,
       saveQueue: saveGeminiQueue,
     });
@@ -108,6 +108,28 @@ export function renderGeminiQueue() {
           input.selectionStart = input.selectionEnd = input.value.length;
         }
       });
+    });
+
+    sendBtn.addEventListener('click', async () => {
+      sendBtn.disabled = true;
+
+      try {
+        await waitForIdle();
+        await sendPrompt(item.prompt);
+
+        const index = queueState.queue.findIndex((queuedItem) => queuedItem.id === item.id);
+
+        if (index !== -1) {
+          queueState.queue.splice(index, 1);
+        }
+
+        saveGeminiQueue();
+        renderGeminiQueue();
+      } catch (err) {
+        error('Failed to send queued prompt:', formatError(err));
+      } finally {
+        sendBtn.disabled = false;
+      }
     });
 
     deleteBtn.addEventListener('click', () => {
