@@ -35,6 +35,7 @@ export function showHelpModal() {
       <li>Click <strong>'Add To Queue'</strong> as an alternative.</li>
       <li>Add as many prompts as you like.</li>
       <li>Click <strong>'Start Queue'</strong> to process them automatically.</li>
+      <li>Right Click and hold Prompt Queue window to move it around.</li>
     </ul>
     <p style="font-size: 13px; opacity: 0.9; margin-bottom: 15px;">The script will wait for the AI to finish each response before sending the next one.</p>
     <div style="text-align: right;">
