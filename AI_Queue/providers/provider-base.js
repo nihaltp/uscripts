@@ -96,24 +96,26 @@ export function createProvider(config) {
       });
 
       sendBtn.addEventListener('click', async () => {
+        if (queueState.running || sendBtn.disabled) return;
+
+        const index = queueState.queue.findIndex(
+          (queuedItem) => queuedItem.id === item.id
+        );
+        if (index === -1) return;
+
+        queueState.queue.splice(index, 1);
         sendBtn.disabled = true;
+        saveQueueFn();
+        renderQueue();
 
         try {
           await waitForIdle();
           await sendPrompt(item.prompt);
-
-          const index = queueState.queue.findIndex((queuedItem) => queuedItem.id === item.id);
-
-          if (index !== -1) {
-            queueState.queue.splice(index, 1);
-          }
-
+        } catch (err) {
+          queueState.queue.splice(index, 0, item);
+          error('Failed to send queued prompt:', formatError(err));
           saveQueueFn();
           renderQueue();
-        } catch (err) {
-          error('Failed to send queued prompt:', formatError(err));
-        } finally {
-          sendBtn.disabled = false;
         }
       });
 
