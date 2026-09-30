@@ -292,6 +292,11 @@ export function createProvider(config) {
 
         const settings = getSettings();
         if (settings.autoRetryEnabled && hasErrorState(prompt)) {
+          if (settings.maxRetries <= 0) {
+            log('Max retries is 0, skipping retry logic');
+            return;
+          }
+
           queueState.currentRetryCount = 0;
 
           while (queueState.currentRetryCount < settings.maxRetries && queueState.running) {
