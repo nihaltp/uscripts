@@ -22,7 +22,7 @@
 // @exclude      https://chatgpt.com/account-link/*
 // @exclude      https://chatgpt.com/gpts/*
 // @icon         https://chatgpt.com/favicon.ico
-// @version      3.4.1
+// @version      3.5.0
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js
 // @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/chatgpt.user.js
@@ -60,6 +60,8 @@
     queueState.editingId = null;
     queueState.draggedId = null;
     queueState.awaitingChatScopeSync = false;
+    queueState.recentErrorIds.clear();
+    queueState.currentRetryCount = 0;
   }
   var queueState;
   var init_state = __esm({
@@ -71,6 +73,8 @@
         editingId: null,
         draggedId: null,
         awaitingChatScopeSync: false,
+        recentErrorIds: /* @__PURE__ */ new Set(),
+        currentRetryCount: 0,
       };
     },
   });
@@ -166,6 +170,7 @@
   // AI_Queue/core/dom.js
   var dom_exports = {};
   __export(dom_exports, {
+    findRetryButton: () => findRetryButton,
     findStopButton: () => findStopButton,
     getButtonLabel: () => getButtonLabel,
     getComposerEditor: () => getComposerEditor,
@@ -173,6 +178,7 @@
     getEditorText: () => getEditorText,
     getSendButton: () => getSendButton,
     hasBusyIndicators: () => hasBusyIndicators,
+    hasErrorState: () => hasErrorState,
     isActionButtonVisible: () => isActionButtonVisible,
     isEditableCandidate: () => isEditableCandidate,
     safeClick: () => safeClick,
@@ -360,6 +366,80 @@
         '[aria-busy="true"], [data-loading="true"], [role="progressbar"]'
       ),
     ].some(isActionButtonVisible);
+  }
+  function findRetryButton(promptText = null) {
+    const selectors = [
+      'button[data-testid="regenerate-thread-error-button"]',
+      'button[aria-label*="Retry" i]',
+      'button[aria-label*="Regenerate" i]',
+      'button[title*="Retry" i]',
+      'button[title*="Regenerate" i]',
+      'button[data-testid*="retry" i]',
+    ];
+    for (const selector of selectors) {
+      const retryButtons = [...document.querySelectorAll(selector)].filter(isActionButtonVisible);
+      for (const button of retryButtons) {
+        if (!promptText) {
+          log('retry button found (no prompt correlation)', button);
+          return button;
+        }
+        const messageContainer = button.closest('[data-message-author-role="assistant"]');
+        if (!messageContainer) continue;
+        const previousSibling = messageContainer.previousElementSibling;
+        if (!previousSibling) continue;
+        const previousText = previousSibling.textContent || '';
+        const promptLower = promptText.toLowerCase().trim();
+        const previousLower = previousText.toLowerCase();
+        if (
+          previousLower.includes(promptLower) ||
+          promptLower.includes(previousLower.slice(0, 50))
+        ) {
+          log('retry button found and correlated with prompt', button);
+          return button;
+        }
+      }
+    }
+    return null;
+  }
+  function hasErrorState(promptText = null) {
+    const errorSelectors = [
+      'div.text-token-text-error',
+      'div[class*="bg-token-surface-error"]',
+      '[role="alert"]',
+    ];
+    for (const selector of errorSelectors) {
+      const errorElements = document.querySelectorAll(selector);
+      for (const element of errorElements) {
+        if (!isAttached(element) || !isVisible(element)) continue;
+        const text = element.textContent || '';
+        if (!text.includes('wrong') && !text.includes('error') && !text.includes('Error')) continue;
+        if (!promptText) {
+          log('error state detected (no prompt correlation)', {
+            selector,
+            text: text.slice(0, 50),
+          });
+          return true;
+        }
+        const messageContainer = element.closest('[data-message-author-role="assistant"]');
+        if (!messageContainer) continue;
+        const previousSibling = messageContainer.previousElementSibling;
+        if (!previousSibling) continue;
+        const previousText = previousSibling.textContent || '';
+        const promptLower = promptText.toLowerCase().trim();
+        const previousLower = previousText.toLowerCase();
+        if (
+          previousLower.includes(promptLower) ||
+          promptLower.includes(previousLower.slice(0, 50))
+        ) {
+          log('error state detected and correlated with prompt', {
+            selector,
+            text: text.slice(0, 50),
+          });
+          return true;
+        }
+      }
+    }
+    return false;
   }
   var init_dom = __esm({
     'AI_Queue/core/dom.js'() {
@@ -727,6 +807,246 @@
     });
   }
 
+  // AI_Queue/core/settings.js
+  init_logging();
+  var STORAGE_KEY = 'pq-settings';
+  var DEFAULT_SETTINGS = {
+    autoRetryEnabled: true,
+    maxRetries: 1,
+    retryLimitAction: 'stop',
+    // 'stop' or 'continue'
+  };
+  function loadSettings() {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) {
+        return { ...DEFAULT_SETTINGS };
+      }
+      const parsed = JSON.parse(stored);
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+      };
+    } catch (err) {
+      error('Failed to load settings:', err);
+      return { ...DEFAULT_SETTINGS };
+    }
+  }
+  function saveSettings(settings) {
+    try {
+      const normalized = {
+        ...DEFAULT_SETTINGS,
+        ...settings,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+      log('Settings saved:', normalized);
+    } catch (err) {
+      error('Failed to save settings:', err);
+    }
+  }
+  function getSettings() {
+    return loadSettings();
+  }
+
+  // AI_Queue/core/settings-modal.js
+  init_logging();
+  function showSettingsModal() {
+    const overlay = document.createElement('div');
+    Object.assign(overlay.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100vw',
+      height: '100vh',
+      background: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: '10002',
+    });
+    const modal = document.createElement('div');
+    Object.assign(modal.style, {
+      background: 'var(--pq-ui-bg)',
+      color: 'var(--pq-ui-text)',
+      padding: '20px',
+      borderRadius: '8px',
+      border: '1px solid var(--pq-ui-border)',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      maxWidth: '400px',
+      width: '90%',
+      fontFamily: 'sans-serif',
+    });
+    const settings = loadSettings();
+    const title = document.createElement('h3');
+    title.textContent = 'Queue Settings';
+    Object.assign(title.style, { marginTop: '0', marginBottom: '15px' });
+    const autoRetryDiv = document.createElement('div');
+    Object.assign(autoRetryDiv.style, { marginBottom: '15px' });
+    const autoRetryLabel = document.createElement('label');
+    Object.assign(autoRetryLabel.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      fontSize: '14px',
+    });
+    const autoRetryCheckbox = document.createElement('input');
+    autoRetryCheckbox.type = 'checkbox';
+    autoRetryCheckbox.id = 'pq-setting-auto-retry';
+    autoRetryCheckbox.checked = settings.autoRetryEnabled;
+    Object.assign(autoRetryCheckbox.style, { cursor: 'pointer' });
+    const autoRetrySpan = document.createElement('span');
+    autoRetrySpan.textContent = 'Enable auto-retry on error';
+    autoRetryLabel.appendChild(autoRetryCheckbox);
+    autoRetryLabel.appendChild(autoRetrySpan);
+    const autoRetryDesc = document.createElement('p');
+    autoRetryDesc.textContent = 'Automatically click retry button when ChatGPT shows an error';
+    Object.assign(autoRetryDesc.style, {
+      fontSize: '12px',
+      opacity: '0.7',
+      marginTop: '4px',
+      marginBottom: '0',
+    });
+    autoRetryDiv.appendChild(autoRetryLabel);
+    autoRetryDiv.appendChild(autoRetryDesc);
+    const maxRetriesDiv = document.createElement('div');
+    Object.assign(maxRetriesDiv.style, { marginBottom: '15px' });
+    const maxRetriesLabel = document.createElement('label');
+    maxRetriesLabel.textContent = 'Max retry attempts:';
+    Object.assign(maxRetriesLabel.style, {
+      display: 'block',
+      fontSize: '14px',
+      marginBottom: '4px',
+    });
+    const maxRetriesInput = document.createElement('input');
+    maxRetriesInput.type = 'number';
+    maxRetriesInput.id = 'pq-setting-max-retries';
+    maxRetriesInput.value = settings.maxRetries;
+    maxRetriesInput.min = '0';
+    maxRetriesInput.max = '10';
+    Object.assign(maxRetriesInput.style, {
+      width: '100%',
+      padding: '6px',
+      border: '1px solid var(--pq-ui-border)',
+      borderRadius: '4px',
+      background: 'var(--pq-ui-input-bg)',
+      color: 'var(--pq-ui-text)',
+      fontSize: '14px',
+    });
+    const maxRetriesDesc = document.createElement('p');
+    maxRetriesDesc.textContent = 'How many times to retry before giving up (0 = disabled)';
+    Object.assign(maxRetriesDesc.style, {
+      fontSize: '12px',
+      opacity: '0.7',
+      marginTop: '4px',
+      marginBottom: '0',
+    });
+    maxRetriesDiv.appendChild(maxRetriesLabel);
+    maxRetriesDiv.appendChild(maxRetriesInput);
+    maxRetriesDiv.appendChild(maxRetriesDesc);
+    const retryActionDiv = document.createElement('div');
+    Object.assign(retryActionDiv.style, { marginBottom: '20px' });
+    const retryActionLabel = document.createElement('label');
+    retryActionLabel.textContent = 'When retry limit reached:';
+    Object.assign(retryActionLabel.style, {
+      display: 'block',
+      fontSize: '14px',
+      marginBottom: '8px',
+    });
+    const retryOptionsDiv = document.createElement('div');
+    Object.assign(retryOptionsDiv.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px',
+    });
+    const stopLabel = document.createElement('label');
+    Object.assign(stopLabel.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      fontSize: '14px',
+    });
+    const stopRadio = document.createElement('input');
+    stopRadio.type = 'radio';
+    stopRadio.name = 'pq-setting-retry-action';
+    stopRadio.value = 'stop';
+    stopRadio.checked = settings.retryLimitAction === 'stop';
+    Object.assign(stopRadio.style, { cursor: 'pointer' });
+    const stopSpan = document.createElement('span');
+    stopSpan.textContent = 'Stop queue';
+    stopLabel.appendChild(stopRadio);
+    stopLabel.appendChild(stopSpan);
+    const continueLabel = document.createElement('label');
+    Object.assign(continueLabel.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      fontSize: '14px',
+    });
+    const continueRadio = document.createElement('input');
+    continueRadio.type = 'radio';
+    continueRadio.name = 'pq-setting-retry-action';
+    continueRadio.value = 'continue';
+    continueRadio.checked = settings.retryLimitAction === 'continue';
+    Object.assign(continueRadio.style, { cursor: 'pointer' });
+    const continueSpan = document.createElement('span');
+    continueSpan.textContent = 'Send next prompt, requeue failed';
+    continueLabel.appendChild(continueRadio);
+    continueLabel.appendChild(continueSpan);
+    retryOptionsDiv.appendChild(stopLabel);
+    retryOptionsDiv.appendChild(continueLabel);
+    const retryActionDesc = document.createElement('p');
+    retryActionDesc.textContent = 'What to do when max retries is exceeded';
+    Object.assign(retryActionDesc.style, {
+      fontSize: '12px',
+      opacity: '0.7',
+      marginTop: '4px',
+      marginBottom: '0',
+    });
+    retryActionDiv.appendChild(retryActionLabel);
+    retryActionDiv.appendChild(retryOptionsDiv);
+    retryActionDiv.appendChild(retryActionDesc);
+    const buttonDiv = document.createElement('div');
+    Object.assign(buttonDiv.style, { textAlign: 'right' });
+    const closeBtn = document.createElement('button');
+    closeBtn.id = 'pq-settings-close';
+    closeBtn.textContent = 'Save & Close';
+    Object.assign(closeBtn.style, {
+      padding: '6px 12px',
+      borderRadius: '4px',
+      border: '1px solid var(--pq-ui-btn-border)',
+      background: 'var(--pq-ui-btn-bg)',
+      color: 'var(--pq-ui-text)',
+      cursor: 'pointer',
+    });
+    buttonDiv.appendChild(closeBtn);
+    modal.appendChild(title);
+    modal.appendChild(autoRetryDiv);
+    modal.appendChild(maxRetriesDiv);
+    modal.appendChild(retryActionDiv);
+    modal.appendChild(buttonDiv);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    const retryActionRadios = overlay.querySelectorAll('input[name="pq-setting-retry-action"]');
+    const saveAndClose = () => {
+      const newSettings = {
+        autoRetryEnabled: autoRetryCheckbox.checked,
+        maxRetries: Math.max(0, Math.min(10, parseInt(maxRetriesInput.value, 10) || 0)),
+        retryLimitAction: Array.from(retryActionRadios).find((r) => r.checked)?.value || 'stop',
+      };
+      saveSettings(newSettings);
+      document.body.removeChild(overlay);
+    };
+    closeBtn.addEventListener('click', saveAndClose);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        saveAndClose();
+      }
+    });
+  }
+
   // AI_Queue/core/panel.js
   function createBasePanel(titleText, includeFailedList = false) {
     log('createBasePanel called');
@@ -796,6 +1116,28 @@
       infoBtn.addEventListener('click', () => {
         showHelpModal();
       });
+      const settingsBtn = document.createElement('button');
+      settingsBtn.id = 'pq-settings';
+      settingsBtn.type = 'button';
+      settingsBtn.textContent = '\u2699';
+      settingsBtn.title = 'Settings';
+      Object.assign(settingsBtn.style, {
+        width: '24px',
+        height: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '50%',
+        border: '1px solid var(--pq-ui-btn-border)',
+        background: 'var(--pq-ui-btn-bg)',
+        color: 'var(--pq-ui-text)',
+        cursor: 'pointer',
+        fontSize: '14px',
+        padding: '0',
+      });
+      settingsBtn.addEventListener('click', () => {
+        showSettingsModal();
+      });
       const closeBtn = document.createElement('button');
       closeBtn.id = 'pq-close';
       closeBtn.type = 'button';
@@ -810,6 +1152,7 @@
       });
       closeBtn.addEventListener('click', () => hidePanel(panel));
       rightControls.appendChild(infoBtn);
+      rightControls.appendChild(settingsBtn);
       rightControls.appendChild(closeBtn);
       title.appendChild(titleLabel);
       title.appendChild(rightControls);
@@ -2485,6 +2828,8 @@
   }
 
   // AI_Queue/providers/provider-base.js
+  init_dom();
+  init_utils();
   function queryPanel() {
     return document.querySelector('#pq-panel');
   }
@@ -2529,6 +2874,7 @@
         text.addEventListener('dblclick', () => {
           editQueueItem(item.id, queueState.queue, (id, prompt) => {
             queueState.editingId = id;
+            queueState.recentErrorIds.delete(item.id);
             const input = queryInput();
             const addButton = queryAddButton();
             if (input && addButton) {
@@ -2544,6 +2890,7 @@
         editBtn.addEventListener('click', () => {
           editQueueItem(item.id, queueState.queue, (id, prompt) => {
             queueState.editingId = id;
+            queueState.recentErrorIds.delete(item.id);
             const input = queryInput();
             const addButton = queryAddButton();
             if (input && addButton) {
@@ -2559,6 +2906,7 @@
           const index = queueState.queue.findIndex((queuedItem) => queuedItem.id === item.id);
           if (index === -1) return;
           queueState.queue.splice(index, 1);
+          queueState.recentErrorIds.delete(item.id);
           sendBtn.disabled = true;
           saveQueueFn();
           renderQueue();
@@ -2573,6 +2921,7 @@
           }
         });
         deleteBtn.addEventListener('click', () => {
+          queueState.recentErrorIds.delete(item.id);
           deleteQueueItem(item.id, queueState.queue, renderQueue, saveQueueFn);
         });
         list.appendChild(li);
@@ -2608,6 +2957,7 @@
               retryItem.attempts = 0;
               retryItem.status = 'queued';
               queueState.queue.push(retryItem);
+              queueState.recentErrorIds.delete(retryItem.id);
               renderQueue();
               saveQueueFn();
             }
@@ -2619,6 +2969,7 @@
           deleteBtn.style.color = '#ff6b6b';
           deleteBtn.style.fontSize = '12px';
           deleteBtn.addEventListener('click', () => {
+            queueState.recentErrorIds.delete(item.id);
             deleteQueueItem(item.id, queueState.failedQueue, renderQueue, saveQueueFn);
           });
           row.appendChild(text);
@@ -2670,6 +3021,13 @@
       setStatus(panel, 'Running');
       while (queueState.queue.length > 0 && queueState.running) {
         await waitForIdle();
+        const nextItem = queueState.queue[0];
+        if (nextItem && queueState.recentErrorIds.has(nextItem.id)) {
+          log('Loop detected: next prompt recently failed, stopping queue');
+          setStatus(panel, 'Loop detected, stopping queue');
+          queueState.running = false;
+          break;
+        }
         const item = queueState.queue.shift();
         if (!item || typeof item.prompt !== 'string') {
           error('Skipping invalid queue item:', item);
@@ -2695,10 +3053,111 @@
             queueState.awaitingChatScopeSync = false;
           }
           item.attempts = 0;
+          queueState.currentRetryCount = 0;
+          await sleep(2e3);
+          const settings = getSettings();
+          if (settings.autoRetryEnabled && hasErrorState(prompt)) {
+            if (settings.maxRetries <= 0) {
+              log('Max retries is 0, skipping retry logic');
+              return;
+            }
+            queueState.currentRetryCount = 0;
+            while (queueState.currentRetryCount < settings.maxRetries && queueState.running) {
+              queueState.currentRetryCount++;
+              setStatus(
+                panel,
+                `Retrying (${queueState.currentRetryCount}/${settings.maxRetries}): ${prompt.slice(0, 40)}...`
+              );
+              const retryButton = findRetryButton(prompt);
+              if (retryButton) {
+                safeClick(retryButton);
+                await sleep(300);
+                await waitForIdle();
+                await sleep(2e3);
+                if (!hasErrorState(prompt)) {
+                  log('Retry successful');
+                  item.attempts = 0;
+                  queueState.currentRetryCount = 0;
+                  queueState.recentErrorIds.delete(item.id);
+                  break;
+                }
+              } else {
+                error('Retry button not found');
+                break;
+              }
+            }
+            if (hasErrorState(prompt) && queueState.currentRetryCount >= settings.maxRetries) {
+              log('Retry limit reached, applying action:', settings.retryLimitAction);
+              queueState.recentErrorIds.add(item.id);
+              if (queueState.recentErrorIds.size > 5) {
+                const firstId = queueState.recentErrorIds.values().next().value;
+                queueState.recentErrorIds.delete(firstId);
+              }
+              if (settings.retryLimitAction === 'stop') {
+                setStatus(panel, 'Retry limit reached, stopping queue');
+                queueState.running = false;
+                if (includeFailedQueue) {
+                  queueState.failedQueue.push(item);
+                }
+              } else if (settings.retryLimitAction === 'continue') {
+                setStatus(panel, 'Retry limit reached, continuing with next');
+                queueState.queue.push(item);
+              }
+            }
+          }
         } catch (err) {
           queueState.awaitingChatScopeSync = false;
           error('Failed to send prompt:', formatError(err));
-          if (maxRetries > 0) {
+          const settings = getSettings();
+          if (settings.autoRetryEnabled && settings.maxRetries > 0) {
+            queueState.currentRetryCount = 0;
+            while (queueState.currentRetryCount < settings.maxRetries && queueState.running) {
+              queueState.currentRetryCount++;
+              setStatus(
+                panel,
+                `Retrying (${queueState.currentRetryCount}/${settings.maxRetries}): ${prompt.slice(0, 40)}...`
+              );
+              try {
+                await sendPrompt(prompt);
+                const afterScope = getCurrentScope();
+                if (!beforeScope && afterScope) {
+                  syncQueuedItemsToCurrentScope(afterScope);
+                }
+                if (afterScope) {
+                  queueState.awaitingChatScopeSync = false;
+                }
+                item.attempts = 0;
+                queueState.currentRetryCount = 0;
+                queueState.recentErrorIds.delete(item.id);
+                log('Retry successful after send error');
+                break;
+              } catch (retryErr) {
+                error('Retry attempt failed:', formatError(retryErr));
+                await sleep(1e3);
+              }
+            }
+            if (queueState.currentRetryCount >= settings.maxRetries) {
+              log(
+                'Retry limit reached after send errors, applying action:',
+                settings.retryLimitAction
+              );
+              queueState.recentErrorIds.add(item.id);
+              if (queueState.recentErrorIds.size > 5) {
+                const firstId = queueState.recentErrorIds.values().next().value;
+                queueState.recentErrorIds.delete(firstId);
+              }
+              if (settings.retryLimitAction === 'stop') {
+                setStatus(panel, 'Retry limit reached, stopping queue');
+                queueState.running = false;
+                if (includeFailedQueue) {
+                  queueState.failedQueue.push(item);
+                }
+              } else if (settings.retryLimitAction === 'continue') {
+                setStatus(panel, 'Retry limit reached, continuing with next');
+                queueState.queue.push(item);
+              }
+            }
+          } else if (maxRetries > 0) {
             item.status = 'failed';
             item.attempts = (item.attempts || 0) + 1;
             if (item.attempts < maxRetries) {
@@ -2908,7 +3367,7 @@
 
   // AI_Queue/providers/chatgpt.js
   init_logging();
-  var STORAGE_KEY = 'pq-chatgpt-queue';
+  var STORAGE_KEY2 = 'pq-chatgpt-queue';
   var DOMAINS = ['chatgpt.com', 'chat.openai.com'];
   function normalizeCode(value) {
     if (typeof value !== 'string') return null;
@@ -2941,7 +3400,7 @@
     }
   }
   var chatgptProvider = createProvider({
-    storageKey: STORAGE_KEY,
+    storageKey: STORAGE_KEY2,
     panelTitle: 'ChatGPT Prompt Queue',
     getCurrentScope: getCurrentChatGPTScope,
     includeFailedQueue: false,
