@@ -71,6 +71,7 @@ export function createProvider(config) {
       text.addEventListener('dblclick', () => {
         editQueueItem(item.id, queueState.queue, (id, prompt) => {
           queueState.editingId = id;
+          queueState.recentErrorIds.delete(item.id);
           const input = queryInput();
           const addButton = queryAddButton();
           if (input && addButton) {
@@ -87,6 +88,7 @@ export function createProvider(config) {
       editBtn.addEventListener('click', () => {
         editQueueItem(item.id, queueState.queue, (id, prompt) => {
           queueState.editingId = id;
+          queueState.recentErrorIds.delete(item.id);
           const input = queryInput();
           const addButton = queryAddButton();
           if (input && addButton) {
@@ -107,6 +109,7 @@ export function createProvider(config) {
         if (index === -1) return;
 
         queueState.queue.splice(index, 1);
+        queueState.recentErrorIds.delete(item.id);
         sendBtn.disabled = true;
         saveQueueFn();
         renderQueue();
@@ -123,6 +126,7 @@ export function createProvider(config) {
       });
 
       deleteBtn.addEventListener('click', () => {
+        queueState.recentErrorIds.delete(item.id);
         deleteQueueItem(item.id, queueState.queue, renderQueue, saveQueueFn);
       });
 
@@ -166,6 +170,7 @@ export function createProvider(config) {
             retryItem.attempts = 0;
             retryItem.status = 'queued';
             queueState.queue.push(retryItem);
+            queueState.recentErrorIds.delete(retryItem.id);
             renderQueue();
             saveQueueFn();
           }
@@ -179,6 +184,7 @@ export function createProvider(config) {
         deleteBtn.style.fontSize = '12px';
 
         deleteBtn.addEventListener('click', () => {
+          queueState.recentErrorIds.delete(item.id);
           deleteQueueItem(item.id, queueState.failedQueue, renderQueue, saveQueueFn);
         });
 
@@ -286,12 +292,6 @@ export function createProvider(config) {
 
         const settings = getSettings();
         if (settings.autoRetryEnabled && hasErrorState(prompt)) {
-          queueState.recentErrorIds.add(item.id);
-          if (queueState.recentErrorIds.size > 5) {
-            const firstId = queueState.recentErrorIds.values().next().value;
-            queueState.recentErrorIds.delete(firstId);
-          }
-
           queueState.currentRetryCount = 0;
 
           while (queueState.currentRetryCount < settings.maxRetries && queueState.running) {
@@ -309,6 +309,7 @@ export function createProvider(config) {
                 log('Retry successful');
                 item.attempts = 0;
                 queueState.currentRetryCount = 0;
+                queueState.recentErrorIds.delete(item.id);
                 break;
               }
             } else {
@@ -319,6 +320,12 @@ export function createProvider(config) {
 
           if (hasErrorState(prompt) && queueState.currentRetryCount >= settings.maxRetries) {
             log('Retry limit reached, applying action:', settings.retryLimitAction);
+            queueState.recentErrorIds.add(item.id);
+            if (queueState.recentErrorIds.size > 5) {
+              const firstId = queueState.recentErrorIds.values().next().value;
+              queueState.recentErrorIds.delete(firstId);
+            }
+
             if (settings.retryLimitAction === 'stop') {
               setStatus(panel, 'Retry limit reached, stopping queue');
               queueState.running = false;
