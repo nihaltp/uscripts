@@ -347,7 +347,57 @@ export function createProvider(config) {
         queueState.awaitingChatScopeSync = false;
         error('Failed to send prompt:', formatError(err));
 
-        if (maxRetries > 0) {
+        const settings = getSettings();
+        if (settings.autoRetryEnabled && settings.maxRetries > 0) {
+          queueState.currentRetryCount = 0;
+
+          while (queueState.currentRetryCount < settings.maxRetries && queueState.running) {
+            queueState.currentRetryCount++;
+            setStatus(panel, `Retrying (${queueState.currentRetryCount}/${settings.maxRetries}): ${prompt.slice(0, 40)}...`);
+
+            try {
+              await sendPrompt(prompt);
+              const afterScope = getCurrentScope();
+
+              if (!beforeScope && afterScope) {
+                syncQueuedItemsToCurrentScope(afterScope);
+              }
+
+              if (afterScope) {
+                queueState.awaitingChatScopeSync = false;
+              }
+
+              item.attempts = 0;
+              queueState.currentRetryCount = 0;
+              queueState.recentErrorIds.delete(item.id);
+              log('Retry successful after send error');
+              break;
+            } catch (retryErr) {
+              error('Retry attempt failed:', formatError(retryErr));
+              await sleep(1000);
+            }
+          }
+
+          if (queueState.currentRetryCount >= settings.maxRetries) {
+            log('Retry limit reached after send errors, applying action:', settings.retryLimitAction);
+            queueState.recentErrorIds.add(item.id);
+            if (queueState.recentErrorIds.size > 5) {
+              const firstId = queueState.recentErrorIds.values().next().value;
+              queueState.recentErrorIds.delete(firstId);
+            }
+
+            if (settings.retryLimitAction === 'stop') {
+              setStatus(panel, 'Retry limit reached, stopping queue');
+              queueState.running = false;
+              if (includeFailedQueue) {
+                queueState.failedQueue.push(item);
+              }
+            } else if (settings.retryLimitAction === 'continue') {
+              setStatus(panel, 'Retry limit reached, continuing with next');
+              queueState.queue.push(item);
+            }
+          }
+        } else if (maxRetries > 0) {
           item.status = 'failed';
           item.attempts = (item.attempts || 0) + 1;
 
