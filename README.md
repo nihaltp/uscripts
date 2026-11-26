@@ -96,6 +96,16 @@
 
 </details>
 
+## <img src="https://www.google.com/s2/favicons?sz=64&domain=notebook.google.com" width="20" height="20" alt=""> Gemini Notebook
+
+[Gemini Notebook Prompt Queue](https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/notebook.user.js) - A script to manage a queue of prompts for Gemini Notebook (formerly NotebookLM).
+<details>
+<summary>Features</summary>
+
+- Manage and automatically submit prompts in a dedicated queue for each notebook.
+
+</details>
+
 ## <img src="https://www.google.com/s2/favicons?sz=64&domain=docs.google.com" width="20" height="20" alt=""> Google Forms
 
 [Google Forms Auto Fill](https://raw.githubusercontent.com/nihaltp/uscripts/main/google_forms/dist/google-forms-saver.user.js) - A script to automatically fill Google Forms with saved data, making it easier to complete forms quickly.

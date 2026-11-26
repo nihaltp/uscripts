@@ -50,6 +50,21 @@ const builds = [
     entry: 'providers/gemini.js',
     outfile: `${config.outputDir}/gemini.user.js`,
   },
+  {
+    id: 'notebook',
+    name: 'Gemini Notebook Prompt Queue',
+    description: 'A userscript to manage a queue of prompts for Gemini Notebook.',
+    matches: [
+      'https://notebook.google.com/notebook/*',
+      'https://notebooklm.google.com/notebook/*',
+    ],
+    excludes: [],
+    icon: 'https://www.google.com/s2/favicons?sz=64&domain=notebook.google.com',
+    grants: ['none'],
+    runAt: 'document-idle',
+    entry: 'providers/notebook.js',
+    outfile: `${config.outputDir}/notebook.user.js`,
+  },
 ];
 
 async function buildAll() {
