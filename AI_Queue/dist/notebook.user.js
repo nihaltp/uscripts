@@ -1,0 +1,3388 @@
+// ==UserScript==
+// @name         Gemini Notebook Prompt Queue
+// @description  A userscript to manage a queue of prompts for Gemini Notebook.
+// @author       nihaltp
+// @namespace    https://github.com/nihaltp/uscripts
+// @supportURL   https://github.com/nihaltp/uscripts/issues/new?template=bug.yml
+// @homepageURL  https://github.com/nihaltp/uscripts
+// @homepage     https://github.com/nihaltp/uscripts
+// @license      MIT
+// @match        https://notebook.google.com/notebook/*
+// @match        https://notebooklm.google.com/notebook/*
+
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=notebook.google.com
+// @version      1.0.0
+// @grant        none
+// @downloadURL  https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/notebook.user.js
+// @updateURL    https://raw.githubusercontent.com/nihaltp/uscripts/main/AI_Queue/dist/notebook.user.js
+// @run-at       document-idle
+// ==/UserScript==
+
+(() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __esm = (fn, res, err) =>
+    function __init() {
+      if (err) throw err[0];
+      try {
+        return (fn && (res = (0, fn[__getOwnPropNames(fn)[0]])((fn = 0))), res);
+      } catch (e) {
+        throw ((err = [e]), e);
+      }
+    };
+  var __export = (target, all) => {
+    for (var name in all) __defProp(target, name, { get: all[name], enumerable: true });
+  };
+
+  // AI_Queue/core/state.js
+  var state_exports = {};
+  __export(state_exports, {
+    queueState: () => queueState,
+    resetQueueState: () => resetQueueState,
+  });
+  function resetQueueState({ includeFailedQueue = false } = {}) {
+    queueState.queue.length = 0;
+    if (includeFailedQueue) {
+      queueState.failedQueue.length = 0;
+    }
+    queueState.running = false;
+    queueState.editingId = null;
+    queueState.draggedId = null;
+    queueState.awaitingChatScopeSync = false;
+    queueState.recentErrorIds.clear();
+    queueState.currentRetryCount = 0;
+  }
+  var queueState;
+  var init_state = __esm({
+    'AI_Queue/core/state.js'() {
+      queueState = {
+        queue: [],
+        failedQueue: [],
+        running: false,
+        editingId: null,
+        draggedId: null,
+        awaitingChatScopeSync: false,
+        recentErrorIds: /* @__PURE__ */ new Set(),
+        currentRetryCount: 0,
+      };
+    },
+  });
+
+  // AI_Queue/core/logging.js
+  function isDebugEnabled() {
+    return Boolean(globalThis.aiQueueDebug);
+  }
+  function log(...args) {
+    const force = typeof args[args.length - 1] === 'boolean' ? args.pop() : false;
+    if (!force && !isDebugEnabled()) return;
+    console.log('[AI QUEUE]', ...args);
+  }
+  function error(...args) {
+    console.error('[AI QUEUE]', ...args);
+  }
+  function formatError(err) {
+    if (err instanceof Error) {
+      return err.message;
+    }
+    if (typeof err === 'string') {
+      return err;
+    }
+    if (err && typeof err.message === 'string') {
+      return err.message;
+    }
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  }
+  function throwError(...args) {
+    error(...args);
+    throw new Error(args.join(' '));
+  }
+  var init_logging = __esm({
+    'AI_Queue/core/logging.js'() {
+      window.aiQueueDebug = false;
+    },
+  });
+
+  // AI_Queue/core/utils.js
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+  function isAttached(element) {
+    return !!element && document.contains(element);
+  }
+  function isVisible(element) {
+    if (!isAttached(element)) return false;
+    if (!(element instanceof HTMLElement)) return false;
+    const style = window.getComputedStyle(element);
+    if (!style) return false;
+    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+      return false;
+    }
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    return (
+      rect.bottom > 0 &&
+      rect.right > 0 &&
+      rect.top < window.innerHeight &&
+      rect.left < window.innerWidth
+    );
+  }
+  function isActionButtonElement(element) {
+    return (
+      !!element &&
+      element instanceof HTMLElement &&
+      element.matches('button, [role="button"], input[type="button"], input[type="submit"]')
+    );
+  }
+  function isOwnMutation(target) {
+    return (
+      !!target &&
+      (target.closest?.('#pq-panel') || target.closest?.('.pq-toolbar') || target.id === 'pq-panel')
+    );
+  }
+  var init_utils = __esm({
+    'AI_Queue/core/utils.js'() {},
+  });
+
+  // AI_Queue/styles/ui.css
+  var ui_default;
+  var init_ui = __esm({
+    'AI_Queue/styles/ui.css'() {
+      ui_default =
+        '@keyframes pq-pulse {\n  0% {\n    transform: scale(1);\n    opacity: 1;\n  }\n\n  50% {\n    transform: scale(1.06);\n    opacity: 0.75;\n  }\n\n  100% {\n    transform: scale(1);\n    opacity: 1;\n  }\n}\n\n:root {\n  --pq-ui-bg: #202123;\n  --pq-ui-border: #444;\n  --pq-ui-text: white;\n  --pq-ui-btn-bg: #2a2a2a;\n  --pq-ui-btn-border: #555;\n  --pq-ui-input-bg: #222;\n  --pq-ui-accent: #7dd3fc;\n  --pq-ui-danger: #ff6b6b;\n}\n\n@media (prefers-color-scheme: light) {\n  :root {\n    --pq-ui-bg: #ffffff;\n    --pq-ui-border: #e5e7eb;\n    --pq-ui-text: #111827;\n    --pq-ui-btn-bg: #f3f4f6;\n    --pq-ui-btn-border: #d1d5db;\n    --pq-ui-input-bg: #f9fafb;\n    --pq-ui-accent: #0284c7;\n    --pq-ui-danger: #ef4444;\n  }\n}';
+    },
+  });
+
+  // AI_Queue/core/dom.js
+  var dom_exports = {};
+  __export(dom_exports, {
+    findRetryButton: () => findRetryButton,
+    findStopButton: () => findStopButton,
+    getButtonLabel: () => getButtonLabel,
+    getComposerEditor: () => getComposerEditor,
+    getComposerHost: () => getComposerHost,
+    getEditorText: () => getEditorText,
+    getSendButton: () => getSendButton,
+    hasBusyIndicators: () => hasBusyIndicators,
+    hasErrorState: () => hasErrorState,
+    isActionButtonVisible: () => isActionButtonVisible,
+    isEditableCandidate: () => isEditableCandidate,
+    safeClick: () => safeClick,
+    scoreEditor: () => scoreEditor,
+    waitForCondition: () => waitForCondition,
+    waitForElement: () => waitForElement,
+  });
+  function waitForCondition(
+    predicate,
+    { timeoutMs = 1e4, intervalMs = 100, description = 'condition' } = {}
+  ) {
+    const startedAt = Date.now();
+    return new Promise((resolve, reject) => {
+      const check = async () => {
+        try {
+          const result = await Promise.resolve(predicate());
+          if (result) {
+            resolve(result);
+            return;
+          }
+        } catch (err) {
+          error('waitForCondition check error:', err);
+        }
+        const elapsed = Date.now() - startedAt;
+        if (elapsed > timeoutMs) {
+          error(`Timeout waiting for ${description} (${elapsed}ms)`);
+          reject(new Error(`Timeout waiting for ${description} (${elapsed}ms`));
+          return;
+        }
+        setTimeout(check, intervalMs);
+      };
+      check();
+    });
+  }
+  function waitForElement(getter, options = {}) {
+    return waitForCondition(() => getter(), options);
+  }
+  function safeClick(element) {
+    if (!isAttached(element) || !isVisible(element)) return false;
+    element.focus?.({ preventScroll: true });
+    if (typeof element.click === 'function') {
+      element.click();
+      return true;
+    }
+    element.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window })
+    );
+    element.dispatchEvent(
+      new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window })
+    );
+    element.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, view: window })
+    );
+    return true;
+  }
+  function getEditorText(editor) {
+    if (!editor) return '';
+    if ('value' in editor) return String(editor.value || '');
+    return String(editor.textContent || '');
+  }
+  function isEditableCandidate(element) {
+    if (!element) return false;
+    if (!(element instanceof HTMLElement)) return false;
+    if (!isAttached(element)) return false;
+    if (!isVisible(element)) return false;
+    const isTextarea = element instanceof HTMLTextAreaElement;
+    const isContentEditable =
+      element.isContentEditable || element.getAttribute('contenteditable') === 'true';
+    if (!isTextarea && !isContentEditable) return false;
+    if (element.matches('button, [role="button"], input[type="button"], input[type="submit"]'))
+      return false;
+    if (element.disabled || element.getAttribute('aria-disabled') === 'true') return false;
+    if (element.closest('#pq-panel')) return false;
+    return true;
+  }
+  function scoreEditor(editor) {
+    const rect = editor.getBoundingClientRect();
+    let score = rect.top;
+    if (editor === document.activeElement) score += 1e3;
+    if (editor.matches('textarea')) score += 100;
+    if (editor.matches('[contenteditable="true"]')) score += 80;
+    if ((editor.getAttribute('role') || '').toLowerCase() === 'textbox') score += 60;
+    if (editor.closest('form')) score += 30;
+    if (editor.closest('[role="form"]')) score += 20;
+    if (rect.bottom > window.innerHeight * 0.5) score += 50;
+    return score;
+  }
+  function getComposerEditor() {
+    const activeElement = document.activeElement;
+    if (isEditableCandidate(activeElement)) {
+      if (isActionButtonElement(activeElement)) return null;
+      return activeElement;
+    }
+    const candidates = [
+      ...document.querySelectorAll(
+        'textarea:not(#pq-input), [contenteditable="true"][role="textbox"], [contenteditable="true"]'
+      ),
+    ]
+      .filter(isEditableCandidate)
+      .sort((left, right) => scoreEditor(right) - scoreEditor(left));
+    const editor = candidates[0] || null;
+    if (editor && editor.matches('button, [role="button"]')) return null;
+    return editor;
+  }
+  function getComposerHost(editor = getComposerEditor()) {
+    if (!editor) return null;
+    const host =
+      editor.closest(
+        'form, [role="form"], [aria-label*="prompt" i], [aria-label*="composer" i], [aria-label*="message" i], [data-testid*="prompt" i], [data-testid*="composer" i]'
+      ) ||
+      editor.parentElement ||
+      null;
+    if (!host || host === editor || editor.contains(host) || host.contains?.(editor)) return null;
+    if (
+      host.isContentEditable ||
+      host.matches?.(
+        '[contenteditable="true"], textarea, input, button, [role="button"], input[type="button"], input[type="submit"]'
+      )
+    )
+      return null;
+    return host;
+  }
+  function getButtonLabel(button) {
+    return [button.getAttribute('aria-label'), button.getAttribute('title'), button.textContent]
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function isActionButtonVisible(button) {
+    return isAttached(button) && isVisible(button);
+  }
+  function getSendButton({ includeDisabled = false } = {}) {
+    const host = getComposerHost();
+    const selectors = [
+      'button[data-testid="send-button"]',
+      '[role="button"][data-testid="send-button"]',
+      'button[aria-label*="Send" i]',
+      'button[title*="Send" i]',
+      '[role="button"][aria-label*="Send" i]',
+      '[role="button"][title*="Send" i]',
+    ];
+    const candidates = [];
+    for (const selector of selectors) {
+      candidates.push(...document.querySelectorAll(selector));
+    }
+    if (host) {
+      candidates.push(...host.querySelectorAll('button, [role="button"]'));
+    }
+    const button =
+      candidates.find((candidate) => {
+        if (!candidate || !(candidate instanceof HTMLElement)) return false;
+        if (!isActionButtonVisible(candidate)) return false;
+        const label = getButtonLabel(candidate);
+        const exactSend = candidate.matches('[data-testid="send-button"]');
+        const looksLikeSend = /\bsend\b/i.test(label) || /\bsubmit\b/i.test(label);
+        if (!exactSend && !looksLikeSend) return false;
+        if (!includeDisabled && candidate.disabled) return false;
+        return true;
+      }) || null;
+    if (button) log('send button found', button);
+    return button;
+  }
+  function findStopButton() {
+    const selectors = [
+      'button[data-testid="stop-button"]',
+      '[role="button"][data-testid="stop-button"]',
+      'button[aria-label*="Stop" i]',
+      'button[title*="Stop" i]',
+      '[role="button"][aria-label*="Stop" i]',
+      '[role="button"][title*="Stop" i]',
+    ];
+    for (const selector of selectors) {
+      const button = [...document.querySelectorAll(selector)].find(isActionButtonVisible) || null;
+      if (button) {
+        log('stop button found', button);
+        return button;
+      }
+    }
+    return null;
+  }
+  function hasBusyIndicators() {
+    return [
+      ...document.querySelectorAll(
+        '[aria-busy="true"], [data-loading="true"], [role="progressbar"]'
+      ),
+    ].some(isActionButtonVisible);
+  }
+  function findRetryButton(promptText = null) {
+    const selectors = [
+      'button[data-testid="regenerate-thread-error-button"]',
+      'button[aria-label*="Retry" i]',
+      'button[aria-label*="Regenerate" i]',
+      'button[title*="Retry" i]',
+      'button[title*="Regenerate" i]',
+      'button[data-testid*="retry" i]',
+    ];
+    for (const selector of selectors) {
+      const retryButtons = [...document.querySelectorAll(selector)].filter(isActionButtonVisible);
+      for (const button of retryButtons) {
+        if (!promptText) {
+          log('retry button found (no prompt correlation)', button);
+          return button;
+        }
+        const messageContainer = button.closest('[data-message-author-role="assistant"]');
+        if (!messageContainer) continue;
+        const previousSibling = messageContainer.previousElementSibling;
+        if (!previousSibling) continue;
+        const previousText = previousSibling.textContent || '';
+        const promptLower = promptText.toLowerCase().trim();
+        const previousLower = previousText.toLowerCase();
+        if (
+          previousLower.includes(promptLower) ||
+          promptLower.includes(previousLower.slice(0, 50))
+        ) {
+          log('retry button found and correlated with prompt', button);
+          return button;
+        }
+      }
+    }
+    return null;
+  }
+  function hasErrorState(promptText = null) {
+    const errorSelectors = [
+      'div.text-token-text-error',
+      'div[class*="bg-token-surface-error"]',
+      '[role="alert"]',
+    ];
+    for (const selector of errorSelectors) {
+      const errorElements = document.querySelectorAll(selector);
+      for (const element of errorElements) {
+        if (!isAttached(element) || !isVisible(element)) continue;
+        const text = element.textContent || '';
+        if (!text.includes('wrong') && !text.includes('error') && !text.includes('Error')) continue;
+        if (!promptText) {
+          log('error state detected (no prompt correlation)', {
+            selector,
+            text: text.slice(0, 50),
+          });
+          return true;
+        }
+        const messageContainer = element.closest('[data-message-author-role="assistant"]');
+        if (!messageContainer) continue;
+        const previousSibling = messageContainer.previousElementSibling;
+        if (!previousSibling) continue;
+        const previousText = previousSibling.textContent || '';
+        const promptLower = promptText.toLowerCase().trim();
+        const previousLower = previousText.toLowerCase();
+        if (
+          previousLower.includes(promptLower) ||
+          promptLower.includes(previousLower.slice(0, 50))
+        ) {
+          log('error state detected and correlated with prompt', {
+            selector,
+            text: text.slice(0, 50),
+          });
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  var init_dom = __esm({
+    'AI_Queue/core/dom.js'() {
+      init_logging();
+      init_utils();
+    },
+  });
+
+  // AI_Queue/core/ui.js
+  var ui_exports = {};
+  __export(ui_exports, {
+    ensurePanelAttached: () => ensurePanelAttached,
+    ensureToolbarStyles: () => ensureToolbarStyles,
+    forceShowPanel: () => forceShowPanel,
+    getPanel: () => getPanel,
+    hidePanel: () => hidePanel,
+    observeInputBoundary: () => observeInputBoundary,
+    patchHistoryMethod: () => patchHistoryMethod,
+    repairUi: () => repairUi,
+    requestRepair: () => requestRepair,
+    showPanel: () => showPanel,
+    startDomObserver: () => startDomObserver,
+    startUrlWatcher: () => startUrlWatcher,
+    updateToolbarButton: () => updateToolbarButton,
+  });
+  function ensureToolbarStyles() {
+    if (document.querySelector('#pq-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'pq-styles';
+    style.textContent = ui_default;
+    document.head.appendChild(style);
+  }
+  function getPanel() {
+    return document.querySelector('#pq-panel');
+  }
+  function forceShowPanel(panel) {
+    if (!panel) return;
+    panel.hidden = false;
+    panel.style.visibility = 'visible';
+    panel.style.opacity = '1';
+    panel.style.setProperty('display', 'block', 'important');
+    panel.style.setProperty('pointer-events', 'auto', 'important');
+  }
+  function ensurePanelAttached(panel = getPanel()) {
+    const currentPanel3 = getPanel() || panel || null;
+    if (!currentPanel3) return false;
+    const root = document.documentElement || document.body;
+    if (!root) return false;
+    if (!root.contains(currentPanel3)) {
+      root.appendChild(currentPanel3);
+    }
+    log('attached', root.contains(currentPanel3));
+    log('parent node', currentPanel3.parentNode);
+    return true;
+  }
+  function showPanel(createPanel) {
+    log('TOGGLE PANEL');
+    let panel = getPanel();
+    if (!panel) {
+      createPanel?.();
+      panel = getPanel();
+    }
+    if (!panel) {
+      error('panel missing');
+      return;
+    }
+    const isHidden = panel.hidden || getComputedStyle(panel).display === 'none';
+    if (isHidden) {
+      if (!ensurePanelAttached(panel)) {
+        error('failed to attach panel');
+        return;
+      }
+      panel.hidden = false;
+      panel.style.setProperty('display', 'block', 'important');
+      panel.style.setProperty('visibility', 'visible', 'important');
+      panel.style.setProperty('opacity', '1', 'important');
+      panel.style.setProperty('pointer-events', 'auto', 'important');
+      panel.style.setProperty('z-index', '2147483647', 'important');
+      log('final state', {
+        display: getComputedStyle(panel).display,
+        visibility: getComputedStyle(panel).visibility,
+        rect: panel.getBoundingClientRect(),
+      });
+      return;
+    }
+    panel.hidden = true;
+    panel.style.setProperty('display', 'none', 'important');
+    panel.style.setProperty('pointer-events', 'none', 'important');
+    log('panel hidden');
+  }
+  function hidePanel(panel = getPanel()) {
+    if (!panel) return;
+    panel.hidden = true;
+    panel.style.setProperty('display', 'none', 'important');
+    panel.style.setProperty('pointer-events', 'none', 'important');
+    log('panel hidden');
+  }
+  function updateToolbarButton(toolbarButton, queue, running) {
+    if (!toolbarButton || !isAttached(toolbarButton)) return;
+    const count = queue.length;
+    toolbarButton.textContent = count > 0 ? `Queue (${count})` : 'Queue';
+    toolbarButton.style.animation = running ? 'pq-pulse 1.2s infinite' : '';
+    toolbarButton.style.opacity = running ? '1' : count > 0 ? '1' : '0.8';
+  }
+  function observeInputBoundary(button) {
+    if (!button || button.__pq_boundary_interval) return;
+    button.__pq_boundary_interval = setInterval(async () => {
+      if (!button.parentElement) return;
+      try {
+        const dom = await Promise.resolve().then(() => (init_dom(), dom_exports));
+        const state = await Promise.resolve().then(() => (init_state(), state_exports));
+        const editor = dom.getComposerEditor();
+        if (!editor) {
+          if (!state.queueState.running) {
+            button.style.bottom = '24px';
+          }
+          return;
+        }
+        const host = editor.closest('form, [role="form"]') || editor.parentElement;
+        if (state.queueState.running) {
+          if (host.style.opacity !== '0.001') {
+            host.dataset.pqOriginalOpacity = host.style.opacity;
+            host.dataset.pqOriginalPointerEvents = host.style.pointerEvents;
+            host.style.opacity = '0.001';
+            host.style.pointerEvents = 'none';
+          }
+        } else if (host.style.opacity === '0.001') {
+          host.style.opacity = host.dataset.pqOriginalOpacity || '';
+          host.style.pointerEvents = host.dataset.pqOriginalPointerEvents || '';
+        }
+        if (!state.queueState.running) {
+          const target = host || editor;
+          const rect = target.getBoundingClientRect();
+          const buttonRect = button.getBoundingClientRect();
+          const windowHeight = window.innerHeight;
+          const isOverlappingHorizontally =
+            rect.right > buttonRect.left - 16 && rect.left < buttonRect.right + 16;
+          if (rect.top > windowHeight / 2 && isOverlappingHorizontally) {
+            const distanceToTop = windowHeight - rect.top;
+            const newBottom = Math.max(24, distanceToTop + 16);
+            button.style.bottom = `${newBottom}px`;
+          } else {
+            button.style.bottom = '24px';
+          }
+        }
+      } catch (err) {}
+    }, 200);
+  }
+  function repairUi(
+    reason = 'repair',
+    createPanel,
+    setupPanelEvents,
+    setupPanelDrag2,
+    ensureToolbarButton
+  ) {
+    if (repairing) return;
+    repairing = true;
+    try {
+      log('repair', reason);
+      createPanel?.();
+      setupPanelEvents?.();
+      setupPanelDrag2?.();
+      ensureToolbarButton?.();
+    } finally {
+      repairing = false;
+    }
+  }
+  function requestRepair(
+    reason = 'repair',
+    createPanel,
+    setupPanelEvents,
+    setupPanelDrag2,
+    ensureToolbarButton
+  ) {
+    const now = Date.now();
+    const delay = Math.max(0, 2e3 - (now - lastRepairAt));
+    if (repairTimer) {
+      clearTimeout(repairTimer);
+    }
+    repairTimer = setTimeout(() => {
+      lastRepairAt = Date.now();
+      repairUi(reason, createPanel, setupPanelEvents, setupPanelDrag2, ensureToolbarButton);
+    }, delay);
+  }
+  function startDomObserver(
+    createPanel,
+    setupPanelEvents,
+    setupPanelDrag2,
+    ensureToolbarButton,
+    isOwnMutationOverride
+  ) {
+    if (mutationObserver) return;
+    const target = document.body || document.documentElement;
+    if (!target) return;
+    mutationObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          const hasExternalChange = [...mutation.addedNodes, ...mutation.removedNodes].some(
+            (node) => node && !isOwnMutation(node)
+          );
+          if (hasExternalChange) {
+            requestRepair(
+              'dom-mutation',
+              createPanel,
+              setupPanelEvents,
+              setupPanelDrag2,
+              ensureToolbarButton
+            );
+            break;
+          }
+        }
+        if (mutation.type === 'attributes') {
+          if (!isOwnMutationOverride?.(mutation.target)) {
+            requestRepair(
+              'attribute-mutation',
+              createPanel,
+              setupPanelEvents,
+              setupPanelDrag2,
+              ensureToolbarButton
+            );
+            break;
+          }
+        }
+      }
+    });
+    mutationObserver.observe(target, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-busy', 'aria-disabled', 'disabled'],
+    });
+  }
+  function patchHistoryMethod(methodName, callback) {
+    const original = history[methodName];
+    if (typeof original !== 'function' || original.__pqPatched) return;
+    const patched = function (...args) {
+      const result = original.apply(this, args);
+      callback?.();
+      return result;
+    };
+    patched.__pqPatched = true;
+    history[methodName] = patched;
+  }
+  function startUrlWatcher(
+    createPanel,
+    setupPanelEvents,
+    setupPanelDrag2,
+    ensureToolbarButton,
+    onUrlChange
+  ) {
+    const handleUrlChange = (reason, previousUrl, currentUrl) => {
+      onUrlChange?.(previousUrl, currentUrl, reason);
+      requestRepair(reason, createPanel, setupPanelEvents, setupPanelDrag2, ensureToolbarButton);
+    };
+    patchHistoryMethod('pushState', () => {
+      const previousUrl = lastKnownUrl;
+      lastKnownUrl = location.href;
+      handleUrlChange('history-pushState', previousUrl, lastKnownUrl);
+    });
+    patchHistoryMethod('replaceState', () => {
+      const previousUrl = lastKnownUrl;
+      lastKnownUrl = location.href;
+      handleUrlChange('history-replaceState', previousUrl, lastKnownUrl);
+    });
+    window.addEventListener('popstate', () => {
+      const previousUrl = lastKnownUrl;
+      lastKnownUrl = location.href;
+      handleUrlChange('popstate', previousUrl, lastKnownUrl);
+    });
+    window.addEventListener('hashchange', () => {
+      const previousUrl = lastKnownUrl;
+      lastKnownUrl = location.href;
+      handleUrlChange('hashchange', previousUrl, lastKnownUrl);
+    });
+    if (urlWatcher) clearInterval(urlWatcher);
+    urlWatcher = setInterval(() => {
+      if (location.href !== lastKnownUrl) {
+        const previousUrl = lastKnownUrl;
+        lastKnownUrl = location.href;
+        handleUrlChange('url-change', previousUrl, lastKnownUrl);
+      }
+    }, 1e3);
+  }
+  var repairTimer, lastRepairAt, repairing, urlWatcher, lastKnownUrl, mutationObserver;
+  var init_ui2 = __esm({
+    'AI_Queue/core/ui.js'() {
+      init_logging();
+      init_utils();
+      init_ui();
+      repairTimer = null;
+      lastRepairAt = 0;
+      repairing = false;
+      urlWatcher = null;
+      lastKnownUrl = location.href;
+      mutationObserver = null;
+    },
+  });
+
+  // AI_Queue/providers/provider-base.js
+  init_state();
+
+  // AI_Queue/core/panel.js
+  init_ui2();
+  init_logging();
+
+  // AI_Queue/core/help-modal.js
+  function showHelpModal() {
+    const overlay = document.createElement('div');
+    Object.assign(overlay.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100vw',
+      height: '100vh',
+      background: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: '10002',
+    });
+    const modal = document.createElement('div');
+    Object.assign(modal.style, {
+      background: 'var(--pq-ui-bg)',
+      color: 'var(--pq-ui-text)',
+      padding: '20px',
+      borderRadius: '8px',
+      border: '1px solid var(--pq-ui-border)',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      maxWidth: '400px',
+      width: '90%',
+      fontFamily: 'sans-serif',
+    });
+    modal.innerHTML = `
+    <h3 style="margin-top: 0; margin-bottom: 15px;">How to use AI Queue</h3>
+    <ul style="padding-left: 20px; line-height: 1.6; font-size: 14px; margin-bottom: 15px;">
+      <li>Type your prompt in the text area.</li>
+      <li>Press <strong>Ctrl + Enter</strong> to add prompt to queue.</li>
+      <li>Press <strong>Shift + Enter</strong> for next line.</li>
+      <li>Click <strong>'Add To Queue'</strong> as an alternative.</li>
+      <li>Add as many prompts as you like.</li>
+      <li>Click <strong>'Start Queue'</strong> to process them automatically.</li>
+      <li>Right Click and hold Prompt Queue window to move it around.</li>
+    </ul>
+    <p style="font-size: 13px; opacity: 0.9; margin-bottom: 15px;">The script will wait for the AI to finish each response before sending the next one.</p>
+    <div style="text-align: right;">
+      <button id="pq-info-close" style="
+        padding: 6px 12px;
+        border-radius: 4px;
+        border: 1px solid var(--pq-ui-btn-border);
+        background: var(--pq-ui-btn-bg);
+        color: var(--pq-ui-text);
+        cursor: pointer;
+      ">Close</button>
+    </div>
+  `;
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    overlay.querySelector('#pq-info-close').addEventListener('click', () => {
+      document.body.removeChild(overlay);
+    });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay);
+      }
+    });
+  }
+
+  // AI_Queue/core/settings.js
+  init_logging();
+  var STORAGE_KEY = 'pq-settings';
+  var DEFAULT_SETTINGS = {
+    autoRetryEnabled: true,
+    maxRetries: 1,
+    retryLimitAction: 'stop',
+    // 'stop' or 'continue'
+  };
+  function loadSettings() {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) {
+        return { ...DEFAULT_SETTINGS };
+      }
+      const parsed = JSON.parse(stored);
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+      };
+    } catch (err) {
+      error('Failed to load settings:', err);
+      return { ...DEFAULT_SETTINGS };
+    }
+  }
+  function saveSettings(settings) {
+    try {
+      const normalized = {
+        ...DEFAULT_SETTINGS,
+        ...settings,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+      log('Settings saved:', normalized);
+    } catch (err) {
+      error('Failed to save settings:', err);
+    }
+  }
+  function getSettings() {
+    return loadSettings();
+  }
+
+  // AI_Queue/core/settings-modal.js
+  init_logging();
+  function showSettingsModal() {
+    const overlay = document.createElement('div');
+    Object.assign(overlay.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100vw',
+      height: '100vh',
+      background: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: '10002',
+    });
+    const modal = document.createElement('div');
+    Object.assign(modal.style, {
+      background: 'var(--pq-ui-bg)',
+      color: 'var(--pq-ui-text)',
+      padding: '20px',
+      borderRadius: '8px',
+      border: '1px solid var(--pq-ui-border)',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      maxWidth: '400px',
+      width: '90%',
+      fontFamily: 'sans-serif',
+    });
+    const settings = loadSettings();
+    const title = document.createElement('h3');
+    title.textContent = 'Queue Settings';
+    Object.assign(title.style, { marginTop: '0', marginBottom: '15px' });
+    const autoRetryDiv = document.createElement('div');
+    Object.assign(autoRetryDiv.style, { marginBottom: '15px' });
+    const autoRetryLabel = document.createElement('label');
+    Object.assign(autoRetryLabel.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      fontSize: '14px',
+    });
+    const autoRetryCheckbox = document.createElement('input');
+    autoRetryCheckbox.type = 'checkbox';
+    autoRetryCheckbox.id = 'pq-setting-auto-retry';
+    autoRetryCheckbox.checked = settings.autoRetryEnabled;
+    Object.assign(autoRetryCheckbox.style, { cursor: 'pointer' });
+    const autoRetrySpan = document.createElement('span');
+    autoRetrySpan.textContent = 'Enable auto-retry on error';
+    autoRetryLabel.appendChild(autoRetryCheckbox);
+    autoRetryLabel.appendChild(autoRetrySpan);
+    const autoRetryDesc = document.createElement('p');
+    autoRetryDesc.textContent = 'Automatically click retry button when ChatGPT shows an error';
+    Object.assign(autoRetryDesc.style, {
+      fontSize: '12px',
+      opacity: '0.7',
+      marginTop: '4px',
+      marginBottom: '0',
+    });
+    autoRetryDiv.appendChild(autoRetryLabel);
+    autoRetryDiv.appendChild(autoRetryDesc);
+    const maxRetriesDiv = document.createElement('div');
+    Object.assign(maxRetriesDiv.style, { marginBottom: '15px' });
+    const maxRetriesLabel = document.createElement('label');
+    maxRetriesLabel.textContent = 'Max retry attempts:';
+    Object.assign(maxRetriesLabel.style, {
+      display: 'block',
+      fontSize: '14px',
+      marginBottom: '4px',
+    });
+    const maxRetriesInput = document.createElement('input');
+    maxRetriesInput.type = 'number';
+    maxRetriesInput.id = 'pq-setting-max-retries';
+    maxRetriesInput.value = settings.maxRetries;
+    maxRetriesInput.min = '0';
+    maxRetriesInput.max = '10';
+    Object.assign(maxRetriesInput.style, {
+      width: '100%',
+      padding: '6px',
+      border: '1px solid var(--pq-ui-border)',
+      borderRadius: '4px',
+      background: 'var(--pq-ui-input-bg)',
+      color: 'var(--pq-ui-text)',
+      fontSize: '14px',
+    });
+    const maxRetriesDesc = document.createElement('p');
+    maxRetriesDesc.textContent = 'How many times to retry before giving up (0 = disabled)';
+    Object.assign(maxRetriesDesc.style, {
+      fontSize: '12px',
+      opacity: '0.7',
+      marginTop: '4px',
+      marginBottom: '0',
+    });
+    maxRetriesDiv.appendChild(maxRetriesLabel);
+    maxRetriesDiv.appendChild(maxRetriesInput);
+    maxRetriesDiv.appendChild(maxRetriesDesc);
+    const retryActionDiv = document.createElement('div');
+    Object.assign(retryActionDiv.style, { marginBottom: '20px' });
+    const retryActionLabel = document.createElement('label');
+    retryActionLabel.textContent = 'When retry limit reached:';
+    Object.assign(retryActionLabel.style, {
+      display: 'block',
+      fontSize: '14px',
+      marginBottom: '8px',
+    });
+    const retryOptionsDiv = document.createElement('div');
+    Object.assign(retryOptionsDiv.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px',
+    });
+    const stopLabel = document.createElement('label');
+    Object.assign(stopLabel.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      fontSize: '14px',
+    });
+    const stopRadio = document.createElement('input');
+    stopRadio.type = 'radio';
+    stopRadio.name = 'pq-setting-retry-action';
+    stopRadio.value = 'stop';
+    stopRadio.checked = settings.retryLimitAction === 'stop';
+    Object.assign(stopRadio.style, { cursor: 'pointer' });
+    const stopSpan = document.createElement('span');
+    stopSpan.textContent = 'Stop queue';
+    stopLabel.appendChild(stopRadio);
+    stopLabel.appendChild(stopSpan);
+    const continueLabel = document.createElement('label');
+    Object.assign(continueLabel.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      fontSize: '14px',
+    });
+    const continueRadio = document.createElement('input');
+    continueRadio.type = 'radio';
+    continueRadio.name = 'pq-setting-retry-action';
+    continueRadio.value = 'continue';
+    continueRadio.checked = settings.retryLimitAction === 'continue';
+    Object.assign(continueRadio.style, { cursor: 'pointer' });
+    const continueSpan = document.createElement('span');
+    continueSpan.textContent = 'Send next prompt, requeue failed';
+    continueLabel.appendChild(continueRadio);
+    continueLabel.appendChild(continueSpan);
+    retryOptionsDiv.appendChild(stopLabel);
+    retryOptionsDiv.appendChild(continueLabel);
+    const retryActionDesc = document.createElement('p');
+    retryActionDesc.textContent = 'What to do when max retries is exceeded';
+    Object.assign(retryActionDesc.style, {
+      fontSize: '12px',
+      opacity: '0.7',
+      marginTop: '4px',
+      marginBottom: '0',
+    });
+    retryActionDiv.appendChild(retryActionLabel);
+    retryActionDiv.appendChild(retryOptionsDiv);
+    retryActionDiv.appendChild(retryActionDesc);
+    const buttonDiv = document.createElement('div');
+    Object.assign(buttonDiv.style, { textAlign: 'right' });
+    const closeBtn = document.createElement('button');
+    closeBtn.id = 'pq-settings-close';
+    closeBtn.textContent = 'Save & Close';
+    Object.assign(closeBtn.style, {
+      padding: '6px 12px',
+      borderRadius: '4px',
+      border: '1px solid var(--pq-ui-btn-border)',
+      background: 'var(--pq-ui-btn-bg)',
+      color: 'var(--pq-ui-text)',
+      cursor: 'pointer',
+    });
+    buttonDiv.appendChild(closeBtn);
+    modal.appendChild(title);
+    modal.appendChild(autoRetryDiv);
+    modal.appendChild(maxRetriesDiv);
+    modal.appendChild(retryActionDiv);
+    modal.appendChild(buttonDiv);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    const retryActionRadios = overlay.querySelectorAll('input[name="pq-setting-retry-action"]');
+    const saveAndClose = () => {
+      const newSettings = {
+        autoRetryEnabled: autoRetryCheckbox.checked,
+        maxRetries: Math.max(0, Math.min(10, parseInt(maxRetriesInput.value, 10) || 0)),
+        retryLimitAction: Array.from(retryActionRadios).find((r) => r.checked)?.value || 'stop',
+      };
+      saveSettings(newSettings);
+      document.body.removeChild(overlay);
+    };
+    closeBtn.addEventListener('click', saveAndClose);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        saveAndClose();
+      }
+    });
+  }
+
+  // AI_Queue/core/panel.js
+  function createBasePanel(titleText, includeFailedList = false) {
+    log('createBasePanel called');
+    let panel = document.querySelector('#pq-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'pq-panel';
+      Object.assign(panel.style, {
+        position: 'fixed',
+        top: '80px',
+        left: '24px',
+        bottom: 'auto',
+        right: 'auto',
+        width: '320px',
+        maxWidth: 'calc(100vw - 48px)',
+        boxSizing: 'border-box',
+        minHeight: '200px',
+        maxHeight: '70vh',
+        overflowX: 'hidden',
+        overflowY: 'auto',
+        resize: 'both',
+        background: 'var(--pq-ui-bg)',
+        color: 'var(--pq-ui-text)',
+        border: '1px solid var(--pq-ui-border)',
+        borderRadius: '16px',
+        padding: '12px',
+        zIndex: '2147483647',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
+        display: 'none',
+        transform: 'none',
+      });
+      const title = document.createElement('div');
+      title.style.display = 'flex';
+      title.style.alignItems = 'center';
+      title.style.justifyContent = 'space-between';
+      title.style.gap = '12px';
+      title.style.fontSize = '18px';
+      title.style.fontWeight = 'bold';
+      title.style.marginBottom = '10px';
+      const titleLabel = document.createElement('span');
+      titleLabel.textContent = titleText;
+      const rightControls = document.createElement('div');
+      rightControls.style.display = 'flex';
+      rightControls.style.gap = '8px';
+      const infoBtn = document.createElement('button');
+      infoBtn.id = 'pq-info';
+      infoBtn.type = 'button';
+      infoBtn.textContent = 'i';
+      infoBtn.title = 'Help';
+      Object.assign(infoBtn.style, {
+        width: '24px',
+        height: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '50%',
+        border: '1px solid var(--pq-ui-btn-border)',
+        background: 'var(--pq-ui-btn-bg)',
+        color: 'var(--pq-ui-text)',
+        cursor: 'pointer',
+        fontFamily: 'serif',
+        fontStyle: 'italic',
+        fontWeight: 'bold',
+        fontSize: '14px',
+        padding: '0',
+      });
+      infoBtn.addEventListener('click', () => {
+        showHelpModal();
+      });
+      const settingsBtn = document.createElement('button');
+      settingsBtn.id = 'pq-settings';
+      settingsBtn.type = 'button';
+      settingsBtn.textContent = '\u2699';
+      settingsBtn.title = 'Settings';
+      Object.assign(settingsBtn.style, {
+        width: '24px',
+        height: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '50%',
+        border: '1px solid var(--pq-ui-btn-border)',
+        background: 'var(--pq-ui-btn-bg)',
+        color: 'var(--pq-ui-text)',
+        cursor: 'pointer',
+        fontSize: '14px',
+        padding: '0',
+      });
+      settingsBtn.addEventListener('click', () => {
+        showSettingsModal();
+      });
+      const closeBtn = document.createElement('button');
+      closeBtn.id = 'pq-close';
+      closeBtn.type = 'button';
+      closeBtn.textContent = 'Close';
+      Object.assign(closeBtn.style, {
+        padding: '4px 10px',
+        borderRadius: '9999px',
+        border: '1px solid var(--pq-ui-btn-border)',
+        background: 'var(--pq-ui-btn-bg)',
+        color: 'var(--pq-ui-text)',
+        cursor: 'pointer',
+      });
+      closeBtn.addEventListener('click', () => hidePanel(panel));
+      rightControls.appendChild(infoBtn);
+      rightControls.appendChild(settingsBtn);
+      rightControls.appendChild(closeBtn);
+      title.appendChild(titleLabel);
+      title.appendChild(rightControls);
+      const textarea = document.createElement('textarea');
+      textarea.id = 'pq-input';
+      textarea.placeholder = 'Enter prompt...';
+      Object.assign(textarea.style, {
+        width: '100%',
+        height: '80px',
+        resize: 'vertical',
+        color: 'var(--pq-ui-text)',
+        background: 'var(--pq-ui-input-bg)',
+        border: '1px solid var(--pq-ui-border)',
+        borderRadius: '6px',
+        padding: '8px',
+        boxSizing: 'border-box',
+      });
+      const btnStyle = {
+        marginTop: '10px',
+        width: '100%',
+        padding: '8px',
+        borderRadius: '6px',
+        border: '1px solid var(--pq-ui-btn-border)',
+        background: 'var(--pq-ui-btn-bg)',
+        color: 'var(--pq-ui-text)',
+        cursor: 'pointer',
+      };
+      const addBtn = document.createElement('button');
+      addBtn.id = 'pq-add';
+      Object.assign(addBtn.style, btnStyle);
+      addBtn.textContent = 'Add To Queue';
+      const manageChatsBtn = document.createElement('button');
+      manageChatsBtn.id = 'pq-manage-chats';
+      Object.assign(manageChatsBtn.style, btnStyle);
+      manageChatsBtn.textContent = 'Manage Chat Prompts';
+      const startBtn = document.createElement('button');
+      startBtn.id = 'pq-start';
+      Object.assign(startBtn.style, btnStyle);
+      startBtn.textContent = 'Start Queue';
+      const status = document.createElement('div');
+      status.id = 'pq-status';
+      status.style.marginTop = '10px';
+      status.textContent = 'Idle';
+      const list = document.createElement('ol');
+      list.id = 'pq-list';
+      list.style.marginTop = '10px';
+      list.style.paddingLeft = '20px';
+      panel.appendChild(title);
+      panel.appendChild(textarea);
+      panel.appendChild(addBtn);
+      panel.appendChild(manageChatsBtn);
+      panel.appendChild(startBtn);
+      panel.appendChild(status);
+      panel.appendChild(list);
+      if (includeFailedList) {
+        const failedTitle = document.createElement('div');
+        failedTitle.id = 'pq-failed-title';
+        failedTitle.style.marginTop = '12px';
+        failedTitle.style.fontSize = '13px';
+        failedTitle.style.opacity = '0.8';
+        failedTitle.textContent = 'Failed Prompts';
+        const failedList = document.createElement('ol');
+        failedList.id = 'pq-failed-list';
+        failedList.style.marginTop = '6px';
+        failedList.style.paddingLeft = '20px';
+        panel.appendChild(failedTitle);
+        panel.appendChild(failedList);
+      }
+      const root = document.documentElement || document.body;
+      if (root) {
+        root.appendChild(panel);
+      }
+    } else {
+      ensurePanelAttached(panel);
+    }
+    log('createBasePanel panel', panel);
+    setTimeout(() => {
+      log('panel element', panel);
+      log('computed display', getComputedStyle(panel).display);
+      log('computed visibility', getComputedStyle(panel).visibility);
+      log('rect', panel.getBoundingClientRect());
+      log('parent', panel.parentElement);
+    }, 0);
+    return panel;
+  }
+
+  // AI_Queue/core/queue-ui.js
+  init_logging();
+
+  // AI_Queue/core/queue.js
+  init_logging();
+  function deleteQueueItem(id, queue, renderQueue, saveQueue2) {
+    const index = queue.findIndex((item) => item.id === id);
+    if (index === -1) {
+      log('Item to delete not found in queue:', id);
+      return;
+    }
+    queue.splice(index, 1);
+    renderQueue();
+    saveQueue2?.();
+  }
+  function editQueueItem(id, queue, updateUI) {
+    const item = queue.find((item2) => item2.id === id);
+    if (!item) {
+      log('Item to edit not found in queue:', id);
+      return;
+    }
+    updateUI(id, item.prompt);
+  }
+  function moveQueueItem(fromId, toId, queue, renderQueue, saveQueue2) {
+    const fromIndex = queue.findIndex((item) => item.id === fromId);
+    const toIndex = queue.findIndex((item) => item.id === toId);
+    if (fromIndex === -1 || toIndex === -1) return;
+    const [movedItem] = queue.splice(fromIndex, 1);
+    queue.splice(toIndex, 0, movedItem);
+    renderQueue();
+    saveQueue2?.();
+  }
+  function setStatus(panel, text) {
+    if (!panel) return;
+    const status = panel.querySelector('#pq-status');
+    if (status) {
+      status.textContent = text;
+    }
+  }
+
+  // AI_Queue/core/queue-ui.js
+  init_state();
+  function createQueueItemElement(item, { renderQueue, saveQueue: saveQueue2 }) {
+    const li = document.createElement('li');
+    li.style.marginBottom = '10px';
+    li.draggable = false;
+    li.style.border = '1px solid var(--pq-ui-btn-border)';
+    li.style.borderRadius = '8px';
+    li.style.padding = '8px';
+    li.style.background = 'var(--pq-ui-btn-bg)';
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.gap = '6px';
+    row.style.alignItems = 'flex-start';
+    const text = document.createElement('div');
+    text.textContent = item.prompt;
+    text.style.flex = '1';
+    text.style.wordBreak = 'break-word';
+    text.style.whiteSpace = 'pre-wrap';
+    text.style.fontSize = '14px';
+    const iconBtnStyle = {
+      cursor: 'pointer',
+      display: 'none',
+      background: 'var(--pq-ui-btn-bg)',
+      border: '1px solid var(--pq-ui-btn-border)',
+      borderRadius: '4px',
+      padding: '2px 6px',
+      fontSize: '12px',
+    };
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '\u{1F589}';
+    editBtn.title = 'Edit';
+    Object.assign(editBtn.style, iconBtnStyle, { color: 'var(--pq-ui-accent)' });
+    const sendBtn = document.createElement('button');
+    sendBtn.textContent = '\u27A4';
+    sendBtn.title = 'Send';
+    Object.assign(sendBtn.style, iconBtnStyle, { color: 'var(--pq-ui-accent)' });
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = '\u2715';
+    deleteBtn.title = 'Delete';
+    Object.assign(deleteBtn.style, iconBtnStyle, { color: 'var(--pq-ui-danger)' });
+    row.appendChild(text);
+    row.appendChild(editBtn);
+    row.appendChild(sendBtn);
+    row.appendChild(deleteBtn);
+    const dragHandle = document.createElement('span');
+    dragHandle.textContent = '\u2630';
+    dragHandle.title = 'Drag to reorder';
+    dragHandle.style.cursor = 'grab';
+    dragHandle.style.userSelect = 'none';
+    dragHandle.style.alignSelf = 'center';
+    dragHandle.style.marginLeft = '6px';
+    dragHandle.style.display = 'none';
+    dragHandle.addEventListener('dragstart', (e) => {
+      queueState.draggedId = item.id;
+      try {
+        e.dataTransfer.setData('text/plain', item.id);
+        e.dataTransfer.effectAllowed = 'move';
+      } catch (err) {
+        error('Drag start dataTransfer error:', err);
+      }
+      li.style.opacity = '0.6';
+    });
+    dragHandle.addEventListener('dragend', () => {
+      queueState.draggedId = null;
+      li.style.opacity = '';
+    });
+    row.appendChild(dragHandle);
+    li.appendChild(row);
+    li.addEventListener('mouseenter', () => {
+      editBtn.style.display = 'inline-block';
+      sendBtn.style.display = 'inline-block';
+      deleteBtn.style.display = 'inline-block';
+      dragHandle.style.display = 'inline-block';
+    });
+    li.addEventListener('mouseleave', () => {
+      if (queueState.editingId === item.id) return;
+      editBtn.style.display = 'none';
+      sendBtn.style.display = 'none';
+      deleteBtn.style.display = 'none';
+      if (queueState.draggedId === item.id) return;
+      dragHandle.style.display = 'none';
+    });
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      try {
+        e.dataTransfer.dropEffect = 'move';
+      } catch (err) {
+        error('Drag over dataTransfer error:', err);
+      }
+      li.style.borderTop = '2px solid var(--pq-ui-accent)';
+    });
+    li.addEventListener('dragleave', () => {
+      li.style.borderTop = '';
+    });
+    li.addEventListener('drop', (e) => {
+      e.preventDefault();
+      li.style.borderTop = '';
+      const draggedId =
+        queueState.draggedId ||
+        (e.dataTransfer && e.dataTransfer.getData && e.dataTransfer.getData('text/plain'));
+      if (draggedId && draggedId !== item.id) {
+        moveQueueItem(draggedId, item.id, queueState.queue, renderQueue, saveQueue2);
+      }
+    });
+    return { li, text, editBtn, sendBtn, deleteBtn };
+  }
+
+  // AI_Queue/core/storage.js
+  init_logging();
+  var GLOBAL_CHAT_KEY = '__global__';
+  var DEFAULT_ITEM_STATUS = 'queued';
+  var DEFAULT_FAILED_STATUS = 'failed';
+  function toChatCode(value) {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim();
+    return normalized ? normalized : null;
+  }
+  function resolveScope(currentScope = null) {
+    if (typeof currentScope === 'string') {
+      return {
+        chatId: toChatCode(currentScope),
+        groupId: null,
+      };
+    }
+    if (!currentScope || typeof currentScope !== 'object') {
+      return {
+        chatId: null,
+        groupId: null,
+      };
+    }
+    const chatId = toChatCode(currentScope.chatId || currentScope.chatCode || null);
+    const groupId = toChatCode(currentScope.groupId || null);
+    return {
+      chatId,
+      groupId,
+    };
+  }
+  function resolveScopeKeys(currentScope = null) {
+    const scope = resolveScope(currentScope);
+    const keys = [...new Set([scope.groupId, scope.chatId].filter(Boolean))];
+    return keys.length > 0 ? keys : [GLOBAL_CHAT_KEY];
+  }
+  function hasItemScope(item) {
+    return !!(item?.chatId || item?.chatCode || item?.groupId);
+  }
+  function applyScopeToQueuedItems(queue, failedQueue, currentScope = null) {
+    const scope = resolveScope(currentScope);
+    if (!scope.chatId && !scope.groupId) return false;
+    let updated = false;
+    const applyScope = (item) => {
+      if (!item || hasItemScope(item)) return;
+      if (scope.chatId) {
+        item.chatId = scope.chatId;
+        item.chatCode = scope.chatId;
+      }
+      if (scope.groupId) {
+        item.groupId = scope.groupId;
+      }
+      updated = true;
+    };
+    (queue || []).forEach(applyScope);
+    if (Array.isArray(failedQueue)) {
+      failedQueue.forEach(applyScope);
+    }
+    return updated;
+  }
+  function toChatKey(value) {
+    return toChatCode(value) || GLOBAL_CHAT_KEY;
+  }
+  function generateId() {
+    if (globalThis.crypto?.randomUUID) {
+      return globalThis.crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+  function toCreatedAt(value) {
+    const timestamp = Number(value);
+    return Number.isFinite(timestamp) ? timestamp : Date.now();
+  }
+  function sanitizeItem(item, defaultStatus = DEFAULT_ITEM_STATUS) {
+    if (!item || typeof item.prompt !== 'string') return null;
+    const chatId = toChatCode(item.chatId || item.chatCode || null);
+    const groupId = toChatCode(item.groupId || null);
+    const normalized = {
+      id: typeof item.id === 'string' && item.id ? item.id : generateId(),
+      prompt: item.prompt,
+      attempts: Number.isFinite(Number(item.attempts)) ? Number(item.attempts) : 0,
+      status:
+        typeof item.status === 'string' && item.status.trim() ? item.status.trim() : defaultStatus,
+      createdAt: toCreatedAt(item.createdAt),
+    };
+    if (chatId) {
+      normalized.chatId = chatId;
+      normalized.chatCode = chatId;
+    }
+    if (groupId) {
+      normalized.groupId = groupId;
+    }
+    return normalized;
+  }
+  function sanitizeItems(items, defaultStatus = DEFAULT_ITEM_STATUS) {
+    if (!Array.isArray(items)) return [];
+    return items.map((item) => sanitizeItem(item, defaultStatus)).filter(Boolean);
+  }
+  function emptyChats() {
+    return {};
+  }
+  function sanitizeChatBuckets(chats) {
+    const normalized = emptyChats();
+    if (!chats || typeof chats !== 'object' || Array.isArray(chats)) {
+      return normalized;
+    }
+    for (const [chatKey, bucket] of Object.entries(chats)) {
+      normalized[toChatKey(chatKey)] = {
+        items: sanitizeItems(bucket?.items, DEFAULT_ITEM_STATUS),
+        failedItems: sanitizeItems(bucket?.failedItems, DEFAULT_FAILED_STATUS),
+      };
+    }
+    return normalized;
+  }
+  function addLegacyItem(chats, item, defaultStatus, bucketName) {
+    const normalizedItem = sanitizeItem(item, defaultStatus);
+    if (!normalizedItem) return;
+    const chatKey = toChatKey(item?.chatCode);
+    if (!chats[chatKey]) {
+      chats[chatKey] = { items: [], failedItems: [] };
+    }
+    chats[chatKey][bucketName].push(normalizedItem);
+  }
+  function mergeUniqueItems(itemsA, itemsB) {
+    const merged = /* @__PURE__ */ new Map();
+    [...(itemsA || []), ...(itemsB || [])].forEach((item) => {
+      if (!item || typeof item.id !== 'string') return;
+      if (!merged.has(item.id)) {
+        merged.set(item.id, { ...item });
+      }
+    });
+    return [...merged.values()];
+  }
+  function buildLegacyData(parsed) {
+    const chats = emptyChats();
+    if (Array.isArray(parsed?.items)) {
+      parsed.items.forEach((item) => addLegacyItem(chats, item, DEFAULT_ITEM_STATUS, 'items'));
+    } else if (Array.isArray(parsed?.queue)) {
+      parsed.queue.forEach((item) => addLegacyItem(chats, item, DEFAULT_ITEM_STATUS, 'items'));
+    }
+    if (Array.isArray(parsed?.failedItems)) {
+      parsed.failedItems.forEach((item) =>
+        addLegacyItem(chats, item, DEFAULT_FAILED_STATUS, 'failedItems')
+      );
+    } else if (Array.isArray(parsed?.failedQueue)) {
+      parsed.failedQueue.forEach((item) =>
+        addLegacyItem(chats, item, DEFAULT_FAILED_STATUS, 'failedItems')
+      );
+    }
+    return { chats };
+  }
+  function normalizeData(parsed) {
+    if (!parsed || typeof parsed !== 'object') {
+      return { chats: emptyChats() };
+    }
+    if (parsed.chats && typeof parsed.chats === 'object' && !Array.isArray(parsed.chats)) {
+      return {
+        chats: sanitizeChatBuckets(parsed.chats),
+      };
+    }
+    return buildLegacyData(parsed);
+  }
+  function readScopedQueueData(storageKey = 'pq-queue-state') {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (!stored) {
+        return { chats: emptyChats() };
+      }
+      const parsed = JSON.parse(stored);
+      return normalizeData(parsed);
+    } catch (err) {
+      error('Failed to read queue storage:', err);
+      return { chats: emptyChats() };
+    }
+  }
+  function writeScopedQueueData(storageKey = 'pq-queue-state', data = {}) {
+    try {
+      const normalized = normalizeData(data);
+      localStorage.setItem(storageKey, JSON.stringify(normalized));
+    } catch (err) {
+      error('Failed to write queue storage:', err);
+    }
+  }
+  function saveQueue(queue, failedQueue, storageKey = 'pq-queue-state', currentScope = null) {
+    try {
+      const scope = resolveScope(currentScope);
+      const scopeKeys = resolveScopeKeys(currentScope);
+      const data = readScopedQueueData(storageKey);
+      const existingBuckets = scopeKeys.map(
+        (scopeKey) => data.chats[scopeKey] || { items: [], failedItems: [] }
+      );
+      const nextItems = sanitizeItems(queue || [], DEFAULT_ITEM_STATUS).map((item) => ({
+        ...item,
+        ...(scope.chatId
+          ? {
+              chatId: scope.chatId,
+              chatCode: scope.chatId,
+            }
+          : {}),
+        ...(scope.groupId ? { groupId: scope.groupId } : {}),
+      }));
+      const nextFailedItems = Array.isArray(failedQueue)
+        ? sanitizeItems(failedQueue || [], DEFAULT_FAILED_STATUS).map((item) => ({
+            ...item,
+            ...(scope.chatId
+              ? {
+                  chatId: scope.chatId,
+                  chatCode: scope.chatId,
+                }
+              : {}),
+            ...(scope.groupId ? { groupId: scope.groupId } : {}),
+          }))
+        : mergeUniqueItems(
+            ...existingBuckets.map((bucket) =>
+              sanitizeItems(bucket.failedItems, DEFAULT_FAILED_STATUS)
+            )
+          );
+      const nextBucket = {
+        items: nextItems,
+        failedItems: nextFailedItems,
+      };
+      const nextChats = { ...data.chats };
+      scopeKeys.forEach((scopeKey) => {
+        nextChats[scopeKey] = {
+          items: nextItems.map((item) => ({ ...item })),
+          failedItems: nextFailedItems.map((item) => ({ ...item })),
+        };
+      });
+      writeScopedQueueData(storageKey, {
+        chats: nextChats,
+      });
+      log('queue saved to storage', {
+        storageKey,
+        currentChatCode: scopeKeys,
+        visibleItems: nextBucket.items.length,
+      });
+    } catch (err) {
+      error('Failed to save queue:', err);
+    }
+  }
+  function loadQueue(queue, failedQueue, storageKey = 'pq-queue-state', currentScope = null) {
+    try {
+      const scopeKeys = resolveScopeKeys(currentScope);
+      const data = readScopedQueueData(storageKey);
+      const buckets = scopeKeys.map(
+        (scopeKey) => data.chats[scopeKey] || { items: [], failedItems: [] }
+      );
+      const visibleQueueItems = mergeUniqueItems(...buckets.map((bucket) => bucket.items));
+      queue.push(...visibleQueueItems.map((item) => ({ ...item })));
+      if (Array.isArray(failedQueue)) {
+        const visibleFailedItems = mergeUniqueItems(...buckets.map((bucket) => bucket.failedItems));
+        failedQueue.push(...visibleFailedItems.map((item) => ({ ...item })));
+      }
+      log('queue loaded from storage', {
+        storageKey,
+        currentChatCode: scopeKeys,
+        visibleItems: visibleQueueItems.length,
+      });
+    } catch (err) {
+      error('Failed to load queue:', err);
+    }
+  }
+
+  // AI_Queue/providers/provider-base.js
+  init_ui2();
+
+  // AI_Queue/core/panel-controls.js
+  init_logging();
+  init_ui2();
+  init_state();
+
+  // AI_Queue/core/chat-manager.js
+  init_logging();
+
+  // AI_Queue/styles/chat-manager.css
+  var chat_manager_default =
+    '#pq-chat-manager-panel {\n  position: fixed;\n  top: 6vh;\n  left: 50%;\n  transform: translateX(-50%);\n  width: min(1100px, calc(100vw - 32px));\n  height: min(760px, calc(100vh - 32px));\n  z-index: 2147483647;\n  display: flex;\n  flex-direction: column;\n  background: var(--pq-ui-bg);\n  color: var(--pq-ui-text);\n  border: 1px solid var(--pq-ui-border);\n  border-radius: 16px;\n  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);\n  overflow: hidden;\n}\n\n.pq-manager-shell {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  min-height: 0;\n}\n\n.pq-manager-header {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 16px;\n  padding: 16px 18px 12px;\n  border-bottom: 1px solid var(--pq-ui-border);\n  background: var(--pq-ui-bg);\n}\n\n.pq-manager-title {\n  font-size: 18px;\n  font-weight: 700;\n  line-height: 1.2;\n  margin: 0;\n}\n\n.pq-manager-subtitle {\n  margin-top: 4px;\n  opacity: 0.8;\n  font-size: 13px;\n  line-height: 1.4;\n  max-width: 72ch;\n}\n\n.pq-manager-actions {\n  display: flex;\n  gap: 8px;\n  flex-shrink: 0;\n}\n\n.pq-manager-actions button {\n  appearance: none;\n  border: 1px solid var(--pq-ui-btn-border);\n  background: var(--pq-ui-btn-bg);\n  color: var(--pq-ui-text);\n  border-radius: 999px;\n  padding: 8px 12px;\n  font: inherit;\n  cursor: pointer;\n}\n\n.pq-manager-actions button:hover {\n  border-color: var(--pq-ui-accent);\n}\n\n.pq-manager-body {\n  display: flex;\n  flex-direction: column;\n  min-height: 0;\n  padding: 16px 18px 18px;\n  gap: 12px;\n  overflow: hidden;\n  background: var(--pq-ui-bg);\n}\n\n.pq-manager-grid {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));\n  gap: 12px;\n  align-items: start;\n  flex: 1;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  padding-right: 4px;\n}\n\n.chat-card {\n  background: var(--pq-ui-bg);\n  border: 1px solid var(--pq-ui-border);\n  border-radius: 12px;\n  overflow: hidden;\n  min-height: 140px;\n}\n\n.chat-title {\n  padding: 10px 12px;\n  border-bottom: 1px solid var(--pq-ui-border);\n  font-size: 12px;\n  letter-spacing: 0.2px;\n  text-transform: uppercase;\n  color: var(--pq-ui-text);\n  display: flex;\n  justify-content: space-between;\n  gap: 8px;\n}\n\n.chat-title .chat-controls {\n  display: inline-flex;\n  gap: 8px;\n  align-items: center;\n}\n\n.chat-delete {\n  appearance: none;\n  border: 1px solid transparent;\n  background: transparent;\n  color: var(--pq-ui-danger);\n  border-radius: 8px;\n  padding: 4px 8px;\n  font-size: 12px;\n  cursor: pointer;\n  opacity: 0.8;\n}\n\n.chat-delete:hover {\n  opacity: 1;\n}\n\n.chat-list {\n  list-style: none;\n  margin: 0;\n  padding: 8px;\n  min-height: 90px;\n}\n\n.chat-item {\n  background: var(--pq-ui-btn-bg);\n  border: 1px solid var(--pq-ui-btn-border);\n  border-radius: 8px;\n  padding: 8px;\n  margin-bottom: 8px;\n  cursor: grab;\n  user-select: none;\n  font-size: 13px;\n  line-height: 1.35;\n  word-break: break-word;\n}\n\n.chat-item.dragging {\n  opacity: 0.5;\n}\n\n.chat-list.drag-over,\n.chat-item.drag-over {\n  outline: 2px dashed var(--pq-ui-accent);\n  outline-offset: 2px;\n}\n\n.empty {\n  opacity: 0.6;\n  font-size: 12px;\n  padding: 8px;\n  border: 1px dashed var(--pq-ui-border);\n  border-radius: 8px;\n  text-align: center;\n}\n\n.pq-manager-footer {\n  opacity: 0.8;\n  font-size: 12px;\n  border-top: 1px solid var(--pq-ui-border);\n  padding-top: 12px;\n}\n';
+
+  // AI_Queue/core/chat-manager.js
+  init_state();
+
+  // AI_Queue/core/resize.js
+  init_logging();
+  var isResizing = false;
+  var currentPanel = null;
+  var currentHandle = null;
+  var startX = 0;
+  var startY = 0;
+  var startWidth = 0;
+  var startHeight = 0;
+  var startLeft = 0;
+  var startTop = 0;
+  var listenersBound = false;
+  function onMouseMove(e) {
+    if (!isResizing || !currentPanel) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (currentHandle.includes('right')) {
+      currentPanel.style.width = startWidth + dx + 'px';
+    }
+    if (currentHandle.includes('bottom')) {
+      currentPanel.style.height = startHeight + dy + 'px';
+    }
+    if (currentHandle.includes('left')) {
+      currentPanel.style.width = startWidth - dx + 'px';
+      currentPanel.style.left = startLeft + dx + 'px';
+    }
+    if (currentHandle.includes('top')) {
+      currentPanel.style.height = startHeight - dy + 'px';
+      currentPanel.style.top = startTop + dy + 'px';
+    }
+  }
+  function onMouseUp() {
+    if (isResizing) {
+      isResizing = false;
+      currentPanel = null;
+      document.body.style.cursor = 'default';
+      log('panel resize ended');
+    }
+  }
+  function setupPanelResize(panel) {
+    if (!panel) {
+      Promise.resolve()
+        .then(() => (init_ui2(), ui_exports))
+        .then((m) => {
+          const defaultPanel = m.getPanel();
+          if (defaultPanel) setupPanelResize(defaultPanel);
+        });
+      return;
+    }
+    if (panel._resizeSetupDone) return;
+    panel._resizeSetupDone = true;
+    const handles = [
+      'top',
+      'right',
+      'bottom',
+      'left',
+      'top-left',
+      'top-right',
+      'bottom-left',
+      'bottom-right',
+    ];
+    const handleSize = 8;
+    handles.forEach((handle) => {
+      const el = document.createElement('div');
+      el.style.position = 'absolute';
+      el.style.zIndex = '2147483647';
+      if (handle.includes('top')) {
+        el.style.top = '-4px';
+        el.style.height = `${handleSize}px`;
+      }
+      if (handle.includes('bottom')) {
+        el.style.bottom = '-4px';
+        el.style.height = `${handleSize}px`;
+      }
+      if (handle.includes('left')) {
+        el.style.left = '-4px';
+        el.style.width = `${handleSize}px`;
+      }
+      if (handle.includes('right')) {
+        el.style.right = '-4px';
+        el.style.width = `${handleSize}px`;
+      }
+      if (handle === 'top' || handle === 'bottom') {
+        el.style.left = '4px';
+        el.style.right = '4px';
+        el.style.cursor = 'ns-resize';
+      } else if (handle === 'left' || handle === 'right') {
+        el.style.top = '4px';
+        el.style.bottom = '4px';
+        el.style.cursor = 'ew-resize';
+      } else if (handle === 'top-left' || handle === 'bottom-right') {
+        el.style.width = `${handleSize}px`;
+        el.style.height = `${handleSize}px`;
+        el.style.cursor = 'nwse-resize';
+      } else if (handle === 'top-right' || handle === 'bottom-left') {
+        el.style.width = `${handleSize}px`;
+        el.style.height = `${handleSize}px`;
+        el.style.cursor = 'nesw-resize';
+      }
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isResizing = true;
+        currentPanel = panel;
+        currentHandle = handle;
+        startX = e.clientX;
+        startY = e.clientY;
+        const computedStyle = window.getComputedStyle(panel);
+        if (computedStyle.transform !== 'none') {
+          const matrix = new DOMMatrix(computedStyle.transform);
+          panel.style.transform = 'none';
+          panel.style.left = panel.offsetLeft + matrix.m41 + 'px';
+          panel.style.top = panel.offsetTop + matrix.m42 + 'px';
+        }
+        const rect = panel.getBoundingClientRect();
+        startWidth = rect.width;
+        startHeight = rect.height;
+        startLeft = rect.left;
+        startTop = rect.top;
+        document.body.style.cursor = el.style.cursor;
+        log(`panel resize started: ${handle}`);
+      });
+      panel.appendChild(el);
+    });
+    if (!listenersBound) {
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      listenersBound = true;
+    }
+  }
+
+  // AI_Queue/core/drag.js
+  init_logging();
+  var listenersBound2 = false;
+  var dragging = false;
+  var currentPanel2 = null;
+  var dragStartX = 0;
+  var dragStartY = 0;
+  var panelStartX = 0;
+  var panelStartY = 0;
+  function onMouseMove2(e) {
+    if (!dragging || !currentPanel2) return;
+    const deltaX = e.clientX - dragStartX;
+    const deltaY = e.clientY - dragStartY;
+    currentPanel2.style.left = panelStartX + deltaX + 'px';
+    currentPanel2.style.top = panelStartY + deltaY + 'px';
+    currentPanel2.style.right = 'auto';
+    currentPanel2.style.bottom = 'auto';
+    currentPanel2.style.transform = 'none';
+  }
+  function onMouseUp2() {
+    if (dragging) {
+      dragging = false;
+      currentPanel2 = null;
+      log('panel drag ended');
+    }
+  }
+  function bindDocumentListeners() {
+    if (listenersBound2) return;
+    document.addEventListener('mousemove', onMouseMove2);
+    document.addEventListener('mouseup', onMouseUp2);
+    listenersBound2 = true;
+  }
+  function setupPanelDrag(panel) {
+    if (!panel) {
+      Promise.resolve()
+        .then(() => (init_ui2(), ui_exports))
+        .then((m) => {
+          const defaultPanel = m.getPanel();
+          if (defaultPanel) setupPanelDrag(defaultPanel);
+        });
+      return;
+    }
+    bindDocumentListeners();
+    if (panel._dragSetupDone) return;
+    panel._dragSetupDone = true;
+    panel.addEventListener(
+      'mousedown',
+      (e) => {
+        if (e.button !== 2) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dragging = true;
+        currentPanel2 = panel;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        panelStartX = panel.offsetLeft;
+        panelStartY = panel.offsetTop;
+        const computedStyle = window.getComputedStyle(panel);
+        if (computedStyle.transform !== 'none') {
+          const matrix = new DOMMatrix(computedStyle.transform);
+          panelStartX += matrix.m41;
+          panelStartY += matrix.m42;
+          panel.style.transform = 'none';
+          panel.style.left = panelStartX + 'px';
+          panel.style.top = panelStartY + 'px';
+        }
+        log('panel drag started');
+      },
+      true
+    );
+    panel.addEventListener('contextmenu', (e) => {
+      if (dragging) {
+        e.preventDefault();
+      }
+    });
+  }
+
+  // AI_Queue/core/chat-manager.js
+  var GLOBAL_CHAT_KEY2 = '__global__';
+  var MANAGER_PANEL_ID = 'pq-chat-manager-panel';
+  var MANAGER_GRID_ID = 'pq-chat-manager-grid';
+  var MANAGER_BODY_ID = 'pq-chat-manager-body';
+  var activeManagers = /* @__PURE__ */ new Map();
+  function toChatCode2(chatKey) {
+    return chatKey === GLOBAL_CHAT_KEY2 ? null : chatKey;
+  }
+  function chatLabel(chatKey) {
+    if (chatKey === GLOBAL_CHAT_KEY2) {
+      return 'Global Chat';
+    }
+    return chatKey;
+  }
+  function cloneItem(item) {
+    return { ...item };
+  }
+  function cloneItems(items) {
+    return Array.isArray(items) ? items.map((item) => cloneItem(item)) : [];
+  }
+  function groupItems(chats) {
+    const grouped = { [GLOBAL_CHAT_KEY2]: [] };
+    Object.entries(chats || {}).forEach(([chatKey, bucket]) => {
+      if (!grouped[chatKey]) {
+        grouped[chatKey] = [];
+      }
+      grouped[chatKey].push(...cloneItems(bucket?.items));
+    });
+    return grouped;
+  }
+  function orderedKeys(groups) {
+    const keys = Object.keys(groups).filter((key) => groups[key]?.length > 0);
+    const nonGlobal = keys
+      .filter((key) => key !== GLOBAL_CHAT_KEY2)
+      .sort((a, b) => a.localeCompare(b));
+    return [GLOBAL_CHAT_KEY2, ...nonGlobal];
+  }
+  function flattenGroups(groups, existingChats = {}) {
+    const nextChats = {};
+    orderedKeys(groups).forEach((key) => {
+      nextChats[key] = {
+        items: cloneItems(groups[key]),
+        failedItems: cloneItems(existingChats[key]?.failedItems),
+      };
+    });
+    Object.entries(existingChats).forEach(([chatKey, bucket]) => {
+      if (nextChats[chatKey]) return;
+      if (Array.isArray(bucket?.failedItems) && bucket.failedItems.length > 0) {
+        nextChats[chatKey] = {
+          items: [],
+          failedItems: cloneItems(bucket.failedItems),
+        };
+      }
+    });
+    return nextChats;
+  }
+  function findItemIndex(groups, chatKey, itemId) {
+    const list = groups[chatKey] || [];
+    return list.findIndex((item) => item.id === itemId);
+  }
+  function ensureManagerStyles(doc) {
+    if (doc.querySelector('#pq-chat-manager-styles')) return;
+    const style = doc.createElement('style');
+    style.id = 'pq-chat-manager-styles';
+    style.textContent = chat_manager_default;
+    doc.head.appendChild(style);
+  }
+  function ensureManagerShell(doc, title, mountTarget) {
+    ensureManagerStyles(doc);
+    let panel = doc.getElementById(MANAGER_PANEL_ID);
+    if (!panel) {
+      panel = doc.createElement('section');
+      panel.id = MANAGER_PANEL_ID;
+      const shell = doc.createElement('div');
+      shell.className = 'pq-manager-shell';
+      const header = doc.createElement('div');
+      header.className = 'pq-manager-header';
+      const titleWrap = doc.createElement('div');
+      const heading = doc.createElement('div');
+      heading.className = 'pq-manager-title';
+      const subtitle = doc.createElement('div');
+      subtitle.className = 'pq-manager-subtitle';
+      titleWrap.appendChild(heading);
+      titleWrap.appendChild(subtitle);
+      const actions = doc.createElement('div');
+      actions.className = 'pq-manager-actions';
+      const refreshButton = doc.createElement('button');
+      refreshButton.type = 'button';
+      refreshButton.id = 'pq-chat-manager-refresh';
+      refreshButton.textContent = 'Refresh';
+      const closeButton = doc.createElement('button');
+      closeButton.type = 'button';
+      closeButton.id = 'pq-chat-manager-close';
+      closeButton.textContent = 'Close';
+      actions.appendChild(refreshButton);
+      actions.appendChild(closeButton);
+      header.appendChild(titleWrap);
+      header.appendChild(actions);
+      const body = doc.createElement('div');
+      body.className = 'pq-manager-body';
+      body.id = MANAGER_BODY_ID;
+      const grid = doc.createElement('div');
+      grid.className = 'pq-manager-grid';
+      grid.id = MANAGER_GRID_ID;
+      const footer = doc.createElement('div');
+      footer.className = 'pq-manager-footer';
+      footer.textContent =
+        'Drag prompts between chats. Changes are saved immediately to localStorage.';
+      body.appendChild(grid);
+      body.appendChild(footer);
+      shell.appendChild(header);
+      shell.appendChild(body);
+      panel.appendChild(shell);
+      closeButton.addEventListener('click', () => {
+        panel.hidden = true;
+        panel.style.display = 'none';
+      });
+    }
+    const titleNode = panel.querySelector('.pq-manager-title');
+    const subtitleNode = panel.querySelector('.pq-manager-subtitle');
+    if (titleNode) {
+      titleNode.textContent = title;
+    }
+    if (subtitleNode) {
+      subtitleNode.textContent =
+        'Reorder prompts within a chat or move them into another chat card. This panel stays inside the page instead of opening a popup.';
+    }
+    const root = mountTarget || doc.documentElement || doc.body;
+    if (root && !root.contains(panel)) {
+      root.appendChild(panel);
+    }
+    panel.hidden = false;
+    panel.style.display = 'flex';
+    setupPanelResize(panel);
+    setupPanelDrag(panel);
+    return panel;
+  }
+  function moveByDrop(state, fromChatKey, itemId, toChatKey2, toIndex) {
+    const fromList = state.groups[fromChatKey] || [];
+    const fromIndex = findItemIndex(state.groups, fromChatKey, itemId);
+    if (fromIndex === -1) {
+      return false;
+    }
+    const [movedItem] = fromList.splice(fromIndex, 1);
+    if (!state.groups[toChatKey2]) {
+      state.groups[toChatKey2] = [];
+    }
+    const targetList = state.groups[toChatKey2];
+    let normalizedIndex = Number.isInteger(toIndex) ? toIndex : targetList.length;
+    if (normalizedIndex < 0) normalizedIndex = 0;
+    if (normalizedIndex > targetList.length) normalizedIndex = targetList.length;
+    if (fromChatKey === toChatKey2 && normalizedIndex > fromIndex) {
+      normalizedIndex -= 1;
+    }
+    movedItem.chatCode = toChatCode2(toChatKey2) || void 0;
+    targetList.splice(normalizedIndex, 0, movedItem);
+    if (fromChatKey !== GLOBAL_CHAT_KEY2 && (state.groups[fromChatKey] || []).length === 0) {
+      delete state.groups[fromChatKey];
+    }
+    return true;
+  }
+  function persistState(storageKey, state) {
+    state.data.chats = flattenGroups(state.groups, state.data.chats);
+    writeScopedQueueData(storageKey, state.data);
+    if (queueState.syncFromStorage) {
+      queueState.syncFromStorage?.();
+    }
+  }
+  function renderCards(grid, storageKey, state, rerender) {
+    if (!grid) return;
+    grid.replaceChildren();
+    const keys = orderedKeys(state.groups);
+    if (keys.length === 0) {
+      const doc2 = grid.ownerDocument;
+      const empty = doc2.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'No prompts found in storage.';
+      grid.appendChild(empty);
+      return;
+    }
+    const doc = grid.ownerDocument;
+    keys.forEach((chatKey) => {
+      const card = doc.createElement('section');
+      card.className = 'chat-card';
+      const title = doc.createElement('div');
+      title.className = 'chat-title';
+      const label = doc.createElement('span');
+      label.textContent = chatLabel(chatKey);
+      const count = doc.createElement('span');
+      count.textContent = String(state.groups[chatKey].length);
+      const controls = doc.createElement('span');
+      controls.className = 'chat-controls';
+      const deleteButton = doc.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'chat-delete';
+      deleteButton.textContent = 'Delete';
+      deleteButton.title = 'Delete all prompts in this chat';
+      deleteButton.addEventListener('click', () => {
+        const chatName = chatLabel(chatKey);
+        if (
+          !doc.defaultView?.confirm(`Delete all prompts in "${chatName}"? This cannot be undone.`)
+        )
+          return;
+        if (state.groups[chatKey]) {
+          delete state.groups[chatKey];
+        }
+        persistState(storageKey, state);
+        rerender();
+        if (queueState.syncFromStorage) {
+          queueState.syncFromStorage?.();
+        }
+      });
+      controls.appendChild(count);
+      controls.appendChild(deleteButton);
+      title.appendChild(label);
+      title.appendChild(controls);
+      const list = doc.createElement('ul');
+      list.className = 'chat-list';
+      list.dataset.chatKey = chatKey;
+      const items = state.groups[chatKey];
+      if (!items || items.length === 0) {
+        const empty = doc.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'Drop a prompt here.';
+        list.appendChild(empty);
+      } else {
+        items.forEach((item, index) => {
+          const entry = doc.createElement('li');
+          entry.className = 'chat-item';
+          entry.draggable = true;
+          entry.dataset.chatKey = chatKey;
+          entry.dataset.itemId = item.id;
+          entry.dataset.index = String(index);
+          entry.textContent = item.prompt;
+          entry.addEventListener('dragstart', (event) => {
+            state.drag = {
+              itemId: item.id,
+              fromChatKey: chatKey,
+            };
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', item.id);
+            entry.classList.add('dragging');
+          });
+          entry.addEventListener('dragend', () => {
+            state.drag = null;
+            entry.classList.remove('dragging');
+            doc.querySelectorAll(`#${MANAGER_PANEL_ID} .drag-over`).forEach((element) => {
+              element.classList.remove('drag-over');
+            });
+          });
+          entry.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            entry.classList.add('drag-over');
+          });
+          entry.addEventListener('dragleave', () => {
+            entry.classList.remove('drag-over');
+          });
+          entry.addEventListener('drop', (event) => {
+            event.preventDefault();
+            entry.classList.remove('drag-over');
+            if (!state.drag) return;
+            const moved = moveByDrop(
+              state,
+              state.drag.fromChatKey,
+              state.drag.itemId,
+              chatKey,
+              Number(entry.dataset.index)
+            );
+            if (!moved) return;
+            persistState(storageKey, state);
+            rerender();
+          });
+          list.appendChild(entry);
+        });
+      }
+      list.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        list.classList.add('drag-over');
+      });
+      list.addEventListener('dragleave', () => {
+        list.classList.remove('drag-over');
+      });
+      list.addEventListener('drop', (event) => {
+        event.preventDefault();
+        list.classList.remove('drag-over');
+        if (!state.drag) return;
+        const moved = moveByDrop(
+          state,
+          state.drag.fromChatKey,
+          state.drag.itemId,
+          chatKey,
+          state.groups[chatKey]?.length
+        );
+        if (!moved) return;
+        persistState(storageKey, state);
+        rerender();
+      });
+      card.appendChild(title);
+      card.appendChild(list);
+      grid.appendChild(card);
+    });
+  }
+  function openChatManagerWindow(storageKey, title = 'Prompt Queue Chat Manager', mountTarget) {
+    const data = readScopedQueueData(storageKey);
+    const state = {
+      data,
+      groups: groupItems(data.chats),
+      drag: null,
+    };
+    const doc = mountTarget?.ownerDocument || document;
+    const panel = ensureManagerShell(doc, title, mountTarget);
+    panel.dataset.storageKey = storageKey;
+    const rerender = () => {
+      const grid = panel.querySelector(`#${MANAGER_GRID_ID}`);
+      renderCards(grid, storageKey, state, rerender);
+    };
+    rerender();
+    const refreshButton = panel.querySelector('#pq-chat-manager-refresh');
+    if (refreshButton) {
+      refreshButton.onclick = () => {
+        if (queueState.syncFromStorage) {
+          queueState.syncFromStorage?.();
+          return;
+        }
+        const refreshedData = readScopedQueueData(storageKey);
+        state.data = refreshedData;
+        state.groups = groupItems(refreshedData.chats);
+        state.drag = null;
+        rerender();
+      };
+    }
+    panel.scrollIntoView?.({ block: 'start', inline: 'nearest', behavior: 'smooth' });
+    log('chat manager opened in-page', { storageKey });
+    activeManagers.set(storageKey, {
+      panel,
+      state,
+      title,
+      rerender,
+    });
+  }
+  function refreshChatManager(storageKey) {
+    const manager = activeManagers.get(storageKey);
+    if (!manager || !manager.panel || manager.panel.hidden) return false;
+    const refreshedData = readScopedQueueData(storageKey);
+    manager.state.data = refreshedData;
+    manager.state.groups = groupItems(refreshedData.chats);
+    manager.state.drag = null;
+    const grid = manager.panel.querySelector(`#${MANAGER_GRID_ID}`);
+    renderCards(grid, storageKey, manager.state, manager.rerender);
+    return true;
+  }
+  function toggleChatManager(openManagerFn) {
+    let panel = document.getElementById(MANAGER_PANEL_ID);
+    if (!panel) {
+      if (typeof openManagerFn === 'function') {
+        openManagerFn();
+      }
+      return;
+    }
+    panel.style.display = panel.hidden ? 'flex' : 'none';
+    panel.hidden = !panel.hidden;
+  }
+
+  // AI_Queue/core/panel-controls.js
+  var boundPanels = /* @__PURE__ */ new WeakSet();
+  function setupPanelControls({
+    createItem,
+    renderQueue,
+    saveQueue: saveQueue2,
+    processQueue,
+    openChatManager,
+  }) {
+    const panel = getPanel();
+    if (!panel) return;
+    if (boundPanels.has(panel)) return;
+    const input = panel.querySelector('#pq-input');
+    const addBtn = panel.querySelector('#pq-add');
+    const manageChatsBtn = panel.querySelector('#pq-manage-chats');
+    const startBtn = panel.querySelector('#pq-start');
+    const getToolbarButton = () => document.querySelector('#pq-toolbar-button');
+    const handleAddClick = () => {
+      const text = input.value.trim();
+      if (!text) {
+        log('Empty prompt, not adding to queue');
+        return;
+      }
+      if (queueState.editingId !== null) {
+        const item = queueState.queue.find((item2) => item2.id === queueState.editingId);
+        if (!item) {
+          log('Editing item not found in queue:', queueState.editingId);
+          queueState.queue.push(createItem(text));
+        } else {
+          item.prompt = text;
+        }
+        queueState.editingId = null;
+        addBtn.textContent = 'Add To Queue';
+      } else {
+        queueState.queue.push(createItem(text));
+      }
+      updateToolbarButton(getToolbarButton(), queueState.queue, queueState.running);
+      input.value = '';
+      renderQueue();
+      saveQueue2();
+    };
+    addBtn.addEventListener('click', handleAddClick);
+    if (manageChatsBtn) {
+      manageChatsBtn.addEventListener('click', () => {
+        toggleChatManager(openChatManager);
+      });
+    }
+    input.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleAddClick();
+      }
+    });
+    function updateStartStopButtons() {
+      if (!startBtn) return;
+      startBtn.textContent = queueState.running ? 'Stop Queue' : 'Start Queue';
+      startBtn.disabled = false;
+    }
+    startBtn.addEventListener('click', async () => {
+      if (queueState.running) {
+        queueState.running = false;
+        setStatus(panel, 'Stopped');
+        updateStartStopButtons();
+        updateToolbarButton(getToolbarButton(), queueState.queue, queueState.running);
+        return;
+      }
+      queueState.running = true;
+      updateStartStopButtons();
+      updateToolbarButton(getToolbarButton(), queueState.queue, queueState.running);
+      try {
+        await processQueue();
+      } catch (err) {
+        error('Queue processor error:', formatError(err));
+      } finally {
+        queueState.running = false;
+        updateStartStopButtons();
+        updateToolbarButton(getToolbarButton(), queueState.queue, queueState.running);
+      }
+    });
+    boundPanels.add(panel);
+    updateStartStopButtons();
+  }
+
+  // AI_Queue/core/keyboard.js
+  init_logging();
+  init_utils();
+  init_dom();
+
+  // AI_Queue/core/generation.js
+  init_logging();
+  init_dom();
+  init_utils();
+  var lastGenerationLabel = '';
+  function getGenerationState() {
+    const editor = getComposerEditor();
+    const sendButton = getSendButton({ includeDisabled: true });
+    const stopButton = findStopButton();
+    const hasPrompt = !!getEditorText(editor).trim();
+    const busyIndicators = hasBusyIndicators();
+    const generating = Boolean(
+      stopButton || busyIndicators || (sendButton && sendButton.disabled && hasPrompt)
+    );
+    const label = JSON.stringify({
+      generating,
+      hasPrompt,
+      busyIndicators,
+      sendDisabled: !!(sendButton && sendButton.disabled),
+      stopButton: !!stopButton,
+    });
+    if (label !== lastGenerationLabel) {
+      lastGenerationLabel = label;
+      log('generation state', {
+        generating,
+        hasPrompt,
+        busyIndicators,
+        sendDisabled: !!(sendButton && sendButton.disabled),
+        stopButton: !!stopButton,
+      });
+    }
+    return { generating, editor, sendButton, stopButton, busyIndicators, hasPrompt };
+  }
+  async function waitForIdle({ timeoutMs = 6e4, intervalMs = 200 } = {}) {
+    try {
+      await waitForCondition(
+        async () => {
+          const { generating } = getGenerationState();
+          return !generating;
+        },
+        {
+          timeoutMs,
+          intervalMs,
+          description: 'AI to become idle',
+        }
+      );
+      await sleep(300);
+    } catch (err) {
+      log('waitForIdle timed out:', formatError(err));
+      await sleep(300);
+    }
+  }
+  async function waitForGenerationStart({ timeoutMs = 8e3, intervalMs = 100 } = {}) {
+    return waitForCondition(() => getGenerationState().generating, {
+      timeoutMs,
+      intervalMs,
+      description: 'Generation to start',
+    });
+  }
+  async function waitForPromptProcessing() {
+    try {
+      await waitForGenerationStart();
+    } catch (err) {
+      log('Generation did not start:', formatError(err));
+    }
+    await waitForIdle();
+  }
+
+  // AI_Queue/core/keyboard.js
+  function isScrollableElement(element) {
+    if (!element || !(element instanceof HTMLElement)) return false;
+    const style = window.getComputedStyle(element);
+    if (!style) return false;
+    const overflowY = style.overflowY;
+    const overflowX = style.overflowX;
+    const canScrollY =
+      /(auto|scroll|overlay)/i.test(overflowY) && element.scrollHeight > element.clientHeight;
+    const canScrollX =
+      /(auto|scroll|overlay)/i.test(overflowX) && element.scrollWidth > element.clientWidth;
+    return canScrollY || canScrollX;
+  }
+  function getScrollTargets(element) {
+    const targets = [];
+    const seen = /* @__PURE__ */ new Set();
+    const addTarget = (target) => {
+      if (!target || seen.has(target)) return;
+      seen.add(target);
+      targets.push(target);
+    };
+    addTarget(window);
+    const scrollingElement = document.scrollingElement || document.documentElement;
+    if (scrollingElement) {
+      addTarget(scrollingElement);
+    }
+    if (document.body) {
+      addTarget(document.body);
+    }
+    let current = element?.parentElement || null;
+    while (current) {
+      if (isScrollableElement(current)) {
+        addTarget(current);
+      }
+      current = current.parentElement;
+    }
+    const root = document.body || document.documentElement;
+    if (root) {
+      for (const candidate of root.querySelectorAll('*')) {
+        if (isScrollableElement(candidate)) {
+          addTarget(candidate);
+        }
+      }
+    }
+    return targets;
+  }
+  function getScrollPosition(target) {
+    if (target === window) {
+      return { x: window.scrollX, y: window.scrollY };
+    }
+    return {
+      x: target.scrollLeft,
+      y: target.scrollTop,
+    };
+  }
+  function restoreScrollPosition(target, position) {
+    if (target === window) {
+      window.scrollTo(position.x, position.y);
+      return;
+    }
+    target.scrollLeft = position.x;
+    target.scrollTop = position.y;
+  }
+  function createScrollApiSuppressor() {
+    const restorers = [];
+    const patch = (target, key, replacement) => {
+      if (!target || typeof target[key] !== 'function') return;
+      const original = target[key];
+      target[key] = replacement;
+      restorers.push(() => {
+        target[key] = original;
+      });
+    };
+    patch(Element.prototype, 'scrollIntoView', function () {});
+    patch(window, 'scrollTo', function () {});
+    patch(window, 'scrollBy', function () {});
+    patch(Element.prototype, 'scroll', function () {});
+    patch(Element.prototype, 'scrollTo', function () {});
+    patch(Element.prototype, 'scrollBy', function () {});
+    return () => {
+      for (let index = restorers.length - 1; index >= 0; index -= 1) {
+        restorers[index]();
+      }
+    };
+  }
+  async function withPreservedViewport(action, targets = []) {
+    const scrollTargets = targets.length > 0 ? targets : [window];
+    const scrollPositions = new Map(
+      scrollTargets.map((target) => [target, getScrollPosition(target)])
+    );
+    const originalAnchors = /* @__PURE__ */ new Map();
+    let restoring = false;
+    const restoreScrollApis = createScrollApiSuppressor();
+    for (const target of scrollTargets) {
+      if (target instanceof HTMLElement) {
+        originalAnchors.set(target, target.style.overflowAnchor);
+        target.style.overflowAnchor = 'none';
+      }
+    }
+    const restoreScroll = () => {
+      if (restoring || userInteracting) return;
+      restoring = true;
+      for (const target of scrollTargets) {
+        const position = scrollPositions.get(target);
+        if (!position) continue;
+        const currentPosition = getScrollPosition(target);
+        if (currentPosition.x === position.x && currentPosition.y === position.y) continue;
+        restoreScrollPosition(target, position);
+      }
+      restoring = false;
+    };
+    const keepViewportStable = () => {
+      restoreScroll();
+    };
+    let userInteracting = false;
+    let userInteractTimer = null;
+    const onUserInteraction = (ev) => {
+      userInteracting = true;
+      if (userInteractTimer) clearTimeout(userInteractTimer);
+      userInteractTimer = setTimeout(() => {
+        userInteracting = false;
+        userInteractTimer = null;
+        try {
+          for (const t of scrollTargets) {
+            scrollPositions.set(t, getScrollPosition(t));
+          }
+        } catch (err) {
+          error('Error updating scroll positions after user interaction:', formatError(err));
+        }
+      }, 300);
+    };
+    window.addEventListener('wheel', onUserInteraction, { passive: true, capture: true });
+    window.addEventListener('touchstart', onUserInteraction, { passive: true, capture: true });
+    window.addEventListener('touchmove', onUserInteraction, { passive: true, capture: true });
+    window.addEventListener('pointerdown', onUserInteraction, { passive: true, capture: true });
+    window.addEventListener('keydown', onUserInteraction, true);
+    window.addEventListener('scroll', keepViewportStable, true);
+    window.addEventListener('resize', keepViewportStable);
+    const restoreTimer = window.setInterval(restoreScroll, 50);
+    try {
+      return await action();
+    } finally {
+      window.clearInterval(restoreTimer);
+      window.removeEventListener('scroll', keepViewportStable, true);
+      window.removeEventListener('resize', keepViewportStable);
+      window.removeEventListener('wheel', onUserInteraction, true);
+      window.removeEventListener('touchstart', onUserInteraction, true);
+      window.removeEventListener('touchmove', onUserInteraction, true);
+      window.removeEventListener('pointerdown', onUserInteraction, true);
+      window.removeEventListener('keydown', onUserInteraction, true);
+      if (userInteractTimer) {
+        clearTimeout(userInteractTimer);
+        try {
+          for (const t of scrollTargets) {
+            scrollPositions.set(t, getScrollPosition(t));
+          }
+        } catch (err) {
+          error('Error updating scroll positions during cleanup:', formatError(err));
+        }
+        userInteractTimer = null;
+      }
+      restoreScrollApis();
+      for (const target of scrollTargets) {
+        if (target instanceof HTMLElement && originalAnchors.has(target)) {
+          target.style.overflowAnchor = originalAnchors.get(target);
+        }
+      }
+      restoreScroll();
+    }
+  }
+  function dispatchEnterKey(target) {
+    const eventInit = {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+    };
+    for (const type of ['keydown', 'keypress', 'keyup']) {
+      target.dispatchEvent(new KeyboardEvent(type, eventInit));
+    }
+  }
+  function setEditorValue(editor, prompt) {
+    if (!editor) throwError('Editor not found');
+    if (!isAttached(editor)) throwError('Editor is detached');
+    editor.focus?.({ preventScroll: true });
+    if ('value' in editor) {
+      const setter =
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set ||
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      if (setter) {
+        setter.call(editor, prompt);
+      } else {
+        editor.value = prompt;
+      }
+      if ('selectionStart' in editor) {
+        editor.selectionStart = editor.selectionEnd = editor.value.length;
+      }
+      editor.dispatchEvent(
+        new InputEvent('beforeinput', {
+          bubbles: true,
+          cancelable: true,
+          inputType: 'insertText',
+          data: prompt,
+        })
+      );
+      editor.dispatchEvent(
+        new InputEvent('input', {
+          bubbles: true,
+          cancelable: true,
+          inputType: 'insertText',
+          data: prompt,
+        })
+      );
+      editor.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+    if (editor.isContentEditable) {
+      editor.focus?.({ preventScroll: true });
+      const selection = window.getSelection();
+      if (selection) {
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        if (document.execCommand('insertText', false, prompt)) {
+          editor.dispatchEvent(new Event('change', { bubbles: true }));
+          return;
+        }
+        document.execCommand('delete', false);
+      }
+      try {
+        const pasteEvent = new ClipboardEvent('paste', {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+        });
+        const mockDataTransfer = {
+          getData: (type) => (type.toLowerCase() === 'text/plain' ? prompt : ''),
+          types: ['text/plain'],
+          items: [{ kind: 'string', type: 'text/plain' }],
+          files: [],
+          setData: () => {},
+          clearData: () => {},
+        };
+        Object.defineProperty(pasteEvent, 'clipboardData', { value: mockDataTransfer });
+        const notCancelled = editor.dispatchEvent(pasteEvent);
+        if (notCancelled) {
+          editor.textContent = prompt;
+          editor.dispatchEvent(
+            new InputEvent('input', {
+              bubbles: true,
+              composed: true,
+              inputType: 'insertText',
+              data: prompt,
+            })
+          );
+        }
+      } catch (err) {
+        editor.textContent = prompt;
+        editor.dispatchEvent(
+          new InputEvent('input', {
+            bubbles: true,
+            composed: true,
+            inputType: 'insertText',
+            data: prompt,
+          })
+        );
+      }
+      editor.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+    throwError('Unsupported editor type');
+  }
+  async function sendPrompt(prompt) {
+    const editor = await waitForElement(() => getComposerEditor(), {
+      timeoutMs: 15e3,
+      intervalMs: 200,
+      description: 'Composer editor',
+    });
+    const scrollTargets = getScrollTargets(editor);
+    return withPreservedViewport(async () => {
+      setEditorValue(editor, prompt);
+      try {
+        await waitForCondition(
+          () => {
+            const btn = getSendButton();
+            return btn && !btn.disabled;
+          },
+          {
+            timeoutMs: 5e3,
+            intervalMs: 100,
+            description: 'send button to enable',
+          }
+        );
+        const sendButton = getSendButton();
+        if (sendButton) {
+          safeClick(sendButton);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          await waitForPromptProcessing();
+          return;
+        }
+      } catch (err) {
+        error('send button unavailable, falling back to Enter', formatError(err));
+      }
+      dispatchEnterKey(editor);
+      if (editor.form && typeof editor.form.requestSubmit === 'function') {
+        editor.form.requestSubmit();
+      }
+      await waitForPromptProcessing();
+    }, scrollTargets);
+  }
+
+  // AI_Queue/providers/provider-base.js
+  init_logging();
+
+  // AI_Queue/core/selection-menu.js
+  init_state();
+
+  // AI_Queue/styles/selection-menu.css
+  var selection_menu_default =
+    ':root {\n  --pq-menu-bg: #202123;\n  --pq-menu-border: #444;\n  --pq-menu-btn-bg: #2a2a2a;\n  --pq-menu-btn-border: #555;\n  --pq-menu-btn-hover-bg: #343434;\n  --pq-menu-text: #fff;\n  --pq-menu-shadow: rgba(0, 0, 0, 0.45);\n}\n\n@media (prefers-color-scheme: light) {\n  :root {\n    --pq-menu-bg: #ffffff;\n    --pq-menu-border: #e5e7eb;\n    --pq-menu-btn-bg: #f3f4f6;\n    --pq-menu-btn-border: #d1d5db;\n    --pq-menu-btn-hover-bg: #e5e7eb;\n    --pq-menu-text: #111827;\n    --pq-menu-shadow: rgba(0, 0, 0, 0.15);\n  }\n}\n\n#pq-selection-menu {\n  position: fixed;\n  z-index: 2147483647;\n  display: none;\n  min-width: 180px;\n  padding: 6px;\n  border: 1px solid var(--pq-menu-border);\n  border-radius: 12px;\n  background: var(--pq-menu-bg);\n  box-shadow: 0 12px 30px var(--pq-menu-shadow);\n}\n\n#pq-selection-menu button {\n  appearance: none;\n  display: block;\n  width: 100%;\n  padding: 8px 12px;\n  border: 1px solid var(--pq-menu-btn-border);\n  border-radius: 10px;\n  background: var(--pq-menu-btn-bg);\n  color: var(--pq-menu-text);\n  cursor: pointer;\n  font: inherit;\n  text-align: left;\n}\n\n#pq-selection-menu button:hover {\n  background: var(--pq-menu-btn-hover-bg);\n}';
+
+  // AI_Queue/core/selection-menu.js
+  var SELECTION_MENU_ID = 'pq-selection-menu';
+  var installed = false;
+  function getSelectedPageText() {
+    const selection = window.getSelection?.();
+    if (!selection || selection.isCollapsed) return '';
+    return selection.toString().trim();
+  }
+  function hideSelectionMenu() {
+    const menu = document.querySelector(`#${SELECTION_MENU_ID}`);
+    if (!menu) return;
+    menu.hidden = true;
+    menu.style.display = 'none';
+  }
+  function ensureSelectionMenu(onAddSelection) {
+    let menu = document.querySelector(`#${SELECTION_MENU_ID}`);
+    if (menu) return menu;
+    if (!document.querySelector('#pq-selection-menu-styles')) {
+      const style = document.createElement('style');
+      style.id = 'pq-selection-menu-styles';
+      style.textContent = selection_menu_default;
+      document.head.appendChild(style);
+    }
+    menu = document.createElement('div');
+    menu.id = SELECTION_MENU_ID;
+    menu.hidden = true;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Add to Prompt Queue';
+    button.addEventListener('click', () => {
+      const prompt = menu.dataset.prompt || '';
+      if (prompt) {
+        onAddSelection(prompt);
+      }
+      hideSelectionMenu();
+    });
+    menu.appendChild(button);
+    document.body.appendChild(menu);
+    return menu;
+  }
+  function showSelectionMenu(selectionText, x, y, onAddSelection) {
+    const menu = ensureSelectionMenu(onAddSelection);
+    menu.dataset.prompt = selectionText;
+    const margin = 12;
+    const left = Math.min(x + margin, window.innerWidth - 200);
+    const top = Math.min(y + margin, window.innerHeight - 64);
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.hidden = false;
+    menu.style.display = 'block';
+  }
+  function addSelectionToQueue(createItem, renderQueue, saveQueue2, updateToolbarButton2) {
+    return (selectionText) => {
+      const prompt = selectionText.trim();
+      if (!prompt) return;
+      queueState.queue.push(createItem(prompt));
+      updateToolbarButton2(
+        document.querySelector('#pq-toolbar-button'),
+        queueState.queue,
+        queueState.running
+      );
+      renderQueue?.();
+      saveQueue2();
+    };
+  }
+  function installSelectionPromptMenu({
+    createItem,
+    renderQueue,
+    saveQueue: saveQueue2,
+    updateToolbarButton: updateToolbarButton2,
+  }) {
+    if (installed) return;
+    installed = true;
+    const onAddSelection = addSelectionToQueue(
+      createItem,
+      renderQueue,
+      saveQueue2,
+      updateToolbarButton2
+    );
+    document.addEventListener(
+      'contextmenu',
+      (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest('#pq-panel') || target.closest(`#${SELECTION_MENU_ID}`)) {
+          hideSelectionMenu();
+          return;
+        }
+        const selectionText = getSelectedPageText();
+        if (!selectionText) {
+          hideSelectionMenu();
+          return;
+        }
+        showSelectionMenu(selectionText, event.clientX, event.clientY, onAddSelection);
+      },
+      true
+    );
+    document.addEventListener('click', (event) => {
+      const menu = document.querySelector(`#${SELECTION_MENU_ID}`);
+      if (!menu) return;
+      if (menu.contains(event.target)) return;
+      hideSelectionMenu();
+    });
+    window.addEventListener('blur', hideSelectionMenu);
+    window.addEventListener('scroll', hideSelectionMenu, true);
+    window.addEventListener('resize', hideSelectionMenu);
+  }
+
+  // AI_Queue/providers/provider-base.js
+  init_dom();
+  init_utils();
+  function queryPanel() {
+    return document.querySelector('#pq-panel');
+  }
+  function queryInput() {
+    return queryPanel()?.querySelector('#pq-input');
+  }
+  function queryAddButton() {
+    return queryPanel()?.querySelector('#pq-add');
+  }
+  function createProvider(config) {
+    const {
+      storageKey,
+      panelTitle,
+      getCurrentScope,
+      includeFailedQueue = false,
+      toolbarButtonClass = null,
+      maxRetries = 0,
+    } = config;
+    function createPanel() {
+      return createBasePanel(panelTitle, includeFailedQueue);
+    }
+    function renderQueue() {
+      const panel = queryPanel();
+      if (!panel) return;
+      const list = panel.querySelector('#pq-list');
+      const failedList = panel.querySelector('#pq-failed-list');
+      const failedTitle = panel.querySelector('#pq-failed-title');
+      if (!list) return;
+      while (list.firstChild) {
+        list.removeChild(list.firstChild);
+      }
+      queueState.queue.forEach((item) => {
+        const { li, text, editBtn, sendBtn, deleteBtn } = createQueueItemElement(item, {
+          renderQueue,
+          saveQueue: saveQueueFn,
+        });
+        if (queueState.editingId == item.id) {
+          li.querySelector('div').style.backgroundColor = '#333';
+          li.querySelector('div').style.padding = '4px';
+          li.querySelector('div').style.borderRadius = '4px';
+        }
+        text.addEventListener('dblclick', () => {
+          editQueueItem(item.id, queueState.queue, (id, prompt) => {
+            queueState.editingId = id;
+            queueState.recentErrorIds.delete(item.id);
+            const input = queryInput();
+            const addButton = queryAddButton();
+            if (input && addButton) {
+              input.value = prompt;
+              addButton.textContent = 'Save Changes';
+              input.focus();
+              input.selectionStart = input.selectionEnd = input.value.length;
+            }
+            editBtn.style.display = 'inline-block';
+            deleteBtn.style.display = 'inline-block';
+          });
+        });
+        editBtn.addEventListener('click', () => {
+          editQueueItem(item.id, queueState.queue, (id, prompt) => {
+            queueState.editingId = id;
+            queueState.recentErrorIds.delete(item.id);
+            const input = queryInput();
+            const addButton = queryAddButton();
+            if (input && addButton) {
+              input.value = prompt;
+              addButton.textContent = 'Save Changes';
+              input.focus();
+              input.selectionStart = input.selectionEnd = input.value.length;
+            }
+          });
+        });
+        sendBtn.addEventListener('click', async () => {
+          if (queueState.running || sendBtn.disabled) return;
+          const index = queueState.queue.findIndex((queuedItem) => queuedItem.id === item.id);
+          if (index === -1) return;
+          queueState.queue.splice(index, 1);
+          queueState.recentErrorIds.delete(item.id);
+          sendBtn.disabled = true;
+          saveQueueFn();
+          renderQueue();
+          try {
+            await waitForIdle();
+            await sendPrompt(item.prompt);
+          } catch (err) {
+            queueState.queue.splice(index, 0, item);
+            error('Failed to send queued prompt:', formatError(err));
+            saveQueueFn();
+            renderQueue();
+          }
+        });
+        deleteBtn.addEventListener('click', () => {
+          queueState.recentErrorIds.delete(item.id);
+          deleteQueueItem(item.id, queueState.queue, renderQueue, saveQueueFn);
+        });
+        list.appendChild(li);
+      });
+      if (includeFailedQueue && failedList && failedTitle) {
+        while (failedList.firstChild) {
+          failedList.removeChild(failedList.firstChild);
+        }
+        failedTitle.style.display = queueState.failedQueue.length > 0 ? 'block' : 'none';
+        queueState.failedQueue.forEach((item) => {
+          const li = document.createElement('li');
+          li.style.marginBottom = '8px';
+          li.style.color = '#ff9999';
+          li.style.fontSize = '13px';
+          const row = document.createElement('div');
+          row.style.display = 'flex';
+          row.style.gap = '6px';
+          row.style.alignItems = 'flex-start';
+          const text = document.createElement('div');
+          text.textContent = item.prompt;
+          text.style.flex = '1';
+          text.style.wordBreak = 'break-word';
+          const retryBtn = document.createElement('button');
+          retryBtn.textContent = '\u{1F504}';
+          retryBtn.title = 'Retry';
+          retryBtn.style.cursor = 'pointer';
+          retryBtn.style.color = '#7dd3fc';
+          retryBtn.style.fontSize = '12px';
+          retryBtn.addEventListener('click', () => {
+            const index = queueState.failedQueue.findIndex((i) => i.id === item.id);
+            if (index !== -1) {
+              const [retryItem] = queueState.failedQueue.splice(index, 1);
+              retryItem.attempts = 0;
+              retryItem.status = 'queued';
+              queueState.queue.push(retryItem);
+              queueState.recentErrorIds.delete(retryItem.id);
+              renderQueue();
+              saveQueueFn();
+            }
+          });
+          const deleteBtn = document.createElement('button');
+          deleteBtn.textContent = '\u2715';
+          deleteBtn.title = 'Delete';
+          deleteBtn.style.cursor = 'pointer';
+          deleteBtn.style.color = '#ff6b6b';
+          deleteBtn.style.fontSize = '12px';
+          deleteBtn.addEventListener('click', () => {
+            queueState.recentErrorIds.delete(item.id);
+            deleteQueueItem(item.id, queueState.failedQueue, renderQueue, saveQueueFn);
+          });
+          row.appendChild(text);
+          row.appendChild(retryBtn);
+          row.appendChild(deleteBtn);
+          li.appendChild(row);
+          failedList.appendChild(li);
+        });
+      }
+      updateToolbarButton(
+        document.querySelector('#pq-toolbar-button'),
+        queueState.queue,
+        queueState.running
+      );
+    }
+    function saveQueueFn() {
+      const scope = getCurrentScope();
+      const queue = queueState.queue;
+      const failedQueue = includeFailedQueue ? queueState.failedQueue : null;
+      saveQueue(queue, failedQueue, storageKey, scope);
+      refreshChatManager(storageKey);
+    }
+    function syncQueuedItemsToCurrentScope(scope) {
+      if (!scope) return false;
+      const queue = queueState.queue;
+      const failedQueue = includeFailedQueue ? queueState.failedQueue : null;
+      const updated = applyScopeToQueuedItems(queue, failedQueue, scope);
+      if (!updated) return false;
+      saveQueueFn();
+      refreshChatManager(storageKey);
+      return true;
+    }
+    function loadQueueFn() {
+      const scope = getCurrentScope();
+      const queue = queueState.queue;
+      const failedQueue = includeFailedQueue ? queueState.failedQueue : null;
+      loadQueue(queue, failedQueue, storageKey, scope);
+    }
+    function openChatManager() {
+      openChatManagerWindow(
+        storageKey,
+        `${panelTitle} Prompt Manager`,
+        document.querySelector('#pq-panel')
+      );
+    }
+    async function processQueue() {
+      const panel = queryPanel();
+      if (!panel) return;
+      setStatus(panel, 'Running');
+      while (queueState.queue.length > 0 && queueState.running) {
+        await waitForIdle();
+        const nextItem = queueState.queue[0];
+        if (nextItem && queueState.recentErrorIds.has(nextItem.id)) {
+          log('Loop detected: next prompt recently failed, stopping queue');
+          setStatus(panel, 'Loop detected, stopping queue');
+          queueState.running = false;
+          break;
+        }
+        const item = queueState.queue.shift();
+        if (!item || typeof item.prompt !== 'string') {
+          error('Skipping invalid queue item:', item);
+          continue;
+        }
+        const prompt = item.prompt;
+        const beforeScope = getCurrentScope();
+        queueState.awaitingChatScopeSync = !beforeScope;
+        updateToolbarButton(
+          document.querySelector('#pq-toolbar-button'),
+          queueState.queue,
+          queueState.running
+        );
+        renderQueue();
+        setStatus(panel, `Sending: ${prompt.slice(0, 40)}...`);
+        try {
+          await sendPrompt(prompt);
+          const afterScope = getCurrentScope();
+          if (!beforeScope && afterScope) {
+            syncQueuedItemsToCurrentScope(afterScope);
+          }
+          if (afterScope) {
+            queueState.awaitingChatScopeSync = false;
+          }
+          item.attempts = 0;
+          queueState.currentRetryCount = 0;
+          await sleep(2e3);
+          const settings = getSettings();
+          if (settings.autoRetryEnabled && hasErrorState(prompt)) {
+            if (settings.maxRetries <= 0) {
+              log('Max retries is 0, skipping retry logic');
+              return;
+            }
+            queueState.currentRetryCount = 0;
+            while (queueState.currentRetryCount < settings.maxRetries && queueState.running) {
+              queueState.currentRetryCount++;
+              setStatus(
+                panel,
+                `Retrying (${queueState.currentRetryCount}/${settings.maxRetries}): ${prompt.slice(0, 40)}...`
+              );
+              const retryButton = findRetryButton(prompt);
+              if (retryButton) {
+                safeClick(retryButton);
+                await sleep(300);
+                await waitForIdle();
+                await sleep(2e3);
+                if (!hasErrorState(prompt)) {
+                  log('Retry successful');
+                  item.attempts = 0;
+                  queueState.currentRetryCount = 0;
+                  queueState.recentErrorIds.delete(item.id);
+                  break;
+                }
+              } else {
+                error('Retry button not found');
+                break;
+              }
+            }
+            if (hasErrorState(prompt) && queueState.currentRetryCount >= settings.maxRetries) {
+              log('Retry limit reached, applying action:', settings.retryLimitAction);
+              queueState.recentErrorIds.add(item.id);
+              if (queueState.recentErrorIds.size > 5) {
+                const firstId = queueState.recentErrorIds.values().next().value;
+                queueState.recentErrorIds.delete(firstId);
+              }
+              if (settings.retryLimitAction === 'stop') {
+                setStatus(panel, 'Retry limit reached, stopping queue');
+                queueState.running = false;
+                if (includeFailedQueue) {
+                  queueState.failedQueue.push(item);
+                }
+              } else if (settings.retryLimitAction === 'continue') {
+                setStatus(panel, 'Retry limit reached, continuing with next');
+                queueState.queue.push(item);
+              }
+            }
+          }
+        } catch (err) {
+          queueState.awaitingChatScopeSync = false;
+          error('Failed to send prompt:', formatError(err));
+          const settings = getSettings();
+          if (settings.autoRetryEnabled && settings.maxRetries > 0) {
+            queueState.currentRetryCount = 0;
+            while (queueState.currentRetryCount < settings.maxRetries && queueState.running) {
+              queueState.currentRetryCount++;
+              setStatus(
+                panel,
+                `Retrying (${queueState.currentRetryCount}/${settings.maxRetries}): ${prompt.slice(0, 40)}...`
+              );
+              try {
+                await sendPrompt(prompt);
+                const afterScope = getCurrentScope();
+                if (!beforeScope && afterScope) {
+                  syncQueuedItemsToCurrentScope(afterScope);
+                }
+                if (afterScope) {
+                  queueState.awaitingChatScopeSync = false;
+                }
+                item.attempts = 0;
+                queueState.currentRetryCount = 0;
+                queueState.recentErrorIds.delete(item.id);
+                log('Retry successful after send error');
+                break;
+              } catch (retryErr) {
+                error('Retry attempt failed:', formatError(retryErr));
+                await sleep(1e3);
+              }
+            }
+            if (queueState.currentRetryCount >= settings.maxRetries) {
+              log(
+                'Retry limit reached after send errors, applying action:',
+                settings.retryLimitAction
+              );
+              queueState.recentErrorIds.add(item.id);
+              if (queueState.recentErrorIds.size > 5) {
+                const firstId = queueState.recentErrorIds.values().next().value;
+                queueState.recentErrorIds.delete(firstId);
+              }
+              if (settings.retryLimitAction === 'stop') {
+                setStatus(panel, 'Retry limit reached, stopping queue');
+                queueState.running = false;
+                if (includeFailedQueue) {
+                  queueState.failedQueue.push(item);
+                }
+              } else if (settings.retryLimitAction === 'continue') {
+                setStatus(panel, 'Retry limit reached, continuing with next');
+                queueState.queue.push(item);
+              }
+            }
+          } else if (maxRetries > 0) {
+            item.status = 'failed';
+            item.attempts = (item.attempts || 0) + 1;
+            if (item.attempts < maxRetries) {
+              item.status = 'queued';
+              queueState.queue.push(item);
+            } else if (includeFailedQueue) {
+              queueState.failedQueue.push(item);
+            }
+          }
+        }
+        if (beforeScope) {
+          queueState.awaitingChatScopeSync = false;
+        }
+        saveQueueFn();
+      }
+      setStatus(panel, queueState.running ? 'Finished' : 'Stopped');
+      queueState.running = false;
+      updateToolbarButton(
+        document.querySelector('#pq-toolbar-button'),
+        queueState.queue,
+        queueState.running
+      );
+    }
+    function ensureToolbarButton() {
+      ensureToolbarStyles();
+      installSelectionPromptMenu({
+        createItem: provider.createItem,
+        renderQueue,
+        saveQueue: saveQueueFn,
+        updateToolbarButton,
+      });
+      let button = document.querySelector('#pq-toolbar-button');
+      if (!button) {
+        button = document.createElement('button');
+        button.id = 'pq-toolbar-button';
+        button.type = 'button';
+        button.textContent = 'Queue';
+        button.addEventListener('click', () => showPanel(() => createPanel()));
+      }
+      if (toolbarButtonClass) {
+        button.classList.add(toolbarButtonClass);
+      }
+      Object.assign(button.style, {
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        padding: '10px 14px',
+        borderRadius: '9999px',
+        background: 'var(--pq-ui-bg)',
+        color: 'var(--pq-ui-text)',
+        border: '1px solid var(--pq-ui-border)',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+        zIndex: '2147483647',
+        cursor: 'pointer',
+      });
+      if (button.parentElement !== document.body) {
+        document.body.appendChild(button);
+      }
+      observeInputBoundary(button);
+    }
+    const provider = {
+      storageKey,
+      includeFailedQueue,
+      getCurrentScope,
+      createItem(text) {
+        const scope = getCurrentScope();
+        const baseItem = {
+          id: crypto.randomUUID(),
+          prompt: text,
+          attempts: 0,
+          status: 'queued',
+          createdAt: Date.now(),
+        };
+        if (scope) {
+          if (typeof scope === 'string') {
+            baseItem.chatCode = scope;
+          } else if (scope.chatId) {
+            baseItem.chatId = scope.chatId;
+            baseItem.chatCode = scope.chatId;
+          }
+          if (scope.groupId) {
+            baseItem.groupId = scope.groupId;
+          }
+        }
+        return baseItem;
+      },
+      createPanel,
+      renderQueue,
+      saveQueue: saveQueueFn,
+      loadQueue: loadQueueFn,
+      processQueue,
+      setupPanelControls,
+      setupPanelDrag,
+      ensureToolbarButton,
+      openChatManager,
+      isOwnMutation(target) {
+        return !!target && (target.closest?.('#pq-panel') || target.closest?.('.pq-toolbar'));
+      },
+    };
+    return provider;
+  }
+
+  // AI_Queue/core/bootstrap.js
+  init_logging();
+  init_state();
+  init_ui2();
+  function bootstrapQueueApp(provider) {
+    globalThis.aiQueue = queueState;
+    log('AI_Queue running', true);
+    const storageKey = provider.storageKey;
+    const syncFromStorage = () => {
+      resetQueueState({ includeFailedQueue: !!provider.includeFailedQueue });
+      provider.loadQueue?.();
+      provider.renderQueue?.();
+      provider.ensureToolbarButton?.();
+      if (storageKey) {
+        refreshChatManager(storageKey);
+      }
+    };
+    queueState.syncFromStorage = syncFromStorage;
+    const refreshForCurrentUrl = (previousUrl = location.href, currentUrl = location.href) => {
+      const getScope = provider.getCurrentScope;
+      const previousScope = typeof getScope === 'function' ? getScope(previousUrl) : null;
+      const currentScope = typeof getScope === 'function' ? getScope(currentUrl) : null;
+      if (
+        queueState.running &&
+        queueState.awaitingChatScopeSync &&
+        !previousScope &&
+        currentScope
+      ) {
+        const updated = applyScopeToQueuedItems(
+          queueState.queue,
+          queueState.failedQueue,
+          currentScope
+        );
+        if (updated) {
+          provider.saveQueue?.();
+          provider.renderQueue?.();
+          provider.ensureToolbarButton?.();
+          if (storageKey) {
+            refreshChatManager(storageKey);
+          }
+        }
+        queueState.awaitingChatScopeSync = false;
+        return;
+      }
+      if (queueState.running) {
+        queueState.running = false;
+      }
+      syncFromStorage();
+    };
+    syncFromStorage();
+    provider.createPanel();
+    provider.setupPanelControls?.({
+      createItem: provider.createItem,
+      renderQueue: provider.renderQueue,
+      saveQueue: provider.saveQueue,
+      processQueue: provider.processQueue,
+      openChatManager: provider.openChatManager,
+    });
+    provider.setupPanelDrag?.();
+    setupPanelResize();
+    provider.renderQueue?.();
+    provider.ensureToolbarButton?.();
+    if (storageKey) {
+      window.addEventListener('storage', (event) => {
+        if (event.storageArea !== localStorage) return;
+        if (event.key !== storageKey) return;
+        syncFromStorage();
+      });
+    }
+    startDomObserver(
+      provider.createPanel,
+      () =>
+        provider.setupPanelControls?.({
+          createItem: provider.createItem,
+          renderQueue: provider.renderQueue,
+          saveQueue: provider.saveQueue,
+          processQueue: provider.processQueue,
+          openChatManager: provider.openChatManager,
+        }),
+      () => {
+        provider.setupPanelDrag?.();
+        setupPanelResize();
+      },
+      provider.ensureToolbarButton,
+      provider.isOwnMutation
+    );
+    startUrlWatcher(
+      provider.createPanel,
+      () =>
+        provider.setupPanelControls?.({
+          createItem: provider.createItem,
+          renderQueue: provider.renderQueue,
+          saveQueue: provider.saveQueue,
+          processQueue: provider.processQueue,
+          openChatManager: provider.openChatManager,
+        }),
+      () => {
+        provider.setupPanelDrag?.();
+        setupPanelResize();
+      },
+      provider.ensureToolbarButton,
+      refreshForCurrentUrl
+    );
+  }
+
+  // AI_Queue/providers/notebook.js
+  var STORAGE_KEY2 = 'pq-notebook-queue';
+  var DOMAINS = ['notebook.google.com', 'notebooklm.google.com'];
+  function normalizeCode(value) {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+  function getCurrentNotebookScope(url = globalThis.location?.href || '') {
+    try {
+      const parsedUrl = new URL(url, globalThis.location?.origin || 'https://example.com');
+      if (!DOMAINS.includes(parsedUrl.hostname.toLowerCase())) {
+        return null;
+      }
+      const segments = parsedUrl.pathname.split('/').filter(Boolean);
+      if (segments[0] !== 'notebook') return null;
+      return normalizeCode(segments[1]);
+    } catch {
+      return null;
+    }
+  }
+  var notebookProvider = createProvider({
+    storageKey: STORAGE_KEY2,
+    panelTitle: 'Gemini Notebook Prompt Queue',
+    getCurrentScope: getCurrentNotebookScope,
+    includeFailedQueue: true,
+    maxRetries: 3,
+    toolbarButtonClass: 'pq-toolbar',
+  });
+  bootstrapQueueApp(notebookProvider);
+})();
+//# sourceMappingURL=notebook.user.js.map
